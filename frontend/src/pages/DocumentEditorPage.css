@@ -64,3 +64,14 @@
   color: #aaa;
   font-size: 0.9rem;
 }
+
+.unsaved-indicator {
+  display: inline-block;
+  margin-left: 1rem;
+  padding: 0.25rem 0.75rem;
+  background-color: #ffd43b;
+  color: #000;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}

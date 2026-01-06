@@ -11,10 +11,10 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 // Import analyzers and generators
-import { CobolAnalyzer } from '../../src/analyzers/CobolAnalyzer.js';
-import { DDLAnalyzer } from '../../src/analyzers/DDLAnalyzer.js';
-import { MetadataExtractor } from '../../src/extractors/MetadataExtractor.js';
-import { DocumentGenerator } from '../../src/generators/DocumentGenerator.js';
+import { CobolAnalyzer } from './analyzers/CobolAnalyzer.js';
+import { DDLAnalyzer } from './analyzers/DDLAnalyzer.js';
+import { MetadataExtractor } from './extractors/MetadataExtractor.js';
+import { DocumentGenerator } from './generators/DocumentGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

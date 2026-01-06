@@ -89,3 +89,28 @@
   padding: 0.5rem 1rem;
   font-size: 0.9rem;
 }
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.empty-metrics {
+  padding: 2rem;
+  text-align: center;
+  color: #888;
+  background-color: #242424;
+  border-radius: 4px;
+}
+
+.metric-value.complexity-medium {
+  color: #ffd43b;
+}
+
+.metric-value.complexity-low {
+  color: #51cf66;
+}
+
+.metric-value.complexity-unknown {
+  color: #888;
+}
