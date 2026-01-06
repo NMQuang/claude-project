@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const projectId = req.params.id;
-    const uploadDir = path.join(__dirname, '../../uploads', projectId);
+    const uploadDir = path.join(__dirname, '../uploads', projectId);
 
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -151,7 +151,7 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
   try {
     project.status = 'Analyzing';
 
-    const uploadDir = path.join(__dirname, '../../uploads', project.id);
+    const uploadDir = path.join(__dirname, '../uploads', project.id);
 
     // Analyze COBOL files
     const cobolAnalyzer = new CobolAnalyzer();
@@ -263,7 +263,7 @@ app.post('/api/projects/:id/generate', async (req, res) => {
     const markdown = await generator.generate(documentType, data);
 
     // Save document
-    const docsDir = path.join(__dirname, '../../uploads', project.id, 'documents');
+    const docsDir = path.join(__dirname, '../../outputs', project.id, 'documents');
     if (!fs.existsSync(docsDir)) {
       fs.mkdirSync(docsDir, { recursive: true });
     }
@@ -291,7 +291,7 @@ app.get('/api/projects/:id/documents/:docType', (req, res) => {
     return res.status(404).json({ error: 'Project not found' });
   }
 
-  const docPath = path.join(__dirname, '../../uploads', project.id, 'documents', `${req.params.docType}.md`);
+  const docPath = path.join(__dirname, '../../outputs', project.id, 'documents', `${req.params.docType}.md`);
 
   if (!fs.existsSync(docPath)) {
     return res.status(404).json({ error: 'Document not found' });
@@ -319,7 +319,7 @@ app.put('/api/projects/:id/documents/:docType', (req, res) => {
     return res.status(400).json({ error: 'Content is required' });
   }
 
-  const docPath = path.join(__dirname, '../../uploads', project.id, 'documents', `${req.params.docType}.md`);
+  const docPath = path.join(__dirname, '../../outputs', project.id, 'documents', `${req.params.docType}.md`);
   fs.writeFileSync(docPath, content);
 
   res.json({ message: 'Document updated successfully' });
@@ -333,7 +333,7 @@ app.get('/api/projects/:id/export', (req, res) => {
     return res.status(404).json({ error: 'Project not found' });
   }
 
-  const docsDir = path.join(__dirname, '../../uploads', project.id, 'documents');
+  const docsDir = path.join(__dirname, '../../outputs', project.id, 'documents');
 
   if (!fs.existsSync(docsDir)) {
     return res.status(404).json({ error: 'No documents found' });
@@ -361,7 +361,7 @@ app.delete('/api/projects/:id', (req, res) => {
   }
 
   // Delete files
-  const uploadDir = path.join(__dirname, '../../uploads', project.id);
+  const uploadDir = path.join(__dirname, '../../outputs', project.id);
   if (fs.existsSync(uploadDir)) {
     fs.rmSync(uploadDir, { recursive: true, force: true });
   }
