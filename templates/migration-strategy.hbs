@@ -1,0 +1,510 @@
+# Migration Strategy Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Document Type** | Migration Strategy |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+| **Author** | {{author}} |
+
+---
+
+## Executive Summary
+
+This document outlines the strategic approach for migrating **{{project.name}}** from **{{source.language}}** to **{{target.language}}** and from **{{source.database}}** to **{{target.database}}**.
+
+### Migration Objectives
+
+{{#if objectives}}
+{{#each objectives}}
+- {{this}}
+{{/each}}
+{{else}}
+- Modernize technology stack to improve maintainability
+- Reduce operational costs
+- Improve system performance and scalability
+- Enhance developer productivity
+{{/if}}
+
+### Success Criteria
+
+{{#if success_criteria}}
+{{#each success_criteria}}
+- {{this}}
+{{/each}}
+{{else}}
+- 100% functional parity with current system
+- Zero data loss during migration
+- Performance meets or exceeds current system
+- Successful UAT with <5% defect rate
+{{/if}}
+
+---
+
+## 1. Migration Overview
+
+### 1.1 Current State
+
+| Aspect | Current |
+|--------|---------|
+| Programming Language | {{source.language}} |
+| Database | {{source.database}} |
+| Total Files | {{metadata.source_analysis.total_files}} |
+| Total LOC | {{metadata.source_analysis.total_loc}} |
+| Database Size | {{metadata.database.data_volume.total_size}} |
+
+### 1.2 Target State
+
+| Aspect | Target |
+|--------|--------|
+| Programming Language | {{target.language}} |
+| Framework | {{target.framework}} |
+| Database | {{target.database}} |
+| Architecture Pattern | {{target.architecture_pattern}} |
+| Deployment | {{target.deployment}} |
+
+### 1.3 Migration Scope
+
+#### In Scope
+
+{{#if scope.in_scope}}
+{{#each scope.in_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+*[Define what will be migrated]*
+{{/if}}
+
+#### Out of Scope
+
+{{#if scope.out_scope}}
+{{#each scope.out_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+*[Define what will NOT be migrated]*
+{{/if}}
+
+---
+
+## 2. Migration Approach
+
+### 2.1 Overall Strategy
+
+{{#if strategy.approach}}
+**Selected Approach:** {{strategy.approach}}
+
+**Rationale:** {{strategy.rationale}}
+{{else}}
+**Options Considered:**
+
+1. **Big Bang Migration**
+   - Migrate entire system at once
+   - Pros: Fast, clean cutover
+   - Cons: High risk, long testing phase
+
+2. **Phased Migration** (Recommended)
+   - Migrate in functional modules
+   - Pros: Reduced risk, incremental value delivery
+   - Cons: Requires integration between old/new systems
+
+3. **Strangler Fig Pattern**
+   - Gradually replace components
+   - Pros: Lowest risk, continuous delivery
+   - Cons: Longest timeline, complexity in maintaining both systems
+{{/if}}
+
+### 2.2 Migration Phases
+
+{{#if strategy.phases}}
+{{#each strategy.phases}}
+#### Phase {{@index}}: {{this.name}}
+
+**Duration:** {{this.duration}}
+
+**Scope:**
+{{#each this.scope}}
+- {{this}}
+{{/each}}
+
+**Deliverables:**
+{{#each this.deliverables}}
+- {{this}}
+{{/each}}
+
+**Success Criteria:**
+{{#each this.success_criteria}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+#### Phase 1: Preparation & Setup
+- Environment setup
+- Tool installation
+- Team training
+
+#### Phase 2: Code Migration
+- Automated code conversion
+- Manual refactoring
+- Code review
+
+#### Phase 3: Database Migration
+- Schema conversion
+- Data migration
+- Validation
+
+#### Phase 4: Testing
+- Unit testing
+- Integration testing
+- UAT
+
+#### Phase 5: Deployment
+- Production deployment
+- Monitoring
+- Hypercare
+{{/if}}
+
+### 2.3 Migration Timeline
+
+```mermaid
+gantt
+    title Migration Timeline
+    dateFormat YYYY-MM-DD
+
+{{#if timeline.milestones}}
+    {{#each timeline.milestones}}
+    {{this.name}} :{{this.start}}, {{this.duration}}
+    {{/each}}
+{{else}}
+    Preparation       :2024-01-01, 30d
+    Code Migration    :2024-02-01, 60d
+    DB Migration      :2024-03-01, 45d
+    Testing           :2024-04-01, 45d
+    Deployment        :2024-05-15, 15d
+{{/if}}
+```
+
+---
+
+## 3. Code Migration Strategy
+
+### 3.1 Conversion Approach
+
+{{#if code_migration.approach}}
+{{code_migration.approach}}
+{{else}}
+**Automated Conversion:**
+- Use migration tools for initial conversion
+- Expected automation rate: 60-70%
+
+**Manual Refactoring:**
+- Complex business logic requires manual review
+- Optimize code structure during migration
+- Implement modern design patterns
+{{/if}}
+
+### 3.2 Code Mapping Rules
+
+{{#if mappings.code}}
+| Source Pattern | Target Pattern | Notes |
+|----------------|----------------|-------|
+{{#each mappings.code}}
+| {{this.source}} | {{this.target}} | {{this.notes}} |
+{{/each}}
+{{else}}
+| COBOL Program | Java Class (Service Layer) | One-to-one mapping |
+| COBOL Paragraph | Java Method | Refactor as needed |
+| COPY Books | Java DTOs/Entities | Generate from data definitions |
+| File I/O | JPA Repository / JDBC | Use Spring Data JPA |
+{{/if}}
+
+### 3.3 Framework & Libraries
+
+{{#if target.libraries}}
+| Purpose | Library/Framework |
+|---------|-------------------|
+{{#each target.libraries}}
+| {{this.purpose}} | {{this.library}} |
+{{/each}}
+{{else}}
+| Purpose | Library/Framework |
+|---------|-------------------|
+| Web Framework | Spring Boot 3.x |
+| ORM | Hibernate / JPA |
+| Database Access | Spring Data JPA |
+| Testing | JUnit 5, Mockito |
+| Build Tool | Maven / Gradle |
+| Logging | SLF4J + Logback |
+{{/if}}
+
+---
+
+## 4. Database Migration Strategy
+
+### 4.1 Schema Migration
+
+{{#if db_migration.schema_approach}}
+{{db_migration.schema_approach}}
+{{else}}
+**Approach:**
+1. Analyze source schema (Oracle)
+2. Generate equivalent PostgreSQL DDL
+3. Optimize schema for target database
+4. Handle vendor-specific features
+{{/if}}
+
+### 4.2 Data Type Mappings
+
+{{#if mappings.database}}
+| Source Type ({{source.database}}) | Target Type ({{target.database}}) | Notes |
+|-----------------------------------|-----------------------------------|-------|
+{{#each mappings.database}}
+| {{this.source}} | {{this.target}} | {{this.notes}} |
+{{/each}}
+{{else}}
+| Source Type (Oracle) | Target Type (PostgreSQL) | Notes |
+|----------------------|--------------------------|-------|
+| NUMBER(p,s) | NUMERIC(p,s) | Direct mapping |
+| VARCHAR2(n) | VARCHAR(n) | Direct mapping |
+| DATE | TIMESTAMP | PostgreSQL DATE stores only date |
+| CLOB | TEXT | Direct mapping |
+| BLOB | BYTEA | Direct mapping |
+{{/if}}
+
+### 4.3 Data Migration Strategy
+
+{{#if db_migration.data_approach}}
+{{db_migration.data_approach}}
+{{else}}
+**Approach:**
+1. **Initial Load:** Full data export/import during migration window
+2. **Validation:** Row counts, checksums, sample data verification
+3. **Rollback Plan:** Maintain source database until validation complete
+
+**Tools:**
+- ETL Tool: Apache NiFi / Talend / Custom scripts
+- Data validation: Custom SQL scripts
+{{/if}}
+
+### 4.4 Stored Procedure Migration
+
+{{#if db_migration.stored_procedures}}
+{{db_migration.stored_procedures}}
+{{else}}
+**Strategy:**
+- Move business logic to application layer (Java services)
+- Convert remaining DB procedures to PostgreSQL PL/pgSQL
+- Eliminate unnecessary procedures during migration
+{{/if}}
+
+---
+
+## 5. Testing Strategy
+
+### 5.1 Testing Approach
+
+{{#if testing.approach}}
+{{testing.approach}}
+{{else}}
+*[See Test Strategy document for details]*
+{{/if}}
+
+### 5.2 Testing Levels
+
+{{#if testing.levels}}
+{{#each testing.levels}}
+- **{{this.level}}:** {{this.description}} (Coverage: {{this.coverage}})
+{{/each}}
+{{else}}
+- **Unit Testing:** 80%+ code coverage
+- **Integration Testing:** All API endpoints and database interactions
+- **System Testing:** End-to-end business processes
+- **Performance Testing:** Load, stress, scalability
+- **UAT:** Business user validation
+{{/if}}
+
+---
+
+## 6. Risk Management
+
+### 6.1 Migration Risks
+
+{{#if risks}}
+| Risk ID | Description | Probability | Impact | Mitigation |
+|---------|-------------|-------------|--------|------------|
+{{#each risks}}
+| {{this.id}} | {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} |
+{{/each}}
+{{else}}
+| Risk ID | Description | Probability | Impact | Mitigation |
+|---------|-------------|-------------|--------|------------|
+| R-001 | Data loss during migration | Low | High | Multiple backups, validation checks |
+| R-002 | Performance degradation | Medium | High | Performance testing, optimization |
+| R-003 | Incomplete functional coverage | Medium | High | Comprehensive testing, UAT |
+| R-004 | Timeline overrun | Medium | Medium | Buffer time, agile approach |
+{{/if}}
+
+### 6.2 Contingency Plans
+
+{{#if contingency}}
+{{#each contingency}}
+**{{this.scenario}}:**
+{{this.plan}}
+
+{{/each}}
+{{else}}
+*[Define rollback and contingency procedures]*
+{{/if}}
+
+---
+
+## 7. Resource Planning
+
+### 7.1 Team Structure
+
+{{#if resources.team}}
+| Role | Count | Responsibility |
+|------|-------|----------------|
+{{#each resources.team}}
+| {{this.role}} | {{this.count}} | {{this.responsibility}} |
+{{/each}}
+{{else}}
+| Role | Count | Responsibility |
+|------|-------|----------------|
+| Project Manager | 1 | Overall coordination |
+| Solution Architect | 1 | Technical design |
+| Backend Developer | 3-4 | Code migration |
+| Database Engineer | 2 | DB migration |
+| QA Engineer | 2 | Testing |
+| BrSE | 2 | Requirements, communication |
+{{/if}}
+
+### 7.2 Training Requirements
+
+{{#if resources.training}}
+{{#each resources.training}}
+- **{{this.topic}}:** {{this.duration}} (Attendees: {{this.attendees}})
+{{/each}}
+{{else}}
+- Java/Spring Boot training for COBOL developers
+- PostgreSQL training for Oracle DBAs
+- New framework and tools training
+{{/if}}
+
+---
+
+## 8. Success Metrics
+
+### 8.1 Key Performance Indicators
+
+{{#if kpis}}
+| KPI | Target | Measurement Method |
+|-----|--------|-------------------|
+{{#each kpis}}
+| {{this.name}} | {{this.target}} | {{this.method}} |
+{{/each}}
+{{else}}
+| KPI | Target | Measurement Method |
+|-----|--------|-------------------|
+| Functional Parity | 100% | Test case coverage |
+| Code Coverage | >80% | JaCoCo reports |
+| Performance | ≥ Current system | Load testing |
+| Defect Rate | <5% in UAT | Defect tracking system |
+| On-time Delivery | ±10% of timeline | Project schedule |
+{{/if}}
+
+---
+
+## 9. Change Management
+
+### 9.1 Stakeholder Communication
+
+{{#if change_management.communication}}
+{{change_management.communication}}
+{{else}}
+- Weekly status reports to management
+- Bi-weekly demos to business stakeholders
+- Daily standups for development team
+{{/if}}
+
+### 9.2 Training & Documentation
+
+{{#if change_management.training}}
+{{change_management.training}}
+{{else}}
+- User documentation for new system
+- Administrator guides
+- Developer onboarding materials
+- Knowledge transfer sessions
+{{/if}}
+
+---
+
+## 10. Post-Migration Support
+
+### 10.1 Hypercare Period
+
+{{#if post_migration.hypercare}}
+{{post_migration.hypercare}}
+{{else}}
+**Duration:** 4-8 weeks post go-live
+
+**Support Structure:**
+- 24/7 on-call support team
+- Daily monitoring and issue triage
+- Weekly status meetings
+- Rapid response to critical issues
+{{/if}}
+
+### 10.2 Decommissioning Plan
+
+{{#if post_migration.decommission}}
+{{post_migration.decommission}}
+{{else}}
+1. Run both systems in parallel for 2-4 weeks
+2. Validate all functionality in new system
+3. Archive old system data
+4. Decommission old infrastructure
+5. Update disaster recovery plans
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Detailed Project Plan
+
+*[Link to project plan or attach Gantt chart]*
+
+### Appendix B: Cost Estimate
+
+{{#if appendix.cost_estimate}}
+{{appendix.cost_estimate}}
+{{else}}
+*[To be provided by project management]*
+{{/if}}
+
+### Appendix C: Vendor Evaluation
+
+{{#if appendix.vendors}}
+*[Details of migration tools and vendors considered]*
+{{/if}}
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+
+---
+
+**End of Migration Strategy Document**

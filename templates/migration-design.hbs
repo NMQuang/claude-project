@@ -1,0 +1,627 @@
+# Migration Design Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Document Type** | Migration Design (Code & Database) |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+| **Author** | {{author}} |
+
+---
+
+## Executive Summary
+
+This document provides detailed design specifications for migrating **{{project.name}}** from **{{source.language}}/{{source.database}}** to **{{target.language}}/{{target.database}}**. It includes code architecture design, database schema design, and implementation guidelines.
+
+---
+
+## 1. Architecture Design
+
+### 1.1 Target Architecture
+
+```mermaid
+{{#if architecture.diagram}}
+{{{architecture.diagram}}}
+{{else}}
+graph TB
+    subgraph "Presentation Layer"
+        UI[Web UI]
+    end
+
+    subgraph "Application Layer"
+        API[REST API]
+        Service[Business Services]
+    end
+
+    subgraph "Data Layer"
+        Repo[Repositories]
+        DB[(PostgreSQL)]
+    end
+
+    UI --> API
+    API --> Service
+    Service --> Repo
+    Repo --> DB
+{{/if}}
+```
+
+### 1.2 Design Patterns
+
+{{#if architecture.patterns}}
+{{#each architecture.patterns}}
+- **{{this.name}}:** {{this.description}}
+  - **Used in:** {{this.usage}}
+{{/each}}
+{{else}}
+- **Layered Architecture:** Presentation → Service → Repository → Data
+- **Dependency Injection:** Spring framework for IoC
+- **Repository Pattern:** Data access abstraction
+- **DTO Pattern:** Data transfer between layers
+{{/if}}
+
+### 1.3 Module Structure
+
+{{#if architecture.modules}}
+{{#each architecture.modules}}
+#### {{this.name}} Module
+
+**Purpose:** {{this.purpose}}
+
+**Components:**
+{{#each this.components}}
+- {{this}}
+{{/each}}
+
+**Dependencies:**
+{{#each this.dependencies}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+*[Define module breakdown based on business domains]*
+{{/if}}
+
+---
+
+## 2. Code Migration Design
+
+### 2.1 Package Structure
+
+```
+{{#if code_design.package_structure}}
+{{{code_design.package_structure}}}
+{{else}}
+src/main/java/com/company/project/
+├── controller/          # REST controllers
+├── service/            # Business logic services
+│   ├── impl/           # Service implementations
+│   └── dto/            # Data Transfer Objects
+├── repository/         # Data access layer
+├── entity/             # JPA entities
+├── config/             # Configuration classes
+├── exception/          # Custom exceptions
+├── util/               # Utility classes
+└── constant/           # Constants
+
+src/main/resources/
+├── application.yml     # Application configuration
+├── db/migration/       # Flyway migration scripts
+└── static/             # Static resources
+{{/if}}
+```
+
+### 2.2 Component Mapping
+
+{{#if mappings.components}}
+| Source Component | Target Component | Mapping Type | Notes |
+|------------------|------------------|--------------|-------|
+{{#each mappings.components}}
+| {{this.source}} | {{this.target}} | {{this.type}} | {{this.notes}} |
+{{/each}}
+{{else}}
+*[Auto-generated from source code analysis]*
+
+Example:
+| Source (COBOL) | Target (Java) | Mapping Type | Notes |
+|----------------|---------------|--------------|-------|
+| CUSTMGMT.cbl | CustomerService.java | 1:1 | Main business logic |
+| CUSTOMER-RECORD | Customer.java (Entity) | Data structure → Entity | JPA entity |
+| GET-CUSTOMER paragraph | getCustomer() method | Paragraph → Method | Service method |
+{{/if}}
+
+### 2.3 Detailed Component Design
+
+{{#if code_design.components}}
+{{#each code_design.components}}
+#### {{this.name}}
+
+**Type:** {{this.type}}
+
+**Source File:** {{this.source_file}}
+
+**Target File:** {{this.target_file}}
+
+**Responsibilities:**
+{{#each this.responsibilities}}
+- {{this}}
+{{/each}}
+
+**Public Interface:**
+```java
+{{this.interface_code}}
+```
+
+**Key Implementation Notes:**
+{{#each this.notes}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 2.4 API Design
+
+{{#if api_design.endpoints}}
+| Endpoint | Method | Description | Request | Response |
+|----------|--------|-------------|---------|----------|
+{{#each api_design.endpoints}}
+| {{this.path}} | {{this.method}} | {{this.description}} | {{this.request}} | {{this.response}} |
+{{/each}}
+{{else}}
+*[API endpoints to be defined based on business requirements]*
+
+Example:
+| Endpoint | Method | Description | Request | Response |
+|----------|--------|-------------|---------|----------|
+| /api/customers | GET | Get all customers | Query params | Customer[] |
+| /api/customers/{id} | GET | Get customer by ID | Path param | Customer |
+| /api/customers | POST | Create customer | Customer DTO | Customer |
+| /api/customers/{id} | PUT | Update customer | Customer DTO | Customer |
+| /api/customers/{id} | DELETE | Delete customer | Path param | 204 No Content |
+{{/if}}
+
+---
+
+## 3. Database Design
+
+### 3.1 Schema Overview
+
+```mermaid
+{{#if db_design.erd}}
+{{{db_design.erd}}}
+{{else}}
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    CUSTOMER {
+        int customer_id PK
+        string name
+        string email
+        timestamp created_at
+    }
+    ORDER {
+        int order_id PK
+        int customer_id FK
+        decimal total_amount
+        timestamp order_date
+    }
+{{/if}}
+```
+
+### 3.2 Table Definitions
+
+{{#if db_design.tables}}
+{{#each db_design.tables}}
+#### Table: `{{this.name}}`
+
+**Source Table:** {{this.source_table}}
+
+**Purpose:** {{this.purpose}}
+
+**DDL:**
+```sql
+CREATE TABLE {{this.name}} (
+{{#each this.columns}}
+    {{this.name}} {{this.type}}{{#if this.nullable}} NULL{{else}} NOT NULL{{/if}}{{#if this.default}} DEFAULT {{this.default}}{{/if}},
+{{/each}}
+    PRIMARY KEY ({{this.primary_key}}),
+{{#each this.foreign_keys}}
+    FOREIGN KEY ({{this.column}}) REFERENCES {{this.ref_table}}({{this.ref_column}}),
+{{/each}}
+);
+```
+
+**Indexes:**
+{{#each this.indexes}}
+- `{{this.name}}`: {{this.columns}} ({{this.type}})
+{{/each}}
+
+**Migration Notes:**
+{{#each this.migration_notes}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+*[Auto-generate from DDL analysis]*
+{{/if}}
+
+### 3.3 Data Type Conversion Matrix
+
+{{#if db_design.type_conversions}}
+| Source Type ({{source.database}}) | Target Type ({{target.database}}) | Conversion Rule | Risk |
+|-----------------------------------|-----------------------------------|-----------------|------|
+{{#each db_design.type_conversions}}
+| {{this.source}} | {{this.target}} | {{this.rule}} | {{this.risk}} |
+{{/each}}
+{{else}}
+| Source (Oracle) | Target (PostgreSQL) | Conversion Rule | Risk |
+|-----------------|---------------------|-----------------|------|
+| NUMBER(10,0) | INTEGER | Direct mapping | Low |
+| NUMBER(10,2) | NUMERIC(10,2) | Direct mapping | Low |
+| VARCHAR2(n) | VARCHAR(n) | Direct mapping | Low |
+| DATE | TIMESTAMP | Oracle DATE includes time | Medium |
+| CLOB | TEXT | Direct mapping | Low |
+| BLOB | BYTEA | Direct mapping | Low |
+| RAW(n) | BYTEA | Direct mapping | Low |
+{{/if}}
+
+### 3.4 Stored Procedure Migration
+
+{{#if db_design.procedures}}
+{{#each db_design.procedures}}
+#### Procedure: {{this.source_name}}
+
+**Migration Approach:** {{this.approach}}
+
+**Target Implementation:**
+{{#if this.move_to_code}}
+- **Location:** {{this.target_service}} (Java service)
+- **Rationale:** {{this.rationale}}
+{{else}}
+- **Location:** PostgreSQL function
+- **Name:** {{this.target_name}}
+{{/if}}
+
+**Source Code (Oracle PL/SQL):**
+```sql
+{{this.source_code}}
+```
+
+**Target Code:**
+```{{#if this.move_to_code}}java{{else}}sql{{/if}}
+{{this.target_code}}
+```
+
+---
+
+{{/each}}
+{{else}}
+*[Analyze stored procedures and define migration strategy]*
+{{/if}}
+
+---
+
+## 4. Data Migration Design
+
+### 4.1 Migration Workflow
+
+```mermaid
+{{#if data_migration.workflow}}
+{{{data_migration.workflow}}}
+{{else}}
+graph LR
+    A[Extract from Oracle] --> B[Transform Data]
+    B --> C[Validate]
+    C --> D[Load to PostgreSQL]
+    D --> E[Verify]
+    E --> F{OK?}
+    F -->|Yes| G[Complete]
+    F -->|No| H[Rollback]
+{{/if}}
+```
+
+### 4.2 Table Migration Priority
+
+{{#if data_migration.priorities}}
+| Priority | Table Name | Rows (Est.) | Dependencies | Strategy |
+|----------|------------|-------------|--------------|----------|
+{{#each data_migration.priorities}}
+| {{this.priority}} | {{this.table}} | {{this.rows}} | {{this.dependencies}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+*[Define migration order based on foreign key dependencies]*
+{{/if}}
+
+### 4.3 Data Transformation Rules
+
+{{#if data_migration.transformations}}
+{{#each data_migration.transformations}}
+#### {{this.table}}.{{this.column}}
+
+**Transformation:** {{this.description}}
+
+**Rule:**
+```
+{{this.rule}}
+```
+
+**Example:**
+- **Before:** {{this.example_before}}
+- **After:** {{this.example_after}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 4.4 Data Validation Strategy
+
+{{#if data_migration.validation}}
+{{#each data_migration.validation}}
+- **{{this.check}}:** {{this.description}}
+  - **Query:** `{{this.query}}`
+  - **Expected Result:** {{this.expected}}
+{{/each}}
+{{else}}
+- **Row Count Validation:** Compare row counts between source and target
+- **Checksum Validation:** MD5/SHA hash of critical tables
+- **Sample Data Validation:** Manual review of sample records
+- **Referential Integrity:** Verify all foreign keys are valid
+- **Business Rule Validation:** Execute business logic checks
+{{/if}}
+
+---
+
+## 5. Configuration Management
+
+### 5.1 Environment Configuration
+
+{{#if config.environments}}
+{{#each config.environments}}
+#### {{this.name}} Environment
+
+**Database:**
+- Host: {{this.db_host}}
+- Port: {{this.db_port}}
+- Database: {{this.db_name}}
+
+**Application:**
+- Server: {{this.app_server}}
+- Port: {{this.app_port}}
+
+**Configuration File:**
+```yaml
+{{this.config_content}}
+```
+
+---
+
+{{/each}}
+{{else}}
+*[Define configuration for dev, test, staging, production]*
+{{/if}}
+
+### 5.2 External Dependencies
+
+{{#if config.dependencies}}
+| Dependency | Purpose | Configuration |
+|------------|---------|---------------|
+{{#each config.dependencies}}
+| {{this.name}} | {{this.purpose}} | {{this.config}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 6. Error Handling & Logging
+
+### 6.1 Exception Hierarchy
+
+{{#if error_handling.exceptions}}
+```
+{{error_handling.exceptions}}
+```
+{{else}}
+```
+RuntimeException
+├── BusinessException
+│   ├── CustomerNotFoundException
+│   ├── InvalidOrderException
+│   └── DuplicateRecordException
+└── TechnicalException
+    ├── DatabaseException
+    ├── IntegrationException
+    └── ConfigurationException
+```
+{{/if}}
+
+### 6.2 Logging Strategy
+
+{{#if error_handling.logging}}
+{{error_handling.logging}}
+{{else}}
+**Log Levels:**
+- **ERROR:** System errors, exceptions
+- **WARN:** Business validation failures, deprecated API usage
+- **INFO:** Key business events, API calls
+- **DEBUG:** Detailed flow information (dev/test only)
+
+**Log Format:**
+```
+[timestamp] [level] [thread] [class] - message
+```
+
+**Log Storage:**
+- Development: Console + file
+- Production: File + ELK Stack (Elasticsearch, Logstash, Kibana)
+{{/if}}
+
+---
+
+## 7. Performance Optimization
+
+### 7.1 Database Optimization
+
+{{#if performance.database}}
+{{#each performance.database}}
+- **{{this.area}}:** {{this.description}}
+  - **Implementation:** {{this.implementation}}
+{{/each}}
+{{else}}
+- **Indexing Strategy:** Create indexes on foreign keys and frequently queried columns
+- **Connection Pooling:** HikariCP with optimized pool size
+- **Query Optimization:** Use EXPLAIN ANALYZE to optimize slow queries
+- **Caching:** Implement second-level cache for read-heavy entities
+{{/if}}
+
+### 7.2 Application Optimization
+
+{{#if performance.application}}
+{{#each performance.application}}
+- **{{this.area}}:** {{this.description}}
+{{/each}}
+{{else}}
+- **Lazy Loading:** Use lazy loading for large object graphs
+- **Batch Processing:** Process bulk operations in batches
+- **Async Processing:** Use @Async for long-running operations
+- **Caching:** Redis for distributed caching
+{{/if}}
+
+---
+
+## 8. Security Design
+
+### 8.1 Authentication & Authorization
+
+{{#if security.auth}}
+{{security.auth}}
+{{else}}
+- **Authentication:** JWT-based authentication
+- **Authorization:** Role-based access control (RBAC)
+- **Password Policy:** BCrypt hashing, minimum 8 characters
+{{/if}}
+
+### 8.2 Data Security
+
+{{#if security.data}}
+{{#each security.data}}
+- **{{this.aspect}}:** {{this.implementation}}
+{{/each}}
+{{else}}
+- **Encryption at Rest:** Database-level encryption
+- **Encryption in Transit:** TLS 1.2+ for all communications
+- **Sensitive Data:** Mask PII in logs
+- **SQL Injection Prevention:** Use parameterized queries/JPA
+{{/if}}
+
+---
+
+## 9. Implementation Guidelines
+
+### 9.1 Coding Standards
+
+{{#if guidelines.coding_standards}}
+{{guidelines.coding_standards}}
+{{else}}
+- Follow Java Code Conventions
+- Use SonarQube for code quality checks
+- Maintain 80%+ unit test coverage
+- Document all public APIs with Javadoc
+- Use meaningful variable and method names
+{{/if}}
+
+### 9.2 Code Review Checklist
+
+{{#if guidelines.code_review}}
+{{#each guidelines.code_review}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] Code follows coding standards
+- [ ] Unit tests exist and pass
+- [ ] No hardcoded values (use configuration)
+- [ ] Error handling is appropriate
+- [ ] Logging is adequate
+- [ ] No security vulnerabilities
+- [ ] Performance considerations addressed
+{{/if}}
+
+---
+
+## 10. Deployment Design
+
+### 10.1 Build & Deployment Pipeline
+
+```mermaid
+{{#if deployment.pipeline}}
+{{{deployment.pipeline}}}
+{{else}}
+graph LR
+    A[Code Commit] --> B[Build]
+    B --> C[Unit Tests]
+    C --> D[Integration Tests]
+    D --> E[Package]
+    E --> F[Deploy to Dev]
+    F --> G[Deploy to Test]
+    G --> H[UAT]
+    H --> I[Deploy to Prod]
+{{/if}}
+```
+
+### 10.2 Deployment Artifacts
+
+{{#if deployment.artifacts}}
+{{#each deployment.artifacts}}
+- **{{this.name}}:** {{this.description}}
+  - **Format:** {{this.format}}
+  - **Location:** {{this.location}}
+{{/each}}
+{{else}}
+- **Application JAR:** Spring Boot executable JAR
+- **Database Scripts:** Flyway migration scripts
+- **Configuration Files:** application-{env}.yml
+- **Deployment Scripts:** Shell scripts for automation
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Database DDL Scripts
+
+*[Full DDL scripts for all tables, indexes, constraints]*
+
+### Appendix B: Sample Code
+
+{{#if appendix.sample_code}}
+*[Code examples for key components]*
+{{/if}}
+
+### Appendix C: API Specifications
+
+{{#if appendix.api_spec}}
+*[OpenAPI/Swagger specification file]*
+{{/if}}
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+
+---
+
+**End of Migration Design Document**

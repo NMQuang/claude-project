@@ -1,0 +1,757 @@
+# Test Strategy Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Document Type** | Test Strategy |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+| **Author** | {{author}} |
+
+---
+
+## Executive Summary
+
+This document outlines the comprehensive testing strategy for the **{{project.name}}** migration project. It defines the testing approach, scope, test levels, test environments, and success criteria to ensure a successful migration from **{{source.language}}/{{source.database}}** to **{{target.language}}/{{target.database}}**.
+
+### Testing Objectives
+
+{{#if objectives}}
+{{#each objectives}}
+- {{this}}
+{{/each}}
+{{else}}
+- Verify 100% functional parity with the current system
+- Ensure data integrity and accuracy after migration
+- Validate performance meets or exceeds current system
+- Identify and resolve defects before production deployment
+- Build confidence in the migrated system
+{{/if}}
+
+---
+
+## 1. Test Scope
+
+### 1.1 In Scope
+
+{{#if scope.in_scope}}
+{{#each scope.in_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+- All business functionalities from the source system
+- Database schema and data migration
+- Integration with external systems
+- Performance and scalability
+- Security and access control
+- User interface (if applicable)
+- Error handling and logging
+{{/if}}
+
+### 1.2 Out of Scope
+
+{{#if scope.out_scope}}
+{{#each scope.out_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+- Features explicitly marked as out of scope in requirements
+- Legacy systems that will be decommissioned
+- Third-party system testing (assumed tested independently)
+{{/if}}
+
+---
+
+## 2. Test Levels
+
+### 2.1 Unit Testing
+
+**Objective:** Verify individual components function correctly in isolation
+
+**Scope:**
+{{#if test_levels.unit.scope}}
+{{test_levels.unit.scope}}
+{{else}}
+- All service methods
+- Utility functions
+- Data transformations
+- Business logic calculations
+{{/if}}
+
+**Approach:**
+- **Framework:** {{#if test_levels.unit.framework}}{{test_levels.unit.framework}}{{else}}JUnit 5, Mockito{{/if}}
+- **Coverage Target:** {{#if test_levels.unit.coverage}}{{test_levels.unit.coverage}}{{else}}80%+{{/if}}
+- **Mocking:** Use Mockito to mock dependencies
+- **Responsibility:** Developers
+
+**Sample Test Case:**
+```java
+@Test
+void testGetCustomerById_Success() {
+    // Given
+    Customer customer = new Customer(1L, "John Doe");
+    when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+
+    // When
+    Customer result = customerService.getCustomerById(1L);
+
+    // Then
+    assertNotNull(result);
+    assertEquals("John Doe", result.getName());
+}
+```
+
+---
+
+### 2.2 Integration Testing
+
+**Objective:** Verify components work correctly together
+
+**Scope:**
+{{#if test_levels.integration.scope}}
+{{test_levels.integration.scope}}
+{{else}}
+- API endpoints (Controller → Service → Repository)
+- Database interactions
+- External system integrations
+- Message queue interactions
+{{/if}}
+
+**Approach:**
+- **Framework:** {{#if test_levels.integration.framework}}{{test_levels.integration.framework}}{{else}}Spring Boot Test, TestContainers{{/if}}
+- **Database:** Use TestContainers for PostgreSQL
+- **Test Data:** SQL scripts or DbUnit
+- **Responsibility:** Developers + QA
+
+**Sample Test Case:**
+```java
+@SpringBootTest
+@AutoConfigureTestDatabase(replace = Replace.NONE)
+class CustomerIntegrationTest {
+
+    @Test
+    void testCreateCustomer_Integration() {
+        // API call → Service → DB
+        // Verify end-to-end flow
+    }
+}
+```
+
+---
+
+### 2.3 System Testing
+
+**Objective:** Validate complete system behavior from end-user perspective
+
+**Scope:**
+{{#if test_levels.system.scope}}
+{{test_levels.system.scope}}
+{{else}}
+- End-to-end business processes
+- User workflows
+- Cross-functional scenarios
+- Error handling and edge cases
+{{/if}}
+
+**Approach:**
+- **Environment:** Dedicated test environment (mirrors production)
+- **Test Data:** Representative production-like data
+- **Execution:** Manual and automated (Selenium/Playwright for UI)
+- **Responsibility:** QA Team
+
+**Test Scenarios:**
+{{#if test_levels.system.scenarios}}
+{{#each test_levels.system.scenarios}}
+- {{this}}
+{{/each}}
+{{else}}
+*[Define based on business use cases]*
+{{/if}}
+
+---
+
+### 2.4 Migration Testing
+
+**Objective:** Verify data migration accuracy and completeness
+
+**Scope:**
+{{#if test_levels.migration.scope}}
+{{test_levels.migration.scope}}
+{{else}}
+- Schema migration (structure, indexes, constraints)
+- Data migration (completeness, accuracy)
+- Data transformation correctness
+- Referential integrity
+{{/if}}
+
+**Approach:**
+
+#### Schema Validation
+{{#if test_levels.migration.schema_validation}}
+{{test_levels.migration.schema_validation}}
+{{else}}
+- Compare source and target schemas
+- Verify all tables, columns, data types migrated
+- Validate indexes, primary keys, foreign keys
+- Check constraints and triggers
+{{/if}}
+
+#### Data Validation
+{{#if test_levels.migration.data_validation}}
+{{#each test_levels.migration.data_validation}}
+- **{{this.check}}:** {{this.description}}
+{{/each}}
+{{else}}
+- **Row Count Validation:** Compare row counts per table
+  ```sql
+  -- Source (Oracle)
+  SELECT COUNT(*) FROM customers;
+
+  -- Target (PostgreSQL)
+  SELECT COUNT(*) FROM customers;
+  ```
+
+- **Checksum Validation:** Verify data integrity
+  ```sql
+  SELECT MD5(string_agg(customer_id::text, ',' ORDER BY customer_id))
+  FROM customers;
+  ```
+
+- **Sample Data Validation:** Manual review of random samples (5-10% of data)
+
+- **Business Rule Validation:** Execute business logic on both systems and compare results
+
+- **Edge Case Validation:** Test NULL values, special characters, date edge cases
+{{/if}}
+
+---
+
+### 2.5 Performance Testing
+
+**Objective:** Ensure system meets performance requirements
+
+**Scope:**
+{{#if test_levels.performance.scope}}
+{{test_levels.performance.scope}}
+{{else}}
+- Response time for key transactions
+- Throughput (transactions per second)
+- Concurrent user load
+- Database query performance
+- Resource utilization (CPU, memory, disk I/O)
+{{/if}}
+
+**Test Types:**
+
+#### Load Testing
+{{#if test_levels.performance.load_testing}}
+{{test_levels.performance.load_testing}}
+{{else}}
+- **Objective:** Verify system handles expected load
+- **Tool:** JMeter, Gatling, or K6
+- **Target:** Simulate normal production load
+- **Success Criteria:**
+  - Average response time < 2 seconds
+  - 95th percentile < 5 seconds
+  - No errors under normal load
+{{/if}}
+
+#### Stress Testing
+{{#if test_levels.performance.stress_testing}}
+{{test_levels.performance.stress_testing}}
+{{else}}
+- **Objective:** Identify breaking point
+- **Approach:** Gradually increase load until system fails
+- **Success Criteria:** Graceful degradation, no data corruption
+{{/if}}
+
+#### Endurance Testing
+{{#if test_levels.performance.endurance_testing}}
+{{test_levels.performance.endurance_testing}}
+{{else}}
+- **Objective:** Verify system stability over extended period
+- **Duration:** 8-24 hours under normal load
+- **Success Criteria:** No memory leaks, consistent performance
+{{/if}}
+
+**Performance Baseline:**
+{{#if test_levels.performance.baseline}}
+| Metric | Current System | Target System | Threshold |
+|--------|----------------|---------------|-----------|
+{{#each test_levels.performance.baseline}}
+| {{this.metric}} | {{this.current}} | {{this.target}} | {{this.threshold}} |
+{{/each}}
+{{else}}
+| Metric | Current System | Target System | Threshold |
+|--------|----------------|---------------|-----------|
+| Page Load Time | 1.5s | ≤ 1.5s | < 2s |
+| API Response Time | 200ms | ≤ 200ms | < 500ms |
+| Concurrent Users | 100 | ≥ 100 | 100+ |
+| Throughput | 50 TPS | ≥ 50 TPS | 50+ TPS |
+{{/if}}
+
+---
+
+### 2.6 Security Testing
+
+**Objective:** Identify security vulnerabilities
+
+**Scope:**
+{{#if test_levels.security.scope}}
+{{test_levels.security.scope}}
+{{else}}
+- Authentication and authorization
+- SQL injection prevention
+- Cross-site scripting (XSS) prevention
+- Sensitive data exposure
+- API security
+{{/if}}
+
+**Approach:**
+{{#if test_levels.security.approach}}
+{{test_levels.security.approach}}
+{{else}}
+- **SAST (Static Analysis):** SonarQube, Checkmarx
+- **DAST (Dynamic Analysis):** OWASP ZAP, Burp Suite
+- **Dependency Scanning:** OWASP Dependency Check
+- **Penetration Testing:** Engage security team for critical systems
+{{/if}}
+
+---
+
+### 2.7 User Acceptance Testing (UAT)
+
+**Objective:** Validate system meets business requirements
+
+**Scope:**
+{{#if test_levels.uat.scope}}
+{{test_levels.uat.scope}}
+{{else}}
+- All business-critical functionalities
+- User workflows and scenarios
+- Reports and data exports
+- UI/UX validation
+{{/if}}
+
+**Approach:**
+- **Participants:** Business users, domain experts
+- **Environment:** UAT environment with production-like data
+- **Duration:** {{#if test_levels.uat.duration}}{{test_levels.uat.duration}}{{else}}2-4 weeks{{/if}}
+- **Success Criteria:** {{#if test_levels.uat.success}}{{test_levels.uat.success}}{{else}}<5% defect rate, all critical defects resolved{{/if}}
+
+**UAT Test Scenarios:**
+{{#if test_levels.uat.scenarios}}
+{{#each test_levels.uat.scenarios}}
+- **{{this.id}}:** {{this.description}}
+  - **Steps:** {{this.steps}}
+  - **Expected Result:** {{this.expected}}
+{{/each}}
+{{else}}
+*[Define business scenarios with business users]*
+{{/if}}
+
+---
+
+## 3. Test Environment
+
+### 3.1 Environment Strategy
+
+{{#if environments.strategy}}
+{{environments.strategy}}
+{{else}}
+| Environment | Purpose | Refresh Frequency | Access |
+|-------------|---------|-------------------|--------|
+| **DEV** | Development and unit testing | On-demand | Developers |
+| **TEST** | Integration and system testing | Weekly | Developers, QA |
+| **UAT** | User acceptance testing | Before UAT cycle | Business users, QA |
+| **STAGING** | Pre-production validation | Before release | QA, Release team |
+| **PROD** | Production | N/A | End users |
+{{/if}}
+
+### 3.2 Environment Configuration
+
+{{#if environments.config}}
+{{#each environments.config}}
+#### {{this.name}} Environment
+
+**Infrastructure:**
+{{#each this.infrastructure}}
+- {{this}}
+{{/each}}
+
+**Database:**
+- **Type:** {{this.db_type}}
+- **Size:** {{this.db_size}}
+- **Data:** {{this.db_data}}
+
+**Configuration:**
+```yaml
+{{this.config}}
+```
+
+---
+
+{{/each}}
+{{else}}
+*[Define configuration for each environment]*
+{{/if}}
+
+### 3.3 Test Data Management
+
+{{#if test_data.strategy}}
+{{test_data.strategy}}
+{{else}}
+**Strategy:**
+- **DEV/TEST:** Synthetic data generated via scripts
+- **UAT:** Subset of production data (anonymized)
+- **STAGING:** Full production data copy (anonymized)
+
+**Data Refresh:**
+- TEST environment: Weekly
+- UAT environment: Before each UAT cycle
+- STAGING: Before each release
+
+**Data Privacy:**
+- Anonymize PII (names, emails, phone numbers)
+- Mask sensitive financial data
+- Use data masking tools or SQL scripts
+{{/if}}
+
+---
+
+## 4. Test Automation Strategy
+
+### 4.1 Automation Scope
+
+{{#if automation.scope}}
+{{#each automation.scope}}
+- {{this}}
+{{/each}}
+{{else}}
+- Unit tests: 100% automated
+- Integration tests: 90% automated
+- API tests: 80% automated
+- UI regression tests: 50% automated (critical paths)
+- Performance tests: 100% automated
+{{/if}}
+
+### 4.2 Automation Framework
+
+{{#if automation.framework}}
+{{automation.framework}}
+{{else}}
+| Test Type | Framework/Tool | Language |
+|-----------|----------------|----------|
+| Unit | JUnit 5, Mockito | Java |
+| Integration | Spring Boot Test | Java |
+| API | REST Assured | Java |
+| UI | Selenium / Playwright | Java / TypeScript |
+| Performance | JMeter / Gatling | Groovy / Scala |
+| DB Migration | Custom SQL scripts | SQL |
+{{/if}}
+
+### 4.3 CI/CD Integration
+
+{{#if automation.cicd}}
+{{automation.cicd}}
+{{else}}
+```mermaid
+graph LR
+    A[Code Commit] --> B[Build]
+    B --> C[Unit Tests]
+    C --> D[Integration Tests]
+    D --> E[Code Quality Check]
+    E --> F{Pass?}
+    F -->|Yes| G[Deploy to TEST]
+    F -->|No| H[Notify Developer]
+    G --> I[Automated Regression]
+    I --> J{Pass?}
+    J -->|Yes| K[Ready for UAT]
+    J -->|No| H
+```
+
+**Pipeline Configuration:**
+- Trigger: On every commit to main branch
+- Unit + Integration tests must pass before deployment
+- Automated regression runs nightly on TEST environment
+- Performance tests run weekly on STAGING environment
+{{/if}}
+
+---
+
+## 5. Defect Management
+
+### 5.1 Defect Lifecycle
+
+{{#if defect.lifecycle}}
+{{defect.lifecycle}}
+{{else}}
+```
+New → Assigned → In Progress → Fixed → Testing → Verified → Closed
+                                    ↓
+                                Reopened (if test fails)
+```
+{{/if}}
+
+### 5.2 Defect Severity & Priority
+
+{{#if defect.severity}}
+{{#each defect.severity}}
+- **{{this.level}}:** {{this.description}}
+  - **Response Time:** {{this.response_time}}
+{{/each}}
+{{else}}
+| Severity | Definition | Response Time | Example |
+|----------|------------|---------------|---------|
+| **Critical** | System crash, data loss, security breach | 4 hours | Database connection failure |
+| **High** | Major functionality broken, no workaround | 1 business day | Payment processing fails |
+| **Medium** | Functionality impaired, workaround exists | 3 business days | Report formatting issue |
+| **Low** | Minor issue, cosmetic | Next release | UI alignment issue |
+{{/if}}
+
+### 5.3 Defect Tracking
+
+{{#if defect.tracking}}
+{{defect.tracking}}
+{{else}}
+**Tool:** Jira, Azure DevOps, or Bugzilla
+
+**Required Fields:**
+- Title, Description, Steps to Reproduce
+- Severity, Priority
+- Environment, Browser/Version (if UI)
+- Assignee, Reporter
+- Attachments (screenshots, logs)
+
+**Metrics to Track:**
+- Total defects found
+- Defects by severity
+- Defect resolution time
+- Defect aging
+- Defect rejection rate
+{{/if}}
+
+---
+
+## 6. Entry & Exit Criteria
+
+### 6.1 Test Entry Criteria
+
+{{#if entry_criteria}}
+{{#each entry_criteria}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] Test plan approved
+- [ ] Test environment ready and accessible
+- [ ] Test data prepared
+- [ ] Application deployed to test environment
+- [ ] Unit tests passing with >80% coverage
+- [ ] Test cases reviewed and approved
+{{/if}}
+
+### 6.2 Test Exit Criteria
+
+{{#if exit_criteria}}
+{{#each exit_criteria}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] All planned test cases executed
+- [ ] 95%+ test case pass rate
+- [ ] No open Critical or High severity defects
+- [ ] All Medium defects reviewed and accepted/fixed
+- [ ] Performance benchmarks met
+- [ ] UAT sign-off obtained
+- [ ] Test summary report completed
+{{/if}}
+
+---
+
+## 7. Test Deliverables
+
+{{#if deliverables}}
+{{#each deliverables}}
+### {{this.name}}
+
+**Description:** {{this.description}}
+
+**Responsible:** {{this.responsible}}
+
+**Delivery Date:** {{this.date}}
+
+---
+
+{{/each}}
+{{else}}
+| Deliverable | Description | Responsible | Timeline |
+|-------------|-------------|-------------|----------|
+| Test Plan | This document | QA Lead | Before testing starts |
+| Test Cases | Detailed test scenarios | QA Team | 1 week before execution |
+| Test Data | Sample datasets | QA + BA | Before testing starts |
+| Test Execution Report | Daily/weekly test progress | QA Team | Daily/weekly |
+| Defect Report | Defect metrics and trends | QA Lead | Weekly |
+| Performance Test Report | Load/stress test results | Performance Engineer | After performance testing |
+| UAT Sign-off | Business approval | Business Users | After UAT completion |
+| Test Summary Report | Final test results | QA Lead | End of testing phase |
+{{/if}}
+
+---
+
+## 8. Roles & Responsibilities
+
+{{#if roles}}
+| Role | Responsibility | Team Members |
+|------|----------------|--------------|
+{{#each roles}}
+| {{this.role}} | {{this.responsibility}} | {{this.members}} |
+{{/each}}
+{{else}}
+| Role | Responsibility | Team Members |
+|------|----------------|--------------|
+| **QA Lead** | Test strategy, planning, reporting | TBD |
+| **QA Engineer** | Test case design, execution, automation | TBD |
+| **Performance Engineer** | Performance testing, analysis | TBD |
+| **Developer** | Unit/integration tests, defect fixing | Dev team |
+| **Business Analyst** | UAT test case review, UAT coordination | BA team |
+| **Business User** | UAT execution, sign-off | Business stakeholders |
+{{/if}}
+
+---
+
+## 9. Test Schedule
+
+{{#if schedule}}
+```mermaid
+gantt
+    title Test Schedule
+    dateFormat YYYY-MM-DD
+
+    {{#each schedule}}
+    {{this.phase}} :{{this.start}}, {{this.duration}}
+    {{/each}}
+```
+{{else}}
+```mermaid
+gantt
+    title Test Schedule
+    dateFormat YYYY-MM-DD
+
+    Test Planning      :2024-01-01, 10d
+    Test Case Design   :2024-01-08, 15d
+    Unit Testing       :2024-01-15, 30d
+    Integration Testing:2024-02-01, 20d
+    System Testing     :2024-02-15, 30d
+    Migration Testing  :2024-02-15, 30d
+    Performance Testing:2024-03-01, 15d
+    UAT                :2024-03-15, 30d
+    Regression Testing :2024-04-01, 15d
+```
+{{/if}}
+
+**Key Milestones:**
+{{#if milestones}}
+{{#each milestones}}
+- **{{this.name}}:** {{this.date}}
+{{/each}}
+{{else}}
+- Test Plan Approval: [Date]
+- Test Environment Ready: [Date]
+- System Testing Complete: [Date]
+- UAT Sign-off: [Date]
+- Go-Live Readiness: [Date]
+{{/if}}
+
+---
+
+## 10. Risk & Mitigation
+
+{{#if risks}}
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+{{#each risks}}
+| {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} |
+{{/each}}
+{{else}}
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Test environment instability | Medium | High | Dedicated DevOps support, backup environment |
+| Insufficient test data | Medium | Medium | Early test data preparation, synthetic data generation |
+| Resource unavailability | Low | High | Cross-training, external QA resources |
+| Delayed defect fixes | Medium | High | Daily defect triage, dedicated fix sprint |
+| UAT delays | Medium | High | Early business engagement, clear UAT criteria |
+{{/if}}
+
+---
+
+## 11. Tools & Infrastructure
+
+{{#if tools}}
+| Category | Tool | Purpose |
+|----------|------|---------|
+{{#each tools}}
+| {{this.category}} | {{this.tool}} | {{this.purpose}} |
+{{/each}}
+{{else}}
+| Category | Tool | Purpose |
+|----------|------|---------|
+| Test Management | Jira / TestRail | Test case management, execution tracking |
+| Defect Tracking | Jira / Bugzilla | Defect lifecycle management |
+| Automation | Selenium / Playwright | UI test automation |
+| API Testing | REST Assured / Postman | API test automation |
+| Performance | JMeter / Gatling | Load and performance testing |
+| CI/CD | Jenkins / GitLab CI | Continuous integration |
+| Code Coverage | JaCoCo / SonarQube | Code coverage analysis |
+| Database | PostgreSQL | Test database |
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Sample Test Cases
+
+{{#if appendix.sample_tests}}
+{{#each appendix.sample_tests}}
+#### Test Case: {{this.id}} - {{this.title}}
+
+**Preconditions:** {{this.preconditions}}
+
+**Steps:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+**Expected Result:** {{this.expected}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### Appendix B: Test Data Samples
+
+{{#if appendix.test_data}}
+*[Sample test data sets]*
+{{/if}}
+
+### Appendix C: Performance Test Scripts
+
+{{#if appendix.perf_scripts}}
+*[JMeter/Gatling test scripts]*
+{{/if}}
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+
+---
+
+**End of Test Strategy Document**
