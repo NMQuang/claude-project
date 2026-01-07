@@ -113,20 +113,20 @@ export class MetadataExtractor {
 
   private determinePriority(result: CobolAnalysisResult): string {
     // Simple heuristic: high complexity or large LOC = high priority
-    if (result.complexity > 15 || result.loc > 1000) {
+    if (result.complexity > 30 || result.loc > 1000) {
       return 'High';
-    } else if (result.complexity > 8 || result.loc > 500) {
+    } else if (result.complexity > 15 || result.loc > 500) {
       return 'Medium';
     }
     return 'Low';
   }
 
   private generateComplexitySummary(avgComplexity: number): string {
-    if (avgComplexity < 5) {
+    if (avgComplexity < 10) {
       return 'Low complexity - straightforward migration expected';
-    } else if (avgComplexity < 10) {
+    } else if (avgComplexity < 20) {
       return 'Medium complexity - some refactoring required';
-    } else if (avgComplexity < 15) {
+    } else if (avgComplexity < 30) {
       return 'High complexity - significant refactoring needed';
     }
     return 'Very high complexity - extensive redesign recommended';
@@ -158,12 +158,12 @@ export class MetadataExtractor {
 
   private identifyHighComplexityModules(results: CobolAnalysisResult[]) {
     return results
-      .filter(result => result.complexity > 10)
+      .filter(result => result.complexity > 20)
       .map(result => ({
         name: result.name,
         score: result.complexity,
-        risk: result.complexity > 20 ? 'High' : 'Medium',
-        recommendation: result.complexity > 20
+        risk: result.complexity > 40 ? 'High' : 'Medium',
+        recommendation: result.complexity > 40
           ? 'Consider breaking into smaller modules during migration'
           : 'Review and simplify logic where possible'
       }))
@@ -175,11 +175,11 @@ export class MetadataExtractor {
     const risks = [];
 
     // Risk: High average complexity
-    if (avgComplexity > 12) {
+    if (avgComplexity > 20) {
       risks.push({
         id: 'R-001',
         category: 'Complexity',
-        description: `Average code complexity is ${avgComplexity}, which is higher than recommended threshold (10)`,
+        description: `Average code complexity is ${avgComplexity}, which is higher than recommended threshold (20)`,
         severity: 'High',
         impact: 'May lead to longer migration timeline and higher defect rate',
         mitigation: 'Allocate experienced developers, plan for refactoring, increase code review frequency'
