@@ -158,20 +158,20 @@ function ProjectDashboardPage() {
             <div className="metric-grid">
               <div className="metric">
                 <div className="metric-label">COBOL Files</div>
-                <div className="metric-value">{project.metadata.total_files || 0}</div>
+                <div className="metric-value">{project.metadata.source_analysis?.total_files || 0}</div>
               </div>
               <div className="metric">
                 <div className="metric-label">Lines of Code</div>
-                <div className="metric-value">{project.metadata.total_loc || 0}</div>
+                <div className="metric-value">{project.metadata.source_analysis?.total_loc || 0}</div>
               </div>
               <div className="metric">
                 <div className="metric-label">Database Tables</div>
-                <div className="metric-value">{project.ddlMetadata?.tables?.length || 0}</div>
+                <div className="metric-value">{project.metadata.source_analysis?.database?.tables || 0}</div>
               </div>
               <div className="metric">
                 <div className="metric-label">Complexity</div>
-                <div className={`metric-value complexity-${project.metadata.complexity?.toLowerCase() || 'unknown'}`}>
-                  {project.metadata.complexity || 'Unknown'}
+                <div className={`metric-value complexity-${project.metadata.complexity_summary?.split(' ')[0]?.toLowerCase() || 'unknown'}`}>
+                  {project.metadata.complexity_summary?.split(' - ')[0] || 'Unknown'}
                 </div>
               </div>
             </div>
