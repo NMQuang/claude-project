@@ -1,0 +1,757 @@
+# テスト戦略ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|---------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | テスト戦略 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}** 移行プロジェクトの包括的なテスト戦略を概説します。**{{source.language}}/{{source.database}}** から **{{target.language}}/{{target.database}}** への移行を成功させるため、テストアプローチ、範囲、テストレベル、テスト環境、および成功基準を定義します。
+
+### テスト目標
+
+{{#if objectives}}
+{{#each objectives}}
+- {{this}}
+{{/each}}
+{{else}}
+- 現行システムとの100%機能同等性を検証
+- 移行後のデータ整合性と正確性を確保
+- パフォーマンスが現行システムと同等以上であることを検証
+- 本番デプロイ前に不具合を特定して解決
+- 移行システムへの信頼を構築
+{{/if}}
+
+---
+
+## 1. テスト範囲
+
+### 1.1 スコープ内
+
+{{#if scope.in_scope}}
+{{#each scope.in_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+- ソースシステムのすべてのビジネス機能
+- データベーススキーマとデータ移行
+- 外部システムとの統合
+- パフォーマンスとスケーラビリティ
+- セキュリティとアクセス制御
+- ユーザーインターフェース（該当する場合）
+- エラー処理とログ
+{{/if}}
+
+### 1.2 スコープ外
+
+{{#if scope.out_scope}}
+{{#each scope.out_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+- 要件で明示的にスコープ外とされた機能
+- 廃止予定のレガシーシステム
+- サードパーティシステムのテスト（独立してテスト済みと想定）
+{{/if}}
+
+---
+
+## 2. テストレベル
+
+### 2.1 単体テスト
+
+**目的:** 個々のコンポーネントが独立して正しく機能することを検証
+
+**範囲:**
+{{#if test_levels.unit.scope}}
+{{test_levels.unit.scope}}
+{{else}}
+- すべてのサービスメソッド
+- ユーティリティ関数
+- データ変換
+- ビジネスロジック計算
+{{/if}}
+
+**アプローチ:**
+- **フレームワーク:** {{#if test_levels.unit.framework}}{{test_levels.unit.framework}}{{else}}JUnit 5, Mockito{{/if}}
+- **カバレッジ目標:** {{#if test_levels.unit.coverage}}{{test_levels.unit.coverage}}{{else}}80%以上{{/if}}
+- **モック:** Mockito を使用して依存関係をモック
+- **担当:** 開発者
+
+**サンプルテストケース:**
+```java
+@Test
+void testGetCustomerById_Success() {
+    // Given
+    Customer customer = new Customer(1L, "John Doe");
+    when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+
+    // When
+    Customer result = customerService.getCustomerById(1L);
+
+    // Then
+    assertNotNull(result);
+    assertEquals("John Doe", result.getName());
+}
+```
+
+---
+
+### 2.2 統合テスト
+
+**目的:** コンポーネントが正しく連携することを検証
+
+**範囲:**
+{{#if test_levels.integration.scope}}
+{{test_levels.integration.scope}}
+{{else}}
+- API エンドポイント（Controller → Service → Repository）
+- データベース連携
+- 外部システム統合
+- メッセージキュー連携
+{{/if}}
+
+**アプローチ:**
+- **フレームワーク:** {{#if test_levels.integration.framework}}{{test_levels.integration.framework}}{{else}}Spring Boot Test, TestContainers{{/if}}
+- **データベース:** PostgreSQL に TestContainers を使用
+- **テストデータ:** SQL スクリプトまたは DbUnit
+- **担当:** 開発者 + QA
+
+**サンプルテストケース:**
+```java
+@SpringBootTest
+@AutoConfigureTestDatabase(replace = Replace.NONE)
+class CustomerIntegrationTest {
+
+    @Test
+    void testCreateCustomer_Integration() {
+        // API call → Service → DB
+        // エンドツーエンドフローを検証
+    }
+}
+```
+
+---
+
+### 2.3 システムテスト
+
+**目的:** エンドユーザーの視点から完全なシステム動作を検証
+
+**範囲:**
+{{#if test_levels.system.scope}}
+{{test_levels.system.scope}}
+{{else}}
+- エンドツーエンドのビジネスプロセス
+- ユーザーワークフロー
+- 機能横断シナリオ
+- エラー処理とエッジケース
+{{/if}}
+
+**アプローチ:**
+- **環境:** 専用テスト環境（本番環境を模倣）
+- **テストデータ:** 本番環境に類似した代表的なデータ
+- **実行:** 手動および自動（UI には Selenium/Playwright）
+- **担当:** QA チーム
+
+**テストシナリオ:**
+{{#if test_levels.system.scenarios}}
+{{#each test_levels.system.scenarios}}
+- {{this}}
+{{/each}}
+{{else}}
+*[ビジネスユースケースに基づいて定義してください]*
+{{/if}}
+
+---
+
+### 2.4 移行テスト
+
+**目的:** データ移行の正確性と完全性を検証
+
+**範囲:**
+{{#if test_levels.migration.scope}}
+{{test_levels.migration.scope}}
+{{else}}
+- スキーマ移行（構造、インデックス、制約）
+- データ移行（完全性、正確性）
+- データ変換の正しさ
+- 参照整合性
+{{/if}}
+
+**アプローチ:**
+
+#### スキーマ検証
+{{#if test_levels.migration.schema_validation}}
+{{test_levels.migration.schema_validation}}
+{{else}}
+- ソースとターゲットのスキーマを比較
+- すべてのテーブル、カラム、データ型が移行されたことを確認
+- インデックス、主キー、外部キーを検証
+- 制約とトリガーをチェック
+{{/if}}
+
+#### データ検証
+{{#if test_levels.migration.data_validation}}
+{{#each test_levels.migration.data_validation}}
+- **{{this.check}}:** {{this.description}}
+{{/each}}
+{{else}}
+- **行数検証:** テーブルごとの行数を比較
+  ```sql
+  -- ソース (Oracle)
+  SELECT COUNT(*) FROM customers;
+
+  -- ターゲット (PostgreSQL)
+  SELECT COUNT(*) FROM customers;
+  ```
+
+- **チェックサム検証:** データ整合性を確認
+  ```sql
+  SELECT MD5(string_agg(customer_id::text, ',' ORDER BY customer_id))
+  FROM customers;
+  ```
+
+- **サンプルデータ検証:** ランダムサンプルの手動レビュー（データの5-10%）
+
+- **ビジネスルール検証:** 両システムでビジネスロジックを実行して結果を比較
+
+- **エッジケース検証:** NULL 値、特殊文字、日付エッジケースをテスト
+{{/if}}
+
+---
+
+### 2.5 性能テスト
+
+**目的:** システムがパフォーマンス要件を満たすことを確保
+
+**範囲:**
+{{#if test_levels.performance.scope}}
+{{test_levels.performance.scope}}
+{{else}}
+- 主要トランザクションのレスポンスタイム
+- スループット（1秒あたりのトランザクション数）
+- 同時ユーザー負荷
+- データベースクエリパフォーマンス
+- リソース使用率（CPU、メモリ、ディスク I/O）
+{{/if}}
+
+**テストタイプ:**
+
+#### 負荷テスト
+{{#if test_levels.performance.load_testing}}
+{{test_levels.performance.load_testing}}
+{{else}}
+- **目的:** システムが期待される負荷を処理できることを確認
+- **ツール:** JMeter、Gatling、または K6
+- **目標:** 通常の本番負荷をシミュレート
+- **成功基準:**
+  - 平均レスポンスタイム < 2秒
+  - 95パーセンタイル < 5秒
+  - 通常負荷下でエラーなし
+{{/if}}
+
+#### ストレステスト
+{{#if test_levels.performance.stress_testing}}
+{{test_levels.performance.stress_testing}}
+{{else}}
+- **目的:** 限界点を特定
+- **アプローチ:** システムが故障するまで負荷を徐々に増加
+- **成功基準:** 緩やかな性能低下、データ破損なし
+{{/if}}
+
+#### 耐久テスト
+{{#if test_levels.performance.endurance_testing}}
+{{test_levels.performance.endurance_testing}}
+{{else}}
+- **目的:** 長期間のシステム安定性を検証
+- **期間:** 通常負荷下で8-24時間
+- **成功基準:** メモリリークなし、一貫したパフォーマンス
+{{/if}}
+
+**パフォーマンスベースライン:**
+{{#if test_levels.performance.baseline}}
+| メトリック | 現行システム | ターゲットシステム | しきい値 |
+|--------|----------------|---------------|-----------|
+{{#each test_levels.performance.baseline}}
+| {{this.metric}} | {{this.current}} | {{this.target}} | {{this.threshold}} |
+{{/each}}
+{{else}}
+| メトリック | 現行システム | ターゲットシステム | しきい値 |
+|--------|----------------|---------------|-----------|
+| ページロード時間 | 1.5秒 | ≤ 1.5秒 | < 2秒 |
+| API レスポンスタイム | 200ms | ≤ 200ms | < 500ms |
+| 同時ユーザー数 | 100 | ≥ 100 | 100以上 |
+| スループット | 50 TPS | ≥ 50 TPS | 50以上 TPS |
+{{/if}}
+
+---
+
+### 2.6 セキュリティテスト
+
+**目的:** セキュリティ脆弱性を特定
+
+**範囲:**
+{{#if test_levels.security.scope}}
+{{test_levels.security.scope}}
+{{else}}
+- 認証と認可
+- SQL インジェクション防止
+- クロスサイトスクリプティング（XSS）防止
+- 機密データ露出
+- API セキュリティ
+{{/if}}
+
+**アプローチ:**
+{{#if test_levels.security.approach}}
+{{test_levels.security.approach}}
+{{else}}
+- **SAST（静的解析）:** SonarQube、Checkmarx
+- **DAST（動的解析）:** OWASP ZAP、Burp Suite
+- **依存関係スキャン:** OWASP Dependency Check
+- **ペネトレーションテスト:** 重要システムについてセキュリティチームと連携
+{{/if}}
+
+---
+
+### 2.7 ユーザー受け入れテスト（UAT）
+
+**目的:** システムがビジネス要件を満たすことを検証
+
+**範囲:**
+{{#if test_levels.uat.scope}}
+{{test_levels.uat.scope}}
+{{else}}
+- すべてのビジネスクリティカルな機能
+- ユーザーワークフローとシナリオ
+- レポートとデータエクスポート
+- UI/UX 検証
+{{/if}}
+
+**アプローチ:**
+- **参加者:** ビジネスユーザー、ドメインエキスパート
+- **環境:** 本番環境に類似したデータを持つ UAT 環境
+- **期間:** {{#if test_levels.uat.duration}}{{test_levels.uat.duration}}{{else}}2-4週間{{/if}}
+- **成功基準:** {{#if test_levels.uat.success}}{{test_levels.uat.success}}{{else}}不具合率5%未満、すべての重大不具合が解決{{/if}}
+
+**UAT テストシナリオ:**
+{{#if test_levels.uat.scenarios}}
+{{#each test_levels.uat.scenarios}}
+- **{{this.id}}:** {{this.description}}
+  - **ステップ:** {{this.steps}}
+  - **期待結果:** {{this.expected}}
+{{/each}}
+{{else}}
+*[ビジネスユーザーとビジネスシナリオを定義してください]*
+{{/if}}
+
+---
+
+## 3. テスト環境
+
+### 3.1 環境戦略
+
+{{#if environments.strategy}}
+{{environments.strategy}}
+{{else}}
+| 環境 | 目的 | リフレッシュ頻度 | アクセス |
+|-------------|---------|-------------------|--------|
+| **DEV** | 開発と単体テスト | オンデマンド | 開発者 |
+| **TEST** | 統合とシステムテスト | 週次 | 開発者、QA |
+| **UAT** | ユーザー受け入れテスト | UAT サイクル前 | ビジネスユーザー、QA |
+| **STAGING** | 本番前検証 | リリース前 | QA、リリースチーム |
+| **PROD** | 本番環境 | N/A | エンドユーザー |
+{{/if}}
+
+### 3.2 環境設定
+
+{{#if environments.config}}
+{{#each environments.config}}
+#### {{this.name}} 環境
+
+**インフラ:**
+{{#each this.infrastructure}}
+- {{this}}
+{{/each}}
+
+**データベース:**
+- **タイプ:** {{this.db_type}}
+- **サイズ:** {{this.db_size}}
+- **データ:** {{this.db_data}}
+
+**設定:**
+```yaml
+{{this.config}}
+```
+
+---
+
+{{/each}}
+{{else}}
+*[各環境の設定を定義してください]*
+{{/if}}
+
+### 3.3 テストデータ管理
+
+{{#if test_data.strategy}}
+{{test_data.strategy}}
+{{else}}
+**戦略:**
+- **DEV/TEST:** スクリプトで生成された合成データ
+- **UAT:** 本番データのサブセット（匿名化）
+- **STAGING:** 本番データの完全コピー（匿名化）
+
+**データリフレッシュ:**
+- TEST 環境: 週次
+- UAT 環境: 各 UAT サイクル前
+- STAGING: 各リリース前
+
+**データプライバシー:**
+- PII（氏名、メール、電話番号）を匿名化
+- 機密金融データをマスク
+- データマスキングツールまたは SQL スクリプトを使用
+{{/if}}
+
+---
+
+## 4. テスト自動化戦略
+
+### 4.1 自動化範囲
+
+{{#if automation.scope}}
+{{#each automation.scope}}
+- {{this}}
+{{/each}}
+{{else}}
+- 単体テスト: 100% 自動化
+- 統合テスト: 90% 自動化
+- API テスト: 80% 自動化
+- UI リグレッションテスト: 50% 自動化（クリティカルパス）
+- 性能テスト: 100% 自動化
+{{/if}}
+
+### 4.2 自動化フレームワーク
+
+{{#if automation.framework}}
+{{automation.framework}}
+{{else}}
+| テストタイプ | フレームワーク/ツール | 言語 |
+|-----------|----------------|----------|
+| 単体 | JUnit 5, Mockito | Java |
+| 統合 | Spring Boot Test | Java |
+| API | REST Assured | Java |
+| UI | Selenium / Playwright | Java / TypeScript |
+| 性能 | JMeter / Gatling | Groovy / Scala |
+| DB 移行 | カスタム SQL スクリプト | SQL |
+{{/if}}
+
+### 4.3 CI/CD 統合
+
+{{#if automation.cicd}}
+{{automation.cicd}}
+{{else}}
+```mermaid
+graph LR
+    A[コードコミット] --> B[ビルド]
+    B --> C[単体テスト]
+    C --> D[統合テスト]
+    D --> E[コード品質チェック]
+    E --> F{合格?}
+    F -->|はい| G[TEST へデプロイ]
+    F -->|いいえ| H[開発者へ通知]
+    G --> I[自動リグレッション]
+    I --> J{合格?}
+    J -->|はい| K[UAT 準備完了]
+    J -->|いいえ| H
+```
+
+**パイプライン設定:**
+- トリガー: main ブランチへの各コミット
+- デプロイ前に単体テストと統合テストが合格必須
+- 自動リグレッションは TEST 環境で夜間実行
+- 性能テストは STAGING 環境で週次実行
+{{/if}}
+
+---
+
+## 5. 不具合管理
+
+### 5.1 不具合ライフサイクル
+
+{{#if defect.lifecycle}}
+{{defect.lifecycle}}
+{{else}}
+```
+新規 → 割り当て → 対応中 → 修正済み → テスト中 → 検証済み → クローズ
+                                    ↓
+                            再オープン（テスト失敗の場合）
+```
+{{/if}}
+
+### 5.2 不具合の深刻度と優先度
+
+{{#if defect.severity}}
+{{#each defect.severity}}
+- **{{this.level}}:** {{this.description}}
+  - **対応時間:** {{this.response_time}}
+{{/each}}
+{{else}}
+| 深刻度 | 定義 | 対応時間 | 例 |
+|----------|------------|---------------|---------|
+| **致命的** | システムクラッシュ、データ損失、セキュリティ侵害 | 4時間 | データベース接続失敗 |
+| **高** | 主要機能が動作不能、回避策なし | 1営業日 | 支払い処理失敗 |
+| **中** | 機能が損なわれている、回避策あり | 3営業日 | レポートフォーマット問題 |
+| **低** | 軽微な問題、見た目の問題 | 次回リリース | UI 配置問題 |
+{{/if}}
+
+### 5.3 不具合追跡
+
+{{#if defect.tracking}}
+{{defect.tracking}}
+{{else}}
+**ツール:** Jira、Azure DevOps、または Bugzilla
+
+**必須フィールド:**
+- タイトル、説明、再現手順
+- 深刻度、優先度
+- 環境、ブラウザ/バージョン（UI の場合）
+- 担当者、報告者
+- 添付ファイル（スクリーンショット、ログ）
+
+**追跡するメトリクス:**
+- 発見された総不具合数
+- 深刻度別不具合
+- 不具合解決時間
+- 不具合エージング
+- 不具合却下率
+{{/if}}
+
+---
+
+## 6. 開始基準と終了基準
+
+### 6.1 テスト開始基準
+
+{{#if entry_criteria}}
+{{#each entry_criteria}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] テスト計画が承認されている
+- [ ] テスト環境が準備され、アクセス可能
+- [ ] テストデータが準備されている
+- [ ] アプリケーションがテスト環境にデプロイされている
+- [ ] 単体テストが80%以上のカバレッジで合格
+- [ ] テストケースがレビューされ、承認されている
+{{/if}}
+
+### 6.2 テスト終了基準
+
+{{#if exit_criteria}}
+{{#each exit_criteria}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] すべての計画されたテストケースが実行されている
+- [ ] テストケース合格率95%以上
+- [ ] 未解決の致命的または高深刻度の不具合がない
+- [ ] すべての中深刻度の不具合がレビューされ、承認/修正されている
+- [ ] パフォーマンスベンチマークを満たしている
+- [ ] UAT の承認を取得
+- [ ] テストサマリーレポートが完成している
+{{/if}}
+
+---
+
+## 7. テスト成果物
+
+{{#if deliverables}}
+{{#each deliverables}}
+### {{this.name}}
+
+**説明:** {{this.description}}
+
+**担当:** {{this.responsible}}
+
+**納品日:** {{this.date}}
+
+---
+
+{{/each}}
+{{else}}
+| 成果物 | 説明 | 担当 | タイムライン |
+|-------------|-------------|-------------|----------|
+| テスト計画 | 本ドキュメント | QA リード | テスト開始前 |
+| テストケース | 詳細テストシナリオ | QA チーム | 実行1週間前 |
+| テストデータ | サンプルデータセット | QA + BA | テスト開始前 |
+| テスト実行レポート | 日次/週次テスト進捗 | QA チーム | 日次/週次 |
+| 不具合レポート | 不具合メトリクスと傾向 | QA リード | 週次 |
+| 性能テストレポート | 負荷/ストレステスト結果 | 性能エンジニア | 性能テスト後 |
+| UAT 承認 | ビジネス承認 | ビジネスユーザー | UAT 完了後 |
+| テストサマリーレポート | 最終テスト結果 | QA リード | テストフェーズ終了時 |
+{{/if}}
+
+---
+
+## 8. 役割と責任
+
+{{#if roles}}
+| 役割 | 責任 | チームメンバー |
+|------|----------------|--------------|
+{{#each roles}}
+| {{this.role}} | {{this.responsibility}} | {{this.members}} |
+{{/each}}
+{{else}}
+| 役割 | 責任 | チームメンバー |
+|------|----------------|--------------|
+| **QA リード** | テスト戦略、計画、レポート | TBD |
+| **QA エンジニア** | テストケース設計、実行、自動化 | TBD |
+| **性能エンジニア** | 性能テスト、分析 | TBD |
+| **開発者** | 単体/統合テスト、不具合修正 | 開発チーム |
+| **ビジネスアナリスト** | UAT テストケースレビュー、UAT 調整 | BA チーム |
+| **ビジネスユーザー** | UAT 実行、承認 | ビジネスステークホルダー |
+{{/if}}
+
+---
+
+## 9. テストスケジュール
+
+{{#if schedule}}
+```mermaid
+gantt
+    title テストスケジュール
+    dateFormat YYYY-MM-DD
+
+    {{#each schedule}}
+    {{this.phase}} :{{this.start}}, {{this.duration}}
+    {{/each}}
+```
+{{else}}
+```mermaid
+gantt
+    title テストスケジュール
+    dateFormat YYYY-MM-DD
+
+    テスト計画      :2024-01-01, 10d
+    テストケース設計   :2024-01-08, 15d
+    単体テスト       :2024-01-15, 30d
+    統合テスト:2024-02-01, 20d
+    システムテスト     :2024-02-15, 30d
+    移行テスト  :2024-02-15, 30d
+    性能テスト:2024-03-01, 15d
+    UAT                :2024-03-15, 30d
+    リグレッションテスト :2024-04-01, 15d
+```
+{{/if}}
+
+**主要マイルストーン:**
+{{#if milestones}}
+{{#each milestones}}
+- **{{this.name}}:** {{this.date}}
+{{/each}}
+{{else}}
+- テスト計画承認: [日付]
+- テスト環境準備完了: [日付]
+- システムテスト完了: [日付]
+- UAT 承認: [日付]
+- 本番稼働準備完了: [日付]
+{{/if}}
+
+---
+
+## 10. リスクと緩和策
+
+{{#if risks}}
+| リスク | 発生確率 | 影響度 | 緩和策 |
+|------|-------------|--------|------------|
+{{#each risks}}
+| {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} |
+{{/each}}
+{{else}}
+| リスク | 発生確率 | 影響度 | 緩和策 |
+|------|-------------|--------|------------|
+| テスト環境の不安定性 | 中 | 高 | 専任 DevOps サポート、バックアップ環境 |
+| テストデータ不足 | 中 | 中 | 早期テストデータ準備、合成データ生成 |
+| リソース不足 | 低 | 高 | クロストレーニング、外部 QA リソース |
+| 不具合修正の遅延 | 中 | 高 | 日次不具合トリアージ、専用修正スプリント |
+| UAT の遅延 | 中 | 高 | 早期ビジネス連携、明確な UAT 基準 |
+{{/if}}
+
+---
+
+## 11. ツールとインフラ
+
+{{#if tools}}
+| カテゴリ | ツール | 目的 |
+|----------|------|---------|
+{{#each tools}}
+| {{this.category}} | {{this.tool}} | {{this.purpose}} |
+{{/each}}
+{{else}}
+| カテゴリ | ツール | 目的 |
+|----------|------|---------|
+| テスト管理 | Jira / TestRail | テストケース管理、実行追跡 |
+| 不具合追跡 | Jira / Bugzilla | 不具合ライフサイクル管理 |
+| 自動化 | Selenium / Playwright | UI テスト自動化 |
+| API テスト | REST Assured / Postman | API テスト自動化 |
+| 性能 | JMeter / Gatling | 負荷と性能テスト |
+| CI/CD | Jenkins / GitLab CI | 継続的インテグレーション |
+| コードカバレッジ | JaCoCo / SonarQube | コードカバレッジ分析 |
+| データベース | PostgreSQL | テストデータベース |
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: サンプルテストケース
+
+{{#if appendix.sample_tests}}
+{{#each appendix.sample_tests}}
+#### テストケース: {{this.id}} - {{this.title}}
+
+**前提条件:** {{this.preconditions}}
+
+**ステップ:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+**期待結果:** {{this.expected}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 付録B: テストデータサンプル
+
+{{#if appendix.test_data}}
+*[サンプルテストデータセット]*
+{{/if}}
+
+### 付録C: 性能テストスクリプト
+
+{{#if appendix.perf_scripts}}
+*[JMeter/Gatling テストスクリプト]*
+{{/if}}
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（自動生成） |
+
+---
+
+**テスト戦略ドキュメント 終了**

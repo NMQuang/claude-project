@@ -1,0 +1,627 @@
+# 移行設計ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|---------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | 移行設計（コードとデータベース） |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}** を **{{source.language}}/{{source.database}}** から **{{target.language}}/{{target.database}}** へ移行するための詳細な設計仕様を提供します。コードアーキテクチャ設計、データベーススキーマ設計、および実装ガイドラインが含まれます。
+
+---
+
+## 1. アーキテクチャ設計
+
+### 1.1 ターゲットアーキテクチャ
+
+```mermaid
+{{#if architecture.diagram}}
+{{{architecture.diagram}}}
+{{else}}
+graph TB
+    subgraph "プレゼンテーション層"
+        UI[Web UI]
+    end
+
+    subgraph "アプリケーション層"
+        API[REST API]
+        Service[ビジネスサービス]
+    end
+
+    subgraph "データ層"
+        Repo[リポジトリ]
+        DB[(PostgreSQL)]
+    end
+
+    UI --> API
+    API --> Service
+    Service --> Repo
+    Repo --> DB
+{{/if}}
+```
+
+### 1.2 デザインパターン
+
+{{#if architecture.patterns}}
+{{#each architecture.patterns}}
+- **{{this.name}}:** {{this.description}}
+  - **使用箇所:** {{this.usage}}
+{{/each}}
+{{else}}
+- **レイヤードアーキテクチャ:** プレゼンテーション → サービス → リポジトリ → データ
+- **依存性注入:** Spring フレームワークによる IoC
+- **リポジトリパターン:** データアクセスの抽象化
+- **DTO パターン:** 層間のデータ転送
+{{/if}}
+
+### 1.3 モジュール構造
+
+{{#if architecture.modules}}
+{{#each architecture.modules}}
+#### {{this.name}} モジュール
+
+**目的:** {{this.purpose}}
+
+**コンポーネント:**
+{{#each this.components}}
+- {{this}}
+{{/each}}
+
+**依存関係:**
+{{#each this.dependencies}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+*[ビジネスドメインに基づいてモジュール分割を定義してください]*
+{{/if}}
+
+---
+
+## 2. コード移行設計
+
+### 2.1 パッケージ構造
+
+```
+{{#if code_design.package_structure}}
+{{{code_design.package_structure}}}
+{{else}}
+src/main/java/com/company/project/
+├── controller/          # REST コントローラー
+├── service/            # ビジネスロジックサービス
+│   ├── impl/           # サービス実装
+│   └── dto/            # データ転送オブジェクト
+├── repository/         # データアクセス層
+├── entity/             # JPA エンティティ
+├── config/             # 設定クラス
+├── exception/          # カスタム例外
+├── util/               # ユーティリティクラス
+└── constant/           # 定数
+
+src/main/resources/
+├── application.yml     # アプリケーション設定
+├── db/migration/       # Flyway マイグレーションスクリプト
+└── static/             # 静的リソース
+{{/if}}
+```
+
+### 2.2 コンポーネントマッピング
+
+{{#if mappings.components}}
+| ソースコンポーネント | ターゲットコンポーネント | マッピングタイプ | 備考 |
+|------------------|------------------|--------------|-------|
+{{#each mappings.components}}
+| {{this.source}} | {{this.target}} | {{this.type}} | {{this.notes}} |
+{{/each}}
+{{else}}
+*[ソースコード分析から自動生成]*
+
+例:
+| ソース (COBOL) | ターゲット (Java) | マッピングタイプ | 備考 |
+|----------------|---------------|--------------|-------|
+| CUSTMGMT.cbl | CustomerService.java | 1:1 | メインビジネスロジック |
+| CUSTOMER-RECORD | Customer.java (Entity) | データ構造 → エンティティ | JPA エンティティ |
+| GET-CUSTOMER paragraph | getCustomer() method | パラグラフ → メソッド | サービスメソッド |
+{{/if}}
+
+### 2.3 詳細コンポーネント設計
+
+{{#if code_design.components}}
+{{#each code_design.components}}
+#### {{this.name}}
+
+**タイプ:** {{this.type}}
+
+**ソースファイル:** {{this.source_file}}
+
+**ターゲットファイル:** {{this.target_file}}
+
+**責務:**
+{{#each this.responsibilities}}
+- {{this}}
+{{/each}}
+
+**公開インターフェース:**
+```java
+{{this.interface_code}}
+```
+
+**主要実装ノート:**
+{{#each this.notes}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 2.4 API 設計
+
+{{#if api_design.endpoints}}
+| エンドポイント | メソッド | 説明 | リクエスト | レスポンス |
+|----------|--------|-------------|---------|----------|
+{{#each api_design.endpoints}}
+| {{this.path}} | {{this.method}} | {{this.description}} | {{this.request}} | {{this.response}} |
+{{/each}}
+{{else}}
+*[ビジネス要件に基づいて API エンドポイントを定義してください]*
+
+例:
+| エンドポイント | メソッド | 説明 | リクエスト | レスポンス |
+|----------|--------|-------------|---------|----------|
+| /api/customers | GET | 全顧客取得 | クエリパラメータ | Customer[] |
+| /api/customers/{id} | GET | ID による顧客取得 | パスパラメータ | Customer |
+| /api/customers | POST | 顧客作成 | Customer DTO | Customer |
+| /api/customers/{id} | PUT | 顧客更新 | Customer DTO | Customer |
+| /api/customers/{id} | DELETE | 顧客削除 | パスパラメータ | 204 No Content |
+{{/if}}
+
+---
+
+## 3. データベース設計
+
+### 3.1 スキーマ概要
+
+```mermaid
+{{#if db_design.erd}}
+{{{db_design.erd}}}
+{{else}}
+erDiagram
+    CUSTOMER ||--o{ ORDER : places
+    CUSTOMER {
+        int customer_id PK
+        string name
+        string email
+        timestamp created_at
+    }
+    ORDER {
+        int order_id PK
+        int customer_id FK
+        decimal total_amount
+        timestamp order_date
+    }
+{{/if}}
+```
+
+### 3.2 テーブル定義
+
+{{#if db_design.tables}}
+{{#each db_design.tables}}
+#### テーブル: `{{this.name}}`
+
+**ソーステーブル:** {{this.source_table}}
+
+**目的:** {{this.purpose}}
+
+**DDL:**
+```sql
+CREATE TABLE {{this.name}} (
+{{#each this.columns}}
+    {{this.name}} {{this.type}}{{#if this.nullable}} NULL{{else}} NOT NULL{{/if}}{{#if this.default}} DEFAULT {{this.default}}{{/if}},
+{{/each}}
+    PRIMARY KEY ({{this.primary_key}}),
+{{#each this.foreign_keys}}
+    FOREIGN KEY ({{this.column}}) REFERENCES {{this.ref_table}}({{this.ref_column}}),
+{{/each}}
+);
+```
+
+**インデックス:**
+{{#each this.indexes}}
+- `{{this.name}}`: {{this.columns}} ({{this.type}})
+{{/each}}
+
+**移行ノート:**
+{{#each this.migration_notes}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+*[DDL 分析から自動生成]*
+{{/if}}
+
+### 3.3 データ型変換マトリックス
+
+{{#if db_design.type_conversions}}
+| ソース型（{{source.database}}） | ターゲット型（{{target.database}}） | 変換ルール | リスク |
+|-----------------------------------|-----------------------------------|-----------------|------|
+{{#each db_design.type_conversions}}
+| {{this.source}} | {{this.target}} | {{this.rule}} | {{this.risk}} |
+{{/each}}
+{{else}}
+| ソース (Oracle) | ターゲット (PostgreSQL) | 変換ルール | リスク |
+|-----------------|---------------------|-----------------|------|
+| NUMBER(10,0) | INTEGER | 直接マッピング | 低 |
+| NUMBER(10,2) | NUMERIC(10,2) | 直接マッピング | 低 |
+| VARCHAR2(n) | VARCHAR(n) | 直接マッピング | 低 |
+| DATE | TIMESTAMP | Oracle DATE は時刻を含む | 中 |
+| CLOB | TEXT | 直接マッピング | 低 |
+| BLOB | BYTEA | 直接マッピング | 低 |
+| RAW(n) | BYTEA | 直接マッピング | 低 |
+{{/if}}
+
+### 3.4 ストアドプロシージャ移行
+
+{{#if db_design.procedures}}
+{{#each db_design.procedures}}
+#### プロシージャ: {{this.source_name}}
+
+**移行アプローチ:** {{this.approach}}
+
+**ターゲット実装:**
+{{#if this.move_to_code}}
+- **配置先:** {{this.target_service}} (Java サービス)
+- **理由:** {{this.rationale}}
+{{else}}
+- **配置先:** PostgreSQL 関数
+- **名前:** {{this.target_name}}
+{{/if}}
+
+**ソースコード (Oracle PL/SQL):**
+```sql
+{{this.source_code}}
+```
+
+**ターゲットコード:**
+```{{#if this.move_to_code}}java{{else}}sql{{/if}}
+{{this.target_code}}
+```
+
+---
+
+{{/each}}
+{{else}}
+*[ストアドプロシージャを分析し、移行戦略を定義してください]*
+{{/if}}
+
+---
+
+## 4. データ移行設計
+
+### 4.1 移行ワークフロー
+
+```mermaid
+{{#if data_migration.workflow}}
+{{{data_migration.workflow}}}
+{{else}}
+graph LR
+    A[Oracle から抽出] --> B[データ変換]
+    B --> C[検証]
+    C --> D[PostgreSQL へロード]
+    D --> E[確認]
+    E --> F{OK?}
+    F -->|はい| G[完了]
+    F -->|いいえ| H[ロールバック]
+{{/if}}
+```
+
+### 4.2 テーブル移行優先度
+
+{{#if data_migration.priorities}}
+| 優先度 | テーブル名 | 行数（推定） | 依存関係 | 戦略 |
+|----------|------------|-------------|--------------|----------|
+{{#each data_migration.priorities}}
+| {{this.priority}} | {{this.table}} | {{this.rows}} | {{this.dependencies}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+*[外部キー依存関係に基づいて移行順序を定義してください]*
+{{/if}}
+
+### 4.3 データ変換ルール
+
+{{#if data_migration.transformations}}
+{{#each data_migration.transformations}}
+#### {{this.table}}.{{this.column}}
+
+**変換:** {{this.description}}
+
+**ルール:**
+```
+{{this.rule}}
+```
+
+**例:**
+- **変換前:** {{this.example_before}}
+- **変換後:** {{this.example_after}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 4.4 データ検証戦略
+
+{{#if data_migration.validation}}
+{{#each data_migration.validation}}
+- **{{this.check}}:** {{this.description}}
+  - **クエリ:** `{{this.query}}`
+  - **期待結果:** {{this.expected}}
+{{/each}}
+{{else}}
+- **行数検証:** ソースとターゲット間の行数を比較
+- **チェックサム検証:** 重要テーブルの MD5/SHA ハッシュ
+- **サンプルデータ検証:** サンプルレコードの手動レビュー
+- **参照整合性:** すべての外部キーが有効であることを確認
+- **ビジネスルール検証:** ビジネスロジックチェックを実行
+{{/if}}
+
+---
+
+## 5. 構成管理
+
+### 5.1 環境設定
+
+{{#if config.environments}}
+{{#each config.environments}}
+#### {{this.name}} 環境
+
+**データベース:**
+- ホスト: {{this.db_host}}
+- ポート: {{this.db_port}}
+- データベース: {{this.db_name}}
+
+**アプリケーション:**
+- サーバー: {{this.app_server}}
+- ポート: {{this.app_port}}
+
+**設定ファイル:**
+```yaml
+{{this.config_content}}
+```
+
+---
+
+{{/each}}
+{{else}}
+*[開発、テスト、ステージング、本番の設定を定義してください]*
+{{/if}}
+
+### 5.2 外部依存関係
+
+{{#if config.dependencies}}
+| 依存関係 | 目的 | 設定 |
+|------------|---------|---------------|
+{{#each config.dependencies}}
+| {{this.name}} | {{this.purpose}} | {{this.config}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 6. エラーハンドリングとログ
+
+### 6.1 例外階層
+
+{{#if error_handling.exceptions}}
+```
+{{error_handling.exceptions}}
+```
+{{else}}
+```
+RuntimeException
+├── BusinessException
+│   ├── CustomerNotFoundException
+│   ├── InvalidOrderException
+│   └── DuplicateRecordException
+└── TechnicalException
+    ├── DatabaseException
+    ├── IntegrationException
+    └── ConfigurationException
+```
+{{/if}}
+
+### 6.2 ログ戦略
+
+{{#if error_handling.logging}}
+{{error_handling.logging}}
+{{else}}
+**ログレベル:**
+- **ERROR:** システムエラー、例外
+- **WARN:** ビジネス検証失敗、非推奨 API 使用
+- **INFO:** 主要ビジネスイベント、API 呼び出し
+- **DEBUG:** 詳細フロー情報（開発/テストのみ）
+
+**ログフォーマット:**
+```
+[timestamp] [level] [thread] [class] - message
+```
+
+**ログ保存:**
+- 開発環境: コンソール + ファイル
+- 本番環境: ファイル + ELK Stack (Elasticsearch, Logstash, Kibana)
+{{/if}}
+
+---
+
+## 7. パフォーマンス最適化
+
+### 7.1 データベース最適化
+
+{{#if performance.database}}
+{{#each performance.database}}
+- **{{this.area}}:** {{this.description}}
+  - **実装:** {{this.implementation}}
+{{/each}}
+{{else}}
+- **インデックス戦略:** 外部キーと頻繁にクエリされるカラムにインデックスを作成
+- **コネクションプール:** 最適化されたプールサイズの HikariCP
+- **クエリ最適化:** EXPLAIN ANALYZE を使用して遅いクエリを最適化
+- **キャッシング:** 読み取り中心のエンティティにセカンドレベルキャッシュを実装
+{{/if}}
+
+### 7.2 アプリケーション最適化
+
+{{#if performance.application}}
+{{#each performance.application}}
+- **{{this.area}}:** {{this.description}}
+{{/each}}
+{{else}}
+- **遅延ロード:** 大きなオブジェクトグラフに遅延ロードを使用
+- **バッチ処理:** バルク操作をバッチで処理
+- **非同期処理:** 長時間実行操作に @Async を使用
+- **キャッシング:** 分散キャッシングに Redis を使用
+{{/if}}
+
+---
+
+## 8. セキュリティ設計
+
+### 8.1 認証と認可
+
+{{#if security.auth}}
+{{security.auth}}
+{{else}}
+- **認証:** JWT ベース認証
+- **認可:** ロールベースアクセス制御 (RBAC)
+- **パスワードポリシー:** BCrypt ハッシュ、最低8文字
+{{/if}}
+
+### 8.2 データセキュリティ
+
+{{#if security.data}}
+{{#each security.data}}
+- **{{this.aspect}}:** {{this.implementation}}
+{{/each}}
+{{else}}
+- **保存時の暗号化:** データベースレベルの暗号化
+- **転送時の暗号化:** すべての通信に TLS 1.2+
+- **機密データ:** ログ内の個人情報をマスク
+- **SQL インジェクション防止:** パラメータ化クエリ/JPA を使用
+{{/if}}
+
+---
+
+## 9. 実装ガイドライン
+
+### 9.1 コーディング規約
+
+{{#if guidelines.coding_standards}}
+{{guidelines.coding_standards}}
+{{else}}
+- Java コーディング規約に従う
+- コード品質チェックに SonarQube を使用
+- 単体テストカバレッジ 80% 以上を維持
+- すべての公開 API を Javadoc で文書化
+- 意味のある変数名とメソッド名を使用
+{{/if}}
+
+### 9.2 コードレビューチェックリスト
+
+{{#if guidelines.code_review}}
+{{#each guidelines.code_review}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] コードがコーディング規約に従っている
+- [ ] 単体テストが存在し、パスする
+- [ ] ハードコードされた値がない（設定を使用）
+- [ ] エラーハンドリングが適切
+- [ ] ログが十分
+- [ ] セキュリティ脆弱性がない
+- [ ] パフォーマンス考慮が対処されている
+{{/if}}
+
+---
+
+## 10. デプロイメント設計
+
+### 10.1 ビルドとデプロイメントパイプライン
+
+```mermaid
+{{#if deployment.pipeline}}
+{{{deployment.pipeline}}}
+{{else}}
+graph LR
+    A[コードコミット] --> B[ビルド]
+    B --> C[単体テスト]
+    C --> D[統合テスト]
+    D --> E[パッケージ]
+    E --> F[開発環境へデプロイ]
+    F --> G[テスト環境へデプロイ]
+    G --> H[UAT]
+    H --> I[本番環境へデプロイ]
+{{/if}}
+```
+
+### 10.2 デプロイメント成果物
+
+{{#if deployment.artifacts}}
+{{#each deployment.artifacts}}
+- **{{this.name}}:** {{this.description}}
+  - **形式:** {{this.format}}
+  - **場所:** {{this.location}}
+{{/each}}
+{{else}}
+- **アプリケーション JAR:** Spring Boot 実行可能 JAR
+- **データベーススクリプト:** Flyway マイグレーションスクリプト
+- **設定ファイル:** application-{env}.yml
+- **デプロイメントスクリプト:** 自動化用シェルスクリプト
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: データベース DDL スクリプト
+
+*[すべてのテーブル、インデックス、制約の完全な DDL スクリプト]*
+
+### 付録B: サンプルコード
+
+{{#if appendix.sample_code}}
+*[主要コンポーネントのコード例]*
+{{/if}}
+
+### 付録C: API 仕様
+
+{{#if appendix.api_spec}}
+*[OpenAPI/Swagger 仕様ファイル]*
+{{/if}}
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（自動生成） |
+
+---
+
+**移行設計ドキュメント 終了**

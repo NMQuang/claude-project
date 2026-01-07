@@ -24,11 +24,27 @@ export class DocumentGenerator {
   /**
    * Generate a document from template
    */
-  async generate(documentType: string, data: any): Promise<string> {
-    const templatePath = path.join(this.templatesDir, `${documentType}.hbs`);
+  async generate(documentType: string, data: any, language: string = 'en'): Promise<string> {
+    // Map language codes to folder names
+    const languageFolder = language === 'ja' ? 'japanese' : 'english';
 
-    if (!fs.existsSync(templatePath)) {
-      throw new Error(`Template not found: ${documentType}.hbs`);
+    // Try language-specific folder first, then fallback to English
+    const tryPaths = [
+      path.join(languageFolder, `${documentType}.hbs`),  // Preferred: language-specific folder
+      path.join('english', `${documentType}.hbs`)        // Fallback: English folder
+    ];
+
+    let templatePath: string | null = null;
+    for (const tryPath of tryPaths) {
+      const fullPath = path.join(this.templatesDir, tryPath);
+      if (fs.existsSync(fullPath)) {
+        templatePath = fullPath;
+        break;
+      }
+    }
+
+    if (!templatePath) {
+      throw new Error(`Template not found for ${documentType} in any language`);
     }
 
     const templateSource = fs.readFileSync(templatePath, 'utf-8');

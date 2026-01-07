@@ -21,6 +21,7 @@ export interface Project {
   targetDatabase?: string;
   metadata?: any;
   ddlMetadata?: any;
+  generatedDocuments?: string[];
 }
 
 export interface CreateProjectRequest {
@@ -98,11 +99,12 @@ export const getProjectMetadata = async (projectId: string): Promise<any> => {
 // Document Generation
 export const generateDocument = async (
   projectId: string,
-  documentType: string
+  documentType: string,
+  language: string = 'en'
 ): Promise<DocumentResponse> => {
   const response = await api.post<DocumentResponse>(
     `/projects/${projectId}/generate`,
-    { documentType }
+    { documentType, language }
   );
   return response.data;
 };
@@ -127,6 +129,23 @@ export const updateDocument = async (
 export const exportDocuments = async (projectId: string): Promise<any> => {
   const response = await api.get(`/projects/${projectId}/export`);
   return response.data;
+};
+
+export const downloadDocument = async (projectId: string, docType: string): Promise<void> => {
+  const response = await api.get(`/projects/${projectId}/documents/${docType}/download`, {
+    responseType: 'blob'
+  });
+
+  // Create a blob URL and trigger download
+  const blob = new Blob([response.data], { type: 'text/markdown' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${docType}.md`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 };
 
 export default api;

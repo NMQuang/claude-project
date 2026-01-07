@@ -59,6 +59,7 @@ interface Project {
   targetDatabase?: string;
   metadata?: any;
   ddlMetadata?: any;
+  generatedDocuments?: string[]; // Track which documents have been generated
 }
 
 const projects: Map<string, Project> = new Map();
@@ -226,7 +227,7 @@ app.post('/api/projects/:id/generate', async (req, res) => {
     return res.status(400).json({ error: 'No metadata found. Run analysis first.' });
   }
 
-  const { documentType } = req.body;
+  const { documentType, language = 'en' } = req.body;
 
   if (!documentType) {
     return res.status(400).json({ error: 'Document type is required' });
@@ -260,7 +261,7 @@ app.post('/api/projects/:id/generate', async (req, res) => {
 
     // Generate document
     const generator = new DocumentGenerator();
-    const markdown = await generator.generate(documentType, data);
+    const markdown = await generator.generate(documentType, data, language);
 
     // Save document
     const docsDir = path.join(__dirname, '../../outputs', project.id, 'documents');
@@ -270,6 +271,14 @@ app.post('/api/projects/:id/generate', async (req, res) => {
 
     const docPath = path.join(docsDir, `${documentType}.md`);
     fs.writeFileSync(docPath, markdown);
+
+    // Track generated document
+    if (!project.generatedDocuments) {
+      project.generatedDocuments = [];
+    }
+    if (!project.generatedDocuments.includes(documentType)) {
+      project.generatedDocuments.push(documentType);
+    }
 
     res.json({
       message: 'Document generated successfully',
@@ -323,6 +332,28 @@ app.put('/api/projects/:id/documents/:docType', (req, res) => {
   fs.writeFileSync(docPath, content);
 
   res.json({ message: 'Document updated successfully' });
+});
+
+// Download a single document
+app.get('/api/projects/:id/documents/:docType/download', (req, res) => {
+  const project = projects.get(req.params.id);
+
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
+  }
+
+  const docPath = path.join(__dirname, '../../outputs', project.id, 'documents', `${req.params.docType}.md`);
+
+  if (!fs.existsSync(docPath)) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+
+  // Set headers for file download
+  res.setHeader('Content-Type', 'text/markdown');
+  res.setHeader('Content-Disposition', `attachment; filename="${req.params.docType}.md"`);
+
+  // Send file
+  res.sendFile(docPath);
 });
 
 // Export documents as ZIP

@@ -1,0 +1,387 @@
+# 現状分析ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|---------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | 現状分析 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}** 移行プロジェクトの現行システム（As-Is）の包括的な分析を提供します。分析は、ソースコード構造、データベーススキーマ、システムアーキテクチャ、依存関係、および特定されたリスクを網羅しています。
+
+### 主要な調査結果
+
+- **総ソースファイル数:** {{metadata.source_analysis.total_files}}
+- **総コード行数:** {{metadata.source_analysis.total_loc}}
+- **ソース言語:** {{source.language}}
+- **ソースデータベース:** {{source.database}}
+- **複雑性評価:** {{metadata.complexity_summary}}
+
+---
+
+## 1. システム概要
+
+### 1.1 目的と範囲
+
+{{#if system_overview.purpose}}
+{{system_overview.purpose}}
+{{else}}
+*[現在のシステムの目的、サポートするビジネス機能、およびこの分析の範囲を記述してください]*
+{{/if}}
+
+### 1.2 システムアーキテクチャ
+
+{{#if system_overview.architecture}}
+{{system_overview.architecture}}
+{{else}}
+*[高レベルアーキテクチャを記述してください：クライアント・サーバー、バッチ処理、メインフレームなど]*
+{{/if}}
+
+```mermaid
+{{#if diagrams.architecture}}
+{{{diagrams.architecture}}}
+{{else}}
+graph LR
+    A[ユーザーインターフェース] --> B[アプリケーション層]
+    B --> C[データベース層]
+{{/if}}
+```
+
+### 1.3 技術スタック
+
+| コンポーネント | 技術 |
+|-----------|------------|
+| プログラミング言語 | {{source.language}} |
+| データベース | {{source.database}} |
+| アプリケーションサーバー | {{source.app_server}} |
+| オペレーティングシステム | {{source.os}} |
+{{#each source.additional_tech}}
+| {{this.component}} | {{this.technology}} |
+{{/each}}
+
+---
+
+## 2. ソースコード分析
+
+### 2.1 コード構造
+
+#### ファイルインベントリ
+
+{{#if metadata.source_analysis.programs}}
+| ファイル名 | タイプ | コード行数 | 複雑度 | 優先度 |
+|-----------|------|-----|------------|----------|
+{{#each metadata.source_analysis.programs}}
+| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | {{this.priority}} |
+{{/each}}
+{{else}}
+*[ソースファイルはまだ分析されていません]*
+{{/if}}
+
+**総ファイル数:** {{metadata.source_analysis.total_files}}
+**総コード行数:** {{metadata.source_analysis.total_loc}}
+
+#### ファイルタイプ分布
+
+{{#if metadata.file_type_distribution}}
+| ファイルタイプ | 数 | パーセンテージ |
+|-----------|-------|------------|
+{{#each metadata.file_type_distribution}}
+| {{this.type}} | {{this.count}} | {{this.percentage}}% |
+{{/each}}
+{{/if}}
+
+### 2.2 プログラム依存関係
+
+{{#if metadata.dependency_graph}}
+```mermaid
+{{{metadata.dependency_graph}}}
+```
+{{else}}
+*[依存関係分析は保留中です]*
+{{/if}}
+
+#### 主要な依存関係
+
+{{#if metadata.dependencies}}
+{{#each metadata.dependencies}}
+- **{{this.source}}** が依存: {{this.targets}}
+{{/each}}
+{{else}}
+*[重要な依存関係はまだ特定されていません]*
+{{/if}}
+
+### 2.3 ビジネスロジック分析
+
+#### コアビジネスプロセス
+
+{{#if business_logic}}
+{{#each business_logic}}
+##### {{this.name}}
+
+**説明:** {{this.description}}
+
+**実装場所:** {{this.files}}
+
+**複雑度:** {{this.complexity_level}}
+
+{{/each}}
+{{else}}
+*[ビジネスロジック分析は手動で完了する必要があります]*
+{{/if}}
+
+### 2.4 データ構造
+
+{{#if metadata.data_structures}}
+| 構造名 | タイプ | フィールド数 | 使用元 |
+|----------------|------|--------|---------|
+{{#each metadata.data_structures}}
+| {{this.name}} | {{this.type}} | {{this.field_count}} | {{this.used_by}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 3. データベース分析
+
+### 3.1 スキーマ概要
+
+| メトリック | 数 |
+|--------|-------|
+| 総テーブル数 | {{metadata.source_analysis.database.tables}} |
+| 総ビュー数 | {{metadata.source_analysis.database.views}} |
+| 総インデックス数 | {{metadata.source_analysis.database.indexes}} |
+| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} |
+| トリガー | {{metadata.source_analysis.database.triggers}} |
+| 関数 | {{metadata.source_analysis.database.functions}} |
+
+### 3.2 テーブルインベントリ
+
+{{#if metadata.database.tables}}
+| テーブル名 | 行数（推定） | カラム数 | 主キー | インデックス数 | 外部キー数 |
+|------------|-------------|---------|-------------|---------|--------------|
+{{#each metadata.database.tables}}
+| {{this.name}} | {{this.row_count}} | {{this.column_count}} | {{this.pk}} | {{this.index_count}} | {{this.fk_count}} |
+{{/each}}
+{{/if}}
+
+### 3.3 データ量分析
+
+{{#if metadata.database.data_volume}}
+| カテゴリ | サイズ |
+|----------|------|
+| 総データベースサイズ | {{metadata.database.data_volume.total_size}} |
+| 最大テーブル | {{metadata.database.data_volume.largest_table}} ({{metadata.database.data_volume.largest_size}}) |
+| 平均行サイズ | {{metadata.database.data_volume.avg_row_size}} |
+{{/if}}
+
+### 3.4 データベースオブジェクト
+
+#### ストアドプロシージャ
+
+{{#if metadata.database.stored_procedures}}
+| 名前 | コード行数 | 複雑度 | 目的 |
+|------|-----|------------|---------|
+{{#each metadata.database.stored_procedures}}
+| {{this.name}} | {{this.loc}} | {{this.complexity}} | {{this.purpose}} |
+{{/each}}
+{{/if}}
+
+#### ビュー
+
+{{#if metadata.database.views}}
+| 名前 | ベーステーブル | 目的 |
+|------|-------------|---------|
+{{#each metadata.database.views}}
+| {{this.name}} | {{this.base_tables}} | {{this.purpose}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 4. 複雑性と品質評価
+
+### 4.1 コード複雑性メトリクス
+
+{{#if metadata.complexity}}
+| メトリック | 値 | しきい値 | ステータス |
+|--------|-------|-----------|--------|
+| 平均循環的複雑度 | {{metadata.complexity.avg_cyclomatic}} | {{complexity_thresholds.cyclomatic}} | {{metadata.complexity.cyclomatic_status}} |
+| 最大循環的複雑度 | {{metadata.complexity.max_cyclomatic}} | - | {{metadata.complexity.max_status}} |
+| 平均メソッド長 | {{metadata.complexity.avg_method_length}} | {{complexity_thresholds.method_length}} | {{metadata.complexity.method_status}} |
+{{/if}}
+
+### 4.2 高複雑度モジュール
+
+{{#if metadata.high_complexity_modules}}
+| モジュール | 複雑度スコア | リスクレベル | 推奨事項 |
+|--------|------------------|------------|----------------|
+{{#each metadata.high_complexity_modules}}
+| {{this.name}} | {{this.score}} | {{this.risk}} | {{this.recommendation}} |
+{{/each}}
+{{else}}
+*[高複雑度モジュールは特定されていません]*
+{{/if}}
+
+### 4.3 コード品質問題
+
+{{#if metadata.quality_issues}}
+{{#each metadata.quality_issues}}
+- **{{this.severity}}:** {{this.description}} (検出場所: {{this.location}})
+{{/each}}
+{{else}}
+*[コード品質分析を実施する必要があります]*
+{{/if}}
+
+---
+
+## 5. 統合と外部依存関係
+
+### 5.1 外部システム
+
+{{#if integrations}}
+| システム名 | 統合タイプ | プロトコル | 頻度 |
+|-------------|------------------|----------|-----------|
+{{#each integrations}}
+| {{this.name}} | {{this.type}} | {{this.protocol}} | {{this.frequency}} |
+{{/each}}
+{{else}}
+*[外部システム統合を文書化する必要があります]*
+{{/if}}
+
+### 5.2 ファイルI/O操作
+
+{{#if metadata.file_operations}}
+| 操作タイプ | ファイル形式 | 目的 |
+|----------------|-------------|---------|
+{{#each metadata.file_operations}}
+| {{this.type}} | {{this.format}} | {{this.purpose}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 6. リスク評価
+
+### 6.1 特定されたリスク
+
+{{#if metadata.risks}}
+| リスクID | カテゴリ | 説明 | 深刻度 | 影響 | 緩和策 |
+|---------|----------|-------------|----------|--------|------------|
+{{#each metadata.risks}}
+| R-{{this.id}} | {{this.category}} | {{this.description}} | {{this.severity}} | {{this.impact}} | {{this.mitigation}} |
+{{/each}}
+{{else}}
+*[リスク評価を完了する必要があります]*
+{{/if}}
+
+### 6.2 技術的負債
+
+{{#if technical_debt}}
+{{#each technical_debt}}
+- **{{this.area}}:** {{this.description}} (工数: {{this.effort}})
+{{/each}}
+{{/if}}
+
+### 6.3 移行の課題
+
+{{#if migration_challenges}}
+{{#each migration_challenges}}
+##### {{this.title}}
+
+**課題:** {{this.description}}
+
+**影響:** {{this.impact}}
+
+**提案されたアプローチ:** {{this.approach}}
+
+{{/each}}
+{{/if}}
+
+---
+
+## 7. 環境とインフラストラクチャ
+
+### 7.1 現在の環境
+
+| コンポーネント | 詳細 |
+|-----------|---------|
+| 開発環境 | {{environment.development}} |
+| テスト環境 | {{environment.testing}} |
+| ステージング環境 | {{environment.staging}} |
+| 本番環境 | {{environment.production}} |
+
+### 7.2 ハードウェア仕様
+
+{{#if infrastructure.hardware}}
+| サーバータイプ | 仕様 |
+|-------------|----------------|
+{{#each infrastructure.hardware}}
+| {{this.type}} | {{this.specs}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 8. 推奨事項
+
+### 8.1 移行アプローチ
+
+{{#if recommendations.migration_approach}}
+{{recommendations.migration_approach}}
+{{else}}
+*[移行戦略ドキュメントで定義される予定です]*
+{{/if}}
+
+### 8.2 優先領域
+
+{{#if recommendations.priorities}}
+1. {{#each recommendations.priorities}}
+   {{@index}}. **{{this.area}}:** {{this.description}}
+{{/each}}
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: 完全なファイルリスト
+
+{{#if appendix.file_list}}
+```
+{{#each appendix.file_list}}
+{{this.path}} ({{this.size}})
+{{/each}}
+```
+{{/if}}
+
+### 付録B: データディクショナリ
+
+{{#if appendix.data_dictionary}}
+*[別のデータディクショナリドキュメントを参照してください]*
+{{/if}}
+
+### 付録C: インターフェース仕様
+
+{{#if appendix.interfaces}}
+*[インターフェースドキュメントを参照してください]*
+{{/if}}
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（自動生成） |
+
+---
+
+**現状分析ドキュメント 終了**

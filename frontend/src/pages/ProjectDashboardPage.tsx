@@ -5,6 +5,7 @@ import {
   uploadFiles,
   analyzeProject,
   generateDocument,
+  downloadDocument,
   type Project
 } from '../services/api'
 import './ProjectDashboardPage.css'
@@ -25,6 +26,7 @@ function ProjectDashboardPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
   const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('en')
 
   const documents: DocumentStatus[] = [
     { id: 'as-is-analysis', name: 'As-Is Analysis', generated: false },
@@ -37,6 +39,21 @@ function ProjectDashboardPage() {
   useEffect(() => {
     loadProject()
   }, [id])
+
+  // Load language preference from localStorage
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem('preferredLanguage')
+    if (savedLanguage) {
+      setSelectedLanguage(savedLanguage)
+    }
+  }, [])
+
+  // Save language preference when it changes
+  useEffect(() => {
+    if (selectedLanguage) {
+      localStorage.setItem('preferredLanguage', selectedLanguage)
+    }
+  }, [selectedLanguage])
 
   const loadProject = async () => {
     if (!id) return
@@ -90,7 +107,7 @@ function ProjectDashboardPage() {
     if (!id) return
     try {
       setGenerating(docType)
-      await generateDocument(id, docType)
+      await generateDocument(id, docType, selectedLanguage)
       alert(`${docType} generated successfully!`)
       loadProject()
     } catch (error) {
@@ -98,6 +115,20 @@ function ProjectDashboardPage() {
       alert('Failed to generate document. Make sure analysis is complete first.')
     } finally {
       setGenerating(null)
+    }
+  }
+
+  const handleLanguageChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLanguage(event.target.value)
+  }
+
+  const handleDownloadDocument = async (docType: string) => {
+    if (!id) return
+    try {
+      await downloadDocument(id, docType)
+    } catch (error) {
+      console.error('Failed to download document:', error)
+      alert('Failed to download document')
     }
   }
 
@@ -126,6 +157,18 @@ function ProjectDashboardPage() {
       <div className="page-header">
         <h2>{project.name}</h2>
         <div className="action-buttons">
+          <div className="language-selector">
+            <label htmlFor="language-select">Language:</label>
+            <select
+              id="language-select"
+              value={selectedLanguage}
+              onChange={handleLanguageChange}
+              className="language-dropdown"
+            >
+              <option value="en">English</option>
+              <option value="ja">日本語 (Japanese)</option>
+            </select>
+          </div>
           <input
             type="file"
             ref={fileInputRef}
@@ -185,34 +228,45 @@ function ProjectDashboardPage() {
         <div className="documents-panel">
           <h3>Documents</h3>
           <div className="document-list">
-            {documents.map(doc => (
-              <div key={doc.id} className="document-item">
-                <div className="document-info">
-                  <div className="document-name">{doc.name}</div>
-                  <div className={`document-status ${doc.generated ? 'status-success' : 'status-pending'}`}>
-                    {doc.generated ? 'Generated' : 'Not Generated'}
+            {documents.map(doc => {
+              const isGenerated = project.generatedDocuments?.includes(doc.id) || false
+              return (
+                <div key={doc.id} className="document-item">
+                  <div className="document-info">
+                    <div className="document-name">{doc.name}</div>
+                    <div className={`document-status ${isGenerated ? 'status-success' : 'status-pending'}`}>
+                      {isGenerated ? 'Generated' : 'Not Generated'}
+                    </div>
+                  </div>
+                  <div className="document-actions">
+                    {isGenerated ? (
+                      <>
+                        <button
+                          className="btn-secondary"
+                          onClick={() => navigate(`/projects/${id}/documents/${doc.id}`)}
+                        >
+                          View/Edit
+                        </button>
+                        <button
+                          className="btn-primary"
+                          onClick={() => handleDownloadDocument(doc.id)}
+                        >
+                          Download
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="btn-primary"
+                        onClick={() => handleGenerateDocument(doc.id)}
+                        disabled={!project.metadata || generating === doc.id}
+                      >
+                        {generating === doc.id ? 'Generating...' : 'Generate'}
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="document-actions">
-                  {doc.generated ? (
-                    <button
-                      className="btn-secondary"
-                      onClick={() => navigate(`/projects/${id}/documents/${doc.id}`)}
-                    >
-                      View/Edit
-                    </button>
-                  ) : (
-                    <button
-                      className="btn-primary"
-                      onClick={() => handleGenerateDocument(doc.id)}
-                      disabled={!project.metadata || generating === doc.id}
-                    >
-                      {generating === doc.id ? 'Generating...' : 'Generate'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

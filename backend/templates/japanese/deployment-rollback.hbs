@@ -1,0 +1,896 @@
+# デプロイメントとロールバック計画
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|---------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | デプロイメントとロールバック計画 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、移行された **{{project.name}}** システムを本番環境にデプロイするための包括的な計画と、重大な問題が発生した場合のロールバック手順を提供します。デプロイ前準備、デプロイ手順、検証手順、およびロールバック戦略を網羅しています。
+
+### デプロイメントアプローチ
+
+{{#if deployment.approach}}
+{{deployment.approach}}
+{{else}}
+**選択された戦略:** ブルーグリーンデプロイメントパターンを使用した段階的デプロイ
+
+**根拠:** リスクを最小化、迅速なロールバックを可能にし、ダウンタイムゼロのデプロイメント
+{{/if}}
+
+---
+
+## 1. デプロイメント概要
+
+### 1.1 デプロイ範囲
+
+{{#if scope.components}}
+| コンポーネント | 説明 | バージョン |
+|-----------|-------------|---------|
+{{#each scope.components}}
+| {{this.name}} | {{this.description}} | {{this.version}} |
+{{/each}}
+{{else}}
+| コンポーネント | 説明 | バージョン |
+|-----------|-------------|---------|
+| アプリケーション | {{target.language}} アプリケーション | {{app_version}} |
+| データベース | {{target.database}} データベース | {{db_version}} |
+| 設定 | 環境設定 | {{config_version}} |
+{{/if}}
+
+### 1.2 デプロイタイムライン
+
+{{#if timeline.schedule}}
+| アクティビティ | 日時 | 所要時間 | 担当 |
+|----------|-----------|----------|-------------|
+{{#each timeline.schedule}}
+| {{this.activity}} | {{this.datetime}} | {{this.duration}} | {{this.responsible}} |
+{{/each}}
+{{else}}
+*[本番スケジュールに基づいて定義される予定]*
+
+**提案デプロイウィンドウ:**
+- **日付:** [週末/休日が望ましい]
+- **時刻:** 午前2:00 - 午前6:00（トラフィックが少ない時間帯）
+- **所要時間:** 4時間（検証を含む）
+{{/if}}
+
+### 1.3 デプロイチーム
+
+{{#if team}}
+| 役割 | 氏名 | 連絡先 | 責任 |
+|------|------|---------|----------------|
+{{#each team}}
+| {{this.role}} | {{this.name}} | {{this.contact}} | {{this.responsibility}} |
+{{/each}}
+{{else}}
+| 役割 | 氏名 | 連絡先 | 責任 |
+|------|------|---------|----------------|
+| デプロイメントリード | TBD | TBD | 全体調整 |
+| アプリケーションリード | TBD | TBD | アプリケーションデプロイ |
+| データベースリード | TBD | TBD | データベース移行 |
+| DevOps エンジニア | TBD | TBD | インフラ、スクリプト |
+| QA リード | TBD | TBD | 検証テスト |
+| ビジネス SME | TBD | TBD | ビジネス検証 |
+{{/if}}
+
+---
+
+## 2. デプロイ前チェックリスト
+
+### 2.1 環境準備
+
+{{#if pre_deployment.environment}}
+{{#each pre_deployment.environment}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] 本番環境の検証とアクセス確認
+- [ ] サーバーリソースの確認（CPU、メモリ、ディスク容量）
+- [ ] ネットワーク接続のテスト
+- [ ] ロードバランサーの設定
+- [ ] SSL 証明書のインストールと有効性確認
+- [ ] DNS エントリの更新（必要な場合）
+- [ ] ファイアウォールルールの設定
+- [ ] モニタリングとアラートの設定
+{{/if}}
+
+### 2.2 コードとデータベース準備
+
+{{#if pre_deployment.code}}
+{{#each pre_deployment.code}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] コードフリーズの適用
+- [ ] すべてのコードをリリースブランチにマージ
+- [ ] リリースブランチのタグ付け（例: v1.0.0）
+- [ ] アプリケーション成果物のビルド（JAR/WAR）
+- [ ] データベース移行スクリプトのステージングでのテスト
+- [ ] 本番用設定ファイルの準備
+- [ ] すべての UAT 不具合の解決
+- [ ] UAT 承認の取得
+{{/if}}
+
+### 2.3 バックアップと復旧
+
+{{#if pre_deployment.backup}}
+{{#each pre_deployment.backup}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] データベースの完全バックアップ完了
+- [ ] バックアップの検証と復元可能性の確認
+- [ ] アプリケーション設定のバックアップ
+- [ ] 現在のアプリケーションバージョンのアーカイブ
+- [ ] バックアップの安全な場所への保存
+- [ ] 復旧時間のテスト（RTO の検証）
+{{/if}}
+
+### 2.4 コミュニケーションと承認
+
+{{#if pre_deployment.communication}}
+{{#each pre_deployment.communication}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] デプロイ計画のレビューと承認
+- [ ] ステークホルダーへのデプロイウィンドウの通知
+- [ ] 変更諮問委員会（CAB）の承認取得
+- [ ] ユーザーへのダウンタイム通知の送信
+- [ ] サポートチームへの変更のブリーフィング
+- [ ] エスカレーション連絡先の確認
+{{/if}}
+
+---
+
+## 3. デプロイ手順
+
+### 3.1 デプロイ戦略
+
+{{#if deployment.strategy}}
+{{deployment.strategy}}
+{{else}}
+**ブルーグリーンデプロイメント:**
+
+```
+┌─────────────────────────────────────────────┐
+│         ロードバランサー                      │
+└──────────────┬──────────────────────────────┘
+               │
+       ┌───────┴────────┐
+       │                │
+   ┌───▼───┐        ┌───▼───┐
+   │ BLUE  │        │ GREEN │
+   │(旧)   │        │(新)   │
+   └───┬───┘        └───┬───┘
+       │                │
+   ┌───▼────────────────▼───┐
+   │      データベース       │
+   └────────────────────────┘
+
+1. GREEN 環境に新バージョンをデプロイ
+2. GREEN 環境をテスト
+3. トラフィックを BLUE から GREEN に切り替え
+4. 問題がないか監視
+5. 迅速なロールバックのため BLUE を稼働状態に保つ
+```
+{{/if}}
+
+### 3.2 詳細デプロイ手順
+
+#### ステップ1: デプロイ前検証
+```bash
+{{#if deployment.steps.pre_verification}}
+{{{deployment.steps.pre_verification}}}
+{{else}}
+# 現在のシステムステータスを確認
+curl -f https://api.example.com/health || echo "Current system DOWN"
+
+# データベース接続をチェック
+psql -h prod-db -U app_user -c "SELECT 1"
+
+# バックアップ完了を確認
+ls -lh /backups/db_backup_$(date +%Y%m%d).sql
+{{/if}}
+```
+
+#### ステップ2: メンテナンスモードの有効化（該当する場合）
+```bash
+{{#if deployment.steps.maintenance_mode}}
+{{{deployment.steps.maintenance_mode}}}
+{{else}}
+# ユーザーにメンテナンスページを表示
+# ロードバランサー経由でメンテナンスページにトラフィックをルーティング
+{{/if}}
+```
+
+#### ステップ3: データベース移行
+```bash
+{{#if deployment.steps.db_migration}}
+{{{deployment.steps.db_migration}}}
+{{else}}
+# データベース移行スクリプトを実行
+cd /opt/migration
+
+# スキーマ移行を実行
+psql -h prod-db -U app_user -d app_db -f schema_migration.sql
+
+# データ移行を実行
+./data_migration.sh
+
+# 移行を検証
+psql -h prod-db -U app_user -d app_db -f verify_migration.sql
+{{/if}}
+```
+
+**移行スクリプト:**
+{{#if deployment.migration_scripts}}
+{{#each deployment.migration_scripts}}
+- `{{this.file}}`: {{this.description}}
+{{/each}}
+{{/if}}
+
+#### ステップ4: アプリケーションデプロイ
+```bash
+{{#if deployment.steps.app_deployment}}
+{{{deployment.steps.app_deployment}}}
+{{else}}
+# GREEN 環境にアプリケーションをデプロイ
+scp target/app-1.0.0.jar prod-green:/opt/app/
+
+# 設定をデプロイ
+scp config/application-prod.yml prod-green:/opt/app/config/
+
+# GREEN でアプリケーションを起動
+ssh prod-green "systemctl start app-green"
+
+# アプリケーションの起動を待機
+sleep 30
+
+# ヘルスチェック
+curl -f http://prod-green:8080/actuator/health
+{{/if}}
+```
+
+#### ステップ5: スモークテスト
+```bash
+{{#if deployment.steps.smoke_test}}
+{{{deployment.steps.smoke_test}}}
+{{else}}
+# GREEN 環境で自動スモークテストを実行
+./smoke_tests.sh http://prod-green:8080
+
+# 手動検証:
+# - ログイン機能
+# - 重要なビジネス操作
+# - データベース接続
+{{/if}}
+```
+
+**スモークテストチェックリスト:**
+{{#if deployment.smoke_tests}}
+{{#each deployment.smoke_tests}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] アプリケーションが正常に起動
+- [ ] ヘルスエンドポイントが 200 OK を返す
+- [ ] データベース接続成功
+- [ ] ユーザーログインが動作
+- [ ] 重要な API エンドポイントが応答
+- [ ] アプリケーションログにエラーがない
+{{/if}}
+
+#### ステップ6: トラフィック切り替え
+```bash
+{{#if deployment.steps.switchover}}
+{{{deployment.steps.switchover}}}
+{{else}}
+# ロードバランサーを更新して GREEN にトラフィックをルーティング
+# オプション1: 段階的（カナリアデプロイメント）
+# - 10% のトラフィックを GREEN にルーティング、監視
+# - 50% のトラフィックを GREEN にルーティング、監視
+# - 100% のトラフィックを GREEN にルーティング
+
+# オプション2: 即時切り替え
+./switch_traffic.sh --from blue --to green
+
+# トラフィックルーティングを確認
+curl -H "Host: api.example.com" http://load-balancer/health
+{{/if}}
+```
+
+#### ステップ7: デプロイ後モニタリング
+```bash
+{{#if deployment.steps.monitoring}}
+{{{deployment.steps.monitoring}}}
+{{else}}
+# アプリケーションログを監視
+tail -f /var/log/app/application.log
+
+# データベース接続を監視
+psql -h prod-db -c "SELECT count(*) FROM pg_stat_activity WHERE datname='app_db'"
+
+# システムリソースを監視
+top
+df -h
+
+# モニタリングダッシュボードでエラー率をチェック
+# - アプリケーションエラー
+# - API レスポンスタイム
+# - データベースクエリパフォーマンス
+{{/if}}
+```
+
+**モニタリングチェックリスト（最初の30分）:**
+{{#if deployment.monitoring}}
+{{#each deployment.monitoring}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] ログにアプリケーションエラーがない
+- [ ] API レスポンスタイムが許容範囲内
+- [ ] データベースクエリが正常に実行されている
+- [ ] CPU/メモリ使用率が正常
+- [ ] ユーザーから報告された問題がない
+- [ ] ビジネストランザクションが正常に完了している
+{{/if}}
+
+#### ステップ8: メンテナンスモードの無効化
+```bash
+{{#if deployment.steps.disable_maintenance}}
+{{{deployment.steps.disable_maintenance}}}
+{{else}}
+# メンテナンスページを削除
+# 通常ルーティングに復元
+{{/if}}
+```
+
+---
+
+## 4. デプロイ後検証
+
+### 4.1 機能検証
+
+{{#if validation.functional}}
+{{#each validation.functional}}
+#### {{this.name}}
+
+**ステップ:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+**期待結果:** {{this.expected}}
+
+**実際の結果:** _______________________
+
+**ステータス:** [ ] 合格  [ ] 不合格
+
+---
+
+{{/each}}
+{{else}}
+| テストシナリオ | 期待結果 | 実際の結果 | ステータス |
+|---------------|-----------------|---------------|--------|
+| ユーザーログイン | 認証成功 | | [ ] 合格 [ ] 不合格 |
+| レコード作成 | データベースにレコード作成 | | [ ] 合格 [ ] 不合格 |
+| レコード更新 | レコードが正常に更新 | | [ ] 合格 [ ] 不合格 |
+| レポート生成 | レポートが正しく生成 | | [ ] 合格 [ ] 不合格 |
+{{/if}}
+
+### 4.2 パフォーマンス検証
+
+{{#if validation.performance}}
+{{#each validation.performance}}
+- **{{this.metric}}:** 目標: {{this.target}}, 実際: _______, ステータス: [ ] 合格 [ ] 不合格
+{{/each}}
+{{else}}
+| メトリック | ベースライン | 目標 | 実際 | ステータス |
+|--------|----------|--------|--------|--------|
+| ページロード時間 | 1.5秒 | ≤ 1.5秒 | _____ | [ ] 合格 [ ] 不合格 |
+| API レスポンスタイム | 200ms | ≤ 200ms | _____ | [ ] 合格 [ ] 不合格 |
+| データベースクエリ時間 | 50ms | ≤ 50ms | _____ | [ ] 合格 [ ] 不合格 |
+| 同時ユーザー数 | 100 | ≥ 100 | _____ | [ ] 合格 [ ] 不合格 |
+{{/if}}
+
+### 4.3 データ検証
+
+{{#if validation.data}}
+{{#each validation.data}}
+- **{{this.check}}:** {{this.query}}
+  - 期待値: {{this.expected}}
+  - 実際: _____________
+  - ステータス: [ ] 合格 [ ] 不合格
+{{/each}}
+{{else}}
+```sql
+-- 行数検証
+SELECT 'customers' as table_name, COUNT(*) as row_count FROM customers
+UNION ALL
+SELECT 'orders', COUNT(*) FROM orders;
+-- 移行前のカウントと比較
+
+-- データ整合性チェック
+SELECT COUNT(*) FROM orders o
+LEFT JOIN customers c ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL;
+-- 0 を返すべき（孤立した注文がない）
+
+-- サンプルデータ検証
+SELECT * FROM customers LIMIT 10;
+-- データが正しく見えるか手動確認
+```
+{{/if}}
+
+---
+
+## 5. ロールバック計画
+
+### 5.1 ロールバック判断基準
+
+{{#if rollback.criteria}}
+{{#each rollback.criteria}}
+- {{this}}
+{{/each}}
+{{else}}
+**以下のいずれかが発生した場合、ロールバックをトリガー:**
+- 重要な機能が動作しない（例: 支払い処理の失敗）
+- データ破損の検出
+- ベースラインから50%以上のパフォーマンス低下
+- セキュリティ脆弱性の発見
+- ユーザーの20%以上がシステムにアクセスできない
+- データベース移行の失敗
+- ロールバックウィンドウ（1時間）内に問題を解決できない
+{{/if}}
+
+### 5.2 ロールバック権限
+
+{{#if rollback.authority}}
+{{rollback.authority}}
+{{else}}
+**ロールバックを開始する権限:**
+- デプロイメントリード
+- アプリケーションリード
+- プロジェクトマネージャー
+
+**承認必要:** なし（デプロイ計画で事前承認済み）
+
+**通知:** ロールバック決定時に全ステークホルダーに即座に通知
+{{/if}}
+
+### 5.3 ロールバック手順
+
+#### オプション1: ブルーグリーンロールバック（最速）
+
+{{#if rollback.blue_green}}
+{{{rollback.blue_green}}}
+{{else}}
+**所要時間:** 5-10分
+
+```bash
+# ステップ1: トラフィックを BLUE（旧バージョン）に切り戻す
+./switch_traffic.sh --from green --to blue
+
+# ステップ2: 旧システムが動作していることを確認
+curl -f https://api.example.com/health
+
+# ステップ3: GREEN 環境を停止
+ssh prod-green "systemctl stop app-green"
+
+# ステップ4: 安定性を監視
+tail -f /var/log/app/application.log
+```
+
+**ロールバック後:**
+- データベースは移行済みのまま（アプリケーションのみロールバック）
+- データベースのロールバックが必要な場合は、オプション2に進む
+{{/if}}
+
+#### オプション2: 完全ロールバック（データベース + アプリケーション）
+
+{{#if rollback.full}}
+{{{rollback.full}}}
+{{else}}
+**所要時間:** 30-60分
+
+**警告:** デプロイ後に作成されたデータが失われます
+
+```bash
+# ステップ1: メンテナンスモードを有効化
+./enable_maintenance.sh
+
+# ステップ2: 新アプリケーションを停止
+systemctl stop app-green
+
+# ステップ3: バックアップからデータベースを復元
+pg_restore -h prod-db -U app_user -d app_db /backups/db_backup_20240101.sql
+
+# ステップ4: データベース復元を確認
+psql -h prod-db -U app_user -d app_db -c "SELECT COUNT(*) FROM customers"
+
+# ステップ5: トラフィックを BLUE（旧アプリケーション）に切り替え
+./switch_traffic.sh --from green --to blue
+
+# ステップ6: メンテナンスモードを無効化
+./disable_maintenance.sh
+
+# ステップ7: システム機能を確認
+./smoke_tests.sh https://api.example.com
+```
+{{/if}}
+
+### 5.4 ロールバック検証
+
+{{#if rollback.validation}}
+{{#each rollback.validation}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] 旧アプリケーションバージョンが稼働中
+- [ ] データベースが復元されている（該当する場合）
+- [ ] ユーザーログインが動作
+- [ ] 重要なビジネス機能が動作可能
+- [ ] アプリケーションログにエラーがない
+- [ ] パフォーマンスメトリクスが正常
+- [ ] ユーザーがシステムにアクセス可能
+{{/if}}
+
+---
+
+## 6. ハイパーケアとモニタリング
+
+### 6.1 ハイパーケア期間
+
+{{#if hypercare.duration}}
+**期間:** {{hypercare.duration}}
+{{else}}
+**期間:** デプロイ後4週間
+{{/if}}
+
+**ハイパーケアチーム:**
+{{#if hypercare.team}}
+{{#each hypercare.team}}
+- **{{this.role}}:** {{this.name}} ({{this.availability}})
+{{/each}}
+{{else}}
+- **L1 サポート:** 24時間365日のオンコールローテーション
+- **L2 サポート:** アプリケーションチーム（営業時間 + オンコール）
+- **L3 サポート:** シニア開発者（重大問題のオンコール）
+{{/if}}
+
+### 6.2 モニタリング戦略
+
+{{#if monitoring.strategy}}
+{{monitoring.strategy}}
+{{else}}
+**即時（最初の24時間）:**
+- アプリケーションログの継続的監視
+- ダッシュボード監視（5分ごとにリフレッシュ）
+- ユーザーフィードバックの監視
+
+**第1週:**
+- 日次ヘルスチェック
+- 日次エラーログレビュー
+- 日次パフォーマンスレポート
+- 日次ステークホルダー更新
+
+**第2-4週:**
+- 隔週ヘルスチェック
+- 週次パフォーマンスレポート
+- 週次ステークホルダー更新
+{{/if}}
+
+### 6.3 監視する主要メトリクス
+
+{{#if monitoring.metrics}}
+| メトリック | しきい値 | アラート | アクション |
+|--------|-----------|-------|--------|
+{{#each monitoring.metrics}}
+| {{this.name}} | {{this.threshold}} | {{this.alert}} | {{this.action}} |
+{{/each}}
+{{else}}
+| メトリック | しきい値 | アラート | アクション |
+|--------|-----------|-------|--------|
+| エラー率 | >1% | 重大 | 即時調査 |
+| API レスポンスタイム | >2秒 | 警告 | パフォーマンス分析 |
+| データベース接続 | >80% プール | 警告 | スケールアップまたは調査 |
+| CPU 使用率 | >80% | 警告 | スケールアップまたは調査 |
+| メモリ使用量 | >90% | 重大 | 即時調査 |
+| ディスク容量 | <10% 空き | 重大 | 容量確保またはスケール |
+{{/if}}
+
+### 6.4 インシデント対応
+
+{{#if incident.response}}
+{{incident.response}}
+{{else}}
+**プロセス:**
+1. **検出:** モニタリングアラートまたはユーザー報告
+2. **トリアージ:** 深刻度と影響を評価（5分）
+3. **エスカレーション:** 適切なチームメンバーに通知
+4. **調査:** 根本原因を特定
+5. **解決:** 修正を適用、または重大な場合はロールバック
+6. **文書化:** インシデントと解決を文書化
+7. **事後分析:** レビューと改善点を特定（重大インシデントは48時間以内）
+
+**深刻度レベル:**
+- **P1（重大）:** システムダウン、データ損失、セキュリティ侵害
+  - 対応: 即時（24時間365日）
+  - 解決目標: 1時間
+- **P2（高）:** 主要機能が動作不能、パフォーマンス50%以上低下
+  - 対応: 1時間（営業時間）、4時間（営業時間外）
+  - 解決目標: 4時間
+- **P3（中）:** 軽微な機能が動作不能、回避策あり
+  - 対応: 4時間（営業時間）
+  - 解決目標: 1営業日
+- **P4（低）:** 見た目の問題、軽微な不便
+  - 対応: 翌営業日
+  - 解決目標: 次回リリース
+{{/if}}
+
+---
+
+## 7. コミュニケーション計画
+
+### 7.1 ステークホルダーコミュニケーション
+
+{{#if communication.stakeholders}}
+{{#each communication.stakeholders}}
+**{{this.group}}:**
+- **方法:** {{this.method}}
+- **頻度:** {{this.frequency}}
+- **内容:** {{this.content}}
+{{/each}}
+{{else}}
+**経営陣:**
+- **方法:** メールサマリー
+- **頻度:** 主要マイルストーンのみ
+- **内容:** Go/No-go 決定、デプロイ完了、ロールバック（該当する場合）
+
+**ビジネスユーザー:**
+- **方法:** メール + アプリ内通知
+- **頻度:** デプロイ前、完了後
+- **内容:** ダウンタイムウィンドウ、新機能、既知の問題
+
+**サポートチーム:**
+- **方法:** Slack + メール
+- **頻度:** デプロイ前、中、後
+- **内容:** 変更点、既知の問題、トラブルシューティングガイド
+
+**開発チーム:**
+- **方法:** Slack
+- **頻度:** デプロイ中リアルタイム
+- **内容:** ステップ完了、発生した問題
+{{/if}}
+
+### 7.2 コミュニケーションテンプレート
+
+#### デプロイ前通知
+{{#if communication.templates.pre_deployment}}
+{{{communication.templates.pre_deployment}}}
+{{else}}
+```
+件名: [PROJECT] システムメンテナンス - [DATE]
+
+ご利用者各位
+
+新プラットフォームへの移行のため、システムメンテナンスを実施いたします。
+
+メンテナンスウィンドウ: [DATE] [TIME] - [TIME]
+予定ダウンタイム: [DURATION]
+影響: [DESCRIPTION]
+
+この期間中、システムは利用できません。ご不便をおかけして申し訳ございません。
+
+ご質問がございましたら、[SUPPORT EMAIL] までお問い合わせください。
+
+ご協力ありがとうございます。
+```
+{{/if}}
+
+#### デプロイ成功通知
+{{#if communication.templates.success}}
+{{{communication.templates.success}}}
+{{else}}
+```
+件名: [PROJECT] 移行が正常に完了しました
+
+システム移行が正常に完了しました。
+
+- 新バージョンをデプロイ
+- すべての検証テストが合格
+- システムは現在利用可能です
+
+問題がございましたら、[SUPPORT EMAIL] までご報告ください。
+
+ご協力ありがとうございました。
+```
+{{/if}}
+
+#### ロールバック通知
+{{#if communication.templates.rollback}}
+{{{communication.templates.rollback}}}
+{{else}}
+```
+件名: [緊急] [PROJECT] デプロイをロールバックしました
+
+技術的な問題により、デプロイを以前のバージョンにロールバックしました。
+
+現在の状況: 以前のバージョンが復元され、動作中
+影響: [データ損失や影響の説明]
+次のステップ: [再デプロイの計画]
+
+ご不便をおかけして申し訳ございません。状況が変わり次第、更新情報を提供いたします。
+
+緊急の問題については、[ON-CALL NUMBER] までご連絡ください。
+```
+{{/if}}
+
+---
+
+## 8. コンティンジェンシー計画
+
+### 8.1 一般的な問題と解決策
+
+{{#if contingency.issues}}
+{{#each contingency.issues}}
+**問題:** {{this.issue}}
+
+**症状:** {{this.symptoms}}
+
+**解決策:**
+{{this.resolution}}
+
+---
+
+{{/each}}
+{{else}}
+**問題:** データベース接続プールの枯渇
+
+**症状:** "接続タイムアウト" エラー、レスポンスタイムの遅延
+
+**解決策:**
+```bash
+# 接続プールサイズを増やす
+# application.yml を編集:
+spring.datasource.hikari.maximum-pool-size=50
+
+# アプリケーションを再起動
+systemctl restart app
+```
+
+**問題:** 高 CPU 使用率
+
+**症状:** レスポンスタイムの遅延、タイムアウト
+
+**解決策:**
+- 長時間実行クエリをチェック: `SELECT * FROM pg_stat_activity WHERE state = 'active' AND query_start < now() - interval '1 minute'`
+- 必要に応じて長時間実行クエリを終了
+- 水平スケール（インスタンス追加）
+
+**問題:** ディスク容量不足
+
+**症状:** "デバイスに空き容量がありません" エラー
+
+**解決策:**
+```bash
+# 古いログをクリア
+find /var/log/app -name "*.log" -mtime +7 -delete
+
+# 一時ファイルをクリア
+rm -rf /tmp/*
+
+# 必要に応じてディスクを拡張
+```
+{{/if}}
+
+---
+
+## 9. デプロイ後タスク
+
+### 9.1 即時タスク（24時間以内）
+
+{{#if post_deployment.immediate}}
+{{#each post_deployment.immediate}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] デプロイ成功通知を送信
+- [ ] ステータスページを更新
+- [ ] 旧アプリケーションバージョンをアーカイブ（BLUE 環境）
+- [ ] デプロイ中に発生した問題を文書化
+- [ ] 新しい手順でランブックを更新
+- [ ] デプロイ後レビューミーティングをスケジュール
+{{/if}}
+
+### 9.2 短期タスク（1週間以内）
+
+{{#if post_deployment.short_term}}
+{{#each post_deployment.short_term}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] デプロイ後レビューミーティングを実施
+- [ ] 学んだ教訓でドキュメントを更新
+- [ ] パフォーマンスメトリクスを分析し、必要に応じて最適化
+- [ ] デプロイ関連チケットをレビューしてクローズ
+- [ ] 旧システムの廃止計画（該当する場合）
+{{/if}}
+
+### 9.3 長期タスク（1ヶ月以内）
+
+{{#if post_deployment.long_term}}
+{{#each post_deployment.long_term}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] 旧システムとインフラを廃止
+- [ ] 旧システムデータをアーカイブ
+- [ ] 災害復旧計画を更新
+- [ ] ナレッジトランスファーセッションを実施
+- [ ] ケーススタディまたは学んだ教訓ドキュメントを公開
+{{/if}}
+
+---
+
+## 10. 付録
+
+### 付録A: 設定ファイル
+
+{{#if appendix.config_files}}
+{{#each appendix.config_files}}
+#### {{this.name}}
+
+```{{this.language}}
+{{{this.content}}}
+```
+
+---
+
+{{/each}}
+{{/if}}
+
+### 付録B: デプロイスクリプト
+
+{{#if appendix.scripts}}
+*[すべてのデプロイスクリプトは /scripts ディレクトリに保存]*
+{{/if}}
+
+### 付録C: 連絡先リスト
+
+{{#if appendix.contacts}}
+| 氏名 | 役割 | 電話 | メール |
+|------|------|-------|-------|
+{{#each appendix.contacts}}
+| {{this.name}} | {{this.role}} | {{this.phone}} | {{this.email}} |
+{{/each}}
+{{/if}}
+
+### 付録D: ランブック
+
+{{#if appendix.runbook}}
+*[運用手順については別のランブックドキュメントを参照してください]*
+{{/if}}
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（自動生成） |
+
+---
+
+**デプロイメントとロールバック計画 終了**

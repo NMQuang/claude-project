@@ -1,0 +1,510 @@
+# 移行戦略ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|---------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | 移行戦略 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}** を **{{source.language}}** から **{{target.language}}**、および **{{source.database}}** から **{{target.database}}** へ移行するための戦略的アプローチを概説します。
+
+### 移行目標
+
+{{#if objectives}}
+{{#each objectives}}
+- {{this}}
+{{/each}}
+{{else}}
+- 保守性向上のための技術スタック近代化
+- 運用コストの削減
+- システムパフォーマンスとスケーラビリティの向上
+- 開発者生産性の向上
+{{/if}}
+
+### 成功基準
+
+{{#if success_criteria}}
+{{#each success_criteria}}
+- {{this}}
+{{/each}}
+{{else}}
+- 現行システムとの100%機能同等性
+- 移行中のデータ損失ゼロ
+- パフォーマンスが現行システムと同等以上
+- UAT不具合率5%未満での成功
+{{/if}}
+
+---
+
+## 1. 移行概要
+
+### 1.1 現状
+
+| 側面 | 現状 |
+|--------|---------|
+| プログラミング言語 | {{source.language}} |
+| データベース | {{source.database}} |
+| 総ファイル数 | {{metadata.source_analysis.total_files}} |
+| 総コード行数 | {{metadata.source_analysis.total_loc}} |
+| データベースサイズ | {{metadata.database.data_volume.total_size}} |
+
+### 1.2 目標状態
+
+| 側面 | 目標 |
+|--------|--------|
+| プログラミング言語 | {{target.language}} |
+| フレームワーク | {{target.framework}} |
+| データベース | {{target.database}} |
+| アーキテクチャパターン | {{target.architecture_pattern}} |
+| デプロイメント | {{target.deployment}} |
+
+### 1.3 移行範囲
+
+#### スコープ内
+
+{{#if scope.in_scope}}
+{{#each scope.in_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+*[移行対象を定義してください]*
+{{/if}}
+
+#### スコープ外
+
+{{#if scope.out_scope}}
+{{#each scope.out_scope}}
+- {{this}}
+{{/each}}
+{{else}}
+*[移行対象外を定義してください]*
+{{/if}}
+
+---
+
+## 2. 移行アプローチ
+
+### 2.1 全体戦略
+
+{{#if strategy.approach}}
+**選択されたアプローチ:** {{strategy.approach}}
+
+**根拠:** {{strategy.rationale}}
+{{else}}
+**検討されたオプション:**
+
+1. **ビッグバン移行**
+   - システム全体を一度に移行
+   - 長所: 迅速、クリーンな切り替え
+   - 短所: 高リスク、長期間のテストフェーズ
+
+2. **段階的移行**（推奨）
+   - 機能モジュール単位で移行
+   - 長所: リスク低減、段階的な価値提供
+   - 短所: 旧/新システム間の統合が必要
+
+3. **ストラングラーフィグパターン**
+   - コンポーネントを段階的に置換
+   - 長所: 最低リスク、継続的デリバリー
+   - 短所: 最長タイムライン、両システム維持の複雑性
+{{/if}}
+
+### 2.2 移行フェーズ
+
+{{#if strategy.phases}}
+{{#each strategy.phases}}
+#### フェーズ {{@index}}: {{this.name}}
+
+**期間:** {{this.duration}}
+
+**スコープ:**
+{{#each this.scope}}
+- {{this}}
+{{/each}}
+
+**成果物:**
+{{#each this.deliverables}}
+- {{this}}
+{{/each}}
+
+**成功基準:**
+{{#each this.success_criteria}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+#### フェーズ1: 準備とセットアップ
+- 環境セットアップ
+- ツールインストール
+- チームトレーニング
+
+#### フェーズ2: コード移行
+- 自動コード変換
+- 手動リファクタリング
+- コードレビュー
+
+#### フェーズ3: データベース移行
+- スキーマ変換
+- データ移行
+- 検証
+
+#### フェーズ4: テスト
+- 単体テスト
+- 統合テスト
+- UAT
+
+#### フェーズ5: デプロイメント
+- 本番デプロイ
+- モニタリング
+- ハイパーケア
+{{/if}}
+
+### 2.3 移行タイムライン
+
+```mermaid
+gantt
+    title 移行タイムライン
+    dateFormat YYYY-MM-DD
+
+{{#if timeline.milestones}}
+    {{#each timeline.milestones}}
+    {{this.name}} :{{this.start}}, {{this.duration}}
+    {{/each}}
+{{else}}
+    準備       :2024-01-01, 30d
+    コード移行    :2024-02-01, 60d
+    DB移行      :2024-03-01, 45d
+    テスト       :2024-04-01, 45d
+    デプロイ     :2024-05-15, 15d
+{{/if}}
+```
+
+---
+
+## 3. コード移行戦略
+
+### 3.1 変換アプローチ
+
+{{#if code_migration.approach}}
+{{code_migration.approach}}
+{{else}}
+**自動変換:**
+- 初期変換に移行ツールを使用
+- 期待される自動化率: 60-70%
+
+**手動リファクタリング:**
+- 複雑なビジネスロジックは手動レビューが必要
+- 移行中にコード構造を最適化
+- モダンなデザインパターンを実装
+{{/if}}
+
+### 3.2 コードマッピングルール
+
+{{#if mappings.code}}
+| ソースパターン | ターゲットパターン | 備考 |
+|----------------|----------------|-------|
+{{#each mappings.code}}
+| {{this.source}} | {{this.target}} | {{this.notes}} |
+{{/each}}
+{{else}}
+| COBOLプログラム | Javaクラス（サービス層） | 1対1マッピング |
+| COBOLパラグラフ | Javaメソッド | 必要に応じてリファクタリング |
+| COPYブック | Java DTO/エンティティ | データ定義から生成 |
+| ファイルI/O | JPAリポジトリ / JDBC | Spring Data JPAを使用 |
+{{/if}}
+
+### 3.3 フレームワークとライブラリ
+
+{{#if target.libraries}}
+| 目的 | ライブラリ/フレームワーク |
+|---------|-------------------|
+{{#each target.libraries}}
+| {{this.purpose}} | {{this.library}} |
+{{/each}}
+{{else}}
+| 目的 | ライブラリ/フレームワーク |
+|---------|-------------------|
+| Webフレームワーク | Spring Boot 3.x |
+| ORM | Hibernate / JPA |
+| データベースアクセス | Spring Data JPA |
+| テスト | JUnit 5, Mockito |
+| ビルドツール | Maven / Gradle |
+| ロギング | SLF4J + Logback |
+{{/if}}
+
+---
+
+## 4. データベース移行戦略
+
+### 4.1 スキーマ移行
+
+{{#if db_migration.schema_approach}}
+{{db_migration.schema_approach}}
+{{else}}
+**アプローチ:**
+1. ソーススキーマを分析（Oracle）
+2. 等価なPostgreSQL DDLを生成
+3. ターゲットデータベース用にスキーマを最適化
+4. ベンダー固有機能を処理
+{{/if}}
+
+### 4.2 データ型マッピング
+
+{{#if mappings.database}}
+| ソース型（{{source.database}}） | ターゲット型（{{target.database}}） | 備考 |
+|-----------------------------------|-----------------------------------|-------|
+{{#each mappings.database}}
+| {{this.source}} | {{this.target}} | {{this.notes}} |
+{{/each}}
+{{else}}
+| ソース型（Oracle） | ターゲット型（PostgreSQL） | 備考 |
+|----------------------|--------------------------|-------|
+| NUMBER(p,s) | NUMERIC(p,s) | 直接マッピング |
+| VARCHAR2(n) | VARCHAR(n) | 直接マッピング |
+| DATE | TIMESTAMP | PostgreSQL DATEは日付のみ格納 |
+| CLOB | TEXT | 直接マッピング |
+| BLOB | BYTEA | 直接マッピング |
+{{/if}}
+
+### 4.3 データ移行戦略
+
+{{#if db_migration.data_approach}}
+{{db_migration.data_approach}}
+{{else}}
+**アプローチ:**
+1. **初期ロード:** 移行ウィンドウ中に完全データエクスポート/インポート
+2. **検証:** 行数、チェックサム、サンプルデータ検証
+3. **ロールバック計画:** 検証完了までソースデータベースを維持
+
+**ツール:**
+- ETLツール: Apache NiFi / Talend / カスタムスクリプト
+- データ検証: カスタムSQLスクリプト
+{{/if}}
+
+### 4.4 ストアドプロシージャ移行
+
+{{#if db_migration.stored_procedures}}
+{{db_migration.stored_procedures}}
+{{else}}
+**戦略:**
+- ビジネスロジックをアプリケーション層（Javaサービス）に移動
+- 残りのDBプロシージャをPostgreSQL PL/pgSQLに変換
+- 移行中に不要なプロシージャを削除
+{{/if}}
+
+---
+
+## 5. テスト戦略
+
+### 5.1 テストアプローチ
+
+{{#if testing.approach}}
+{{testing.approach}}
+{{else}}
+*[詳細はテスト戦略ドキュメントを参照してください]*
+{{/if}}
+
+### 5.2 テストレベル
+
+{{#if testing.levels}}
+{{#each testing.levels}}
+- **{{this.level}}:** {{this.description}} (カバレッジ: {{this.coverage}})
+{{/each}}
+{{else}}
+- **単体テスト:** コードカバレッジ80%以上
+- **統合テスト:** すべてのAPIエンドポイントとデータベース連携
+- **システムテスト:** エンドツーエンドビジネスプロセス
+- **性能テスト:** 負荷、ストレス、スケーラビリティ
+- **UAT:** ビジネスユーザー検証
+{{/if}}
+
+---
+
+## 6. リスク管理
+
+### 6.1 移行リスク
+
+{{#if risks}}
+| リスクID | 説明 | 発生確率 | 影響度 | 緩和策 |
+|---------|-------------|-------------|--------|------------|
+{{#each risks}}
+| {{this.id}} | {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} |
+{{/each}}
+{{else}}
+| リスクID | 説明 | 発生確率 | 影響度 | 緩和策 |
+|---------|-------------|-------------|--------|------------|
+| R-001 | 移行中のデータ損失 | 低 | 高 | 複数バックアップ、検証チェック |
+| R-002 | パフォーマンス低下 | 中 | 高 | 性能テスト、最適化 |
+| R-003 | 機能カバレッジ不完全 | 中 | 高 | 包括的テスト、UAT |
+| R-004 | タイムライン超過 | 中 | 中 | バッファ時間、アジャイルアプローチ |
+{{/if}}
+
+### 6.2 コンティンジェンシー計画
+
+{{#if contingency}}
+{{#each contingency}}
+**{{this.scenario}}:**
+{{this.plan}}
+
+{{/each}}
+{{else}}
+*[ロールバックとコンティンジェンシー手順を定義してください]*
+{{/if}}
+
+---
+
+## 7. リソース計画
+
+### 7.1 チーム構成
+
+{{#if resources.team}}
+| 役割 | 人数 | 責任 |
+|------|-------|----------------|
+{{#each resources.team}}
+| {{this.role}} | {{this.count}} | {{this.responsibility}} |
+{{/each}}
+{{else}}
+| 役割 | 人数 | 責任 |
+|------|-------|----------------|
+| プロジェクトマネージャー | 1 | 全体調整 |
+| ソリューションアーキテクト | 1 | 技術設計 |
+| バックエンド開発者 | 3-4 | コード移行 |
+| データベースエンジニア | 2 | DB移行 |
+| QAエンジニア | 2 | テスト |
+| BrSE | 2 | 要件定義、コミュニケーション |
+{{/if}}
+
+### 7.2 トレーニング要件
+
+{{#if resources.training}}
+{{#each resources.training}}
+- **{{this.topic}}:** {{this.duration}} (対象者: {{this.attendees}})
+{{/each}}
+{{else}}
+- COBOL開発者向けJava/Spring Bootトレーニング
+- Oracle DBA向けPostgreSQLトレーニング
+- 新フレームワークとツールのトレーニング
+{{/if}}
+
+---
+
+## 8. 成功指標
+
+### 8.1 主要業績評価指標
+
+{{#if kpis}}
+| KPI | 目標 | 測定方法 |
+|-----|--------|-------------------|
+{{#each kpis}}
+| {{this.name}} | {{this.target}} | {{this.method}} |
+{{/each}}
+{{else}}
+| KPI | 目標 | 測定方法 |
+|-----|--------|-------------------|
+| 機能同等性 | 100% | テストケースカバレッジ |
+| コードカバレッジ | >80% | JaCoCoレポート |
+| パフォーマンス | ≥現行システム | 負荷テスト |
+| 不具合率 | UAT<5% | 不具合追跡システム |
+| 納期遵守 | タイムライン±10% | プロジェクトスケジュール |
+{{/if}}
+
+---
+
+## 9. 変更管理
+
+### 9.1 ステークホルダーコミュニケーション
+
+{{#if change_management.communication}}
+{{change_management.communication}}
+{{else}}
+- 経営陣への週次ステータスレポート
+- ビジネスステークホルダーへの隔週デモ
+- 開発チームの日次スタンドアップ
+{{/if}}
+
+### 9.2 トレーニングとドキュメント
+
+{{#if change_management.training}}
+{{change_management.training}}
+{{else}}
+- 新システムのユーザードキュメント
+- 管理者ガイド
+- 開発者オンボーディング資料
+- ナレッジトランスファーセッション
+{{/if}}
+
+---
+
+## 10. 移行後サポート
+
+### 10.1 ハイパーケア期間
+
+{{#if post_migration.hypercare}}
+{{post_migration.hypercare}}
+{{else}}
+**期間:** 本番稼働後4-8週間
+
+**サポート体制:**
+- 24時間365日のオンコールサポートチーム
+- 日次監視と問題トリアージ
+- 週次ステータスミーティング
+- 重大問題への迅速対応
+{{/if}}
+
+### 10.2 廃止計画
+
+{{#if post_migration.decommission}}
+{{post_migration.decommission}}
+{{else}}
+1. 両システムを2-4週間並行稼働
+2. 新システムですべての機能を検証
+3. 旧システムデータをアーカイブ
+4. 旧インフラを廃止
+5. 災害復旧計画を更新
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: 詳細プロジェクト計画
+
+*[プロジェクト計画へのリンクまたはガントチャートを添付]*
+
+### 付録B: コスト見積もり
+
+{{#if appendix.cost_estimate}}
+{{appendix.cost_estimate}}
+{{else}}
+*[プロジェクトマネジメントより提供される予定]*
+{{/if}}
+
+### 付録C: ベンダー評価
+
+{{#if appendix.vendors}}
+*[検討された移行ツールとベンダーの詳細]*
+{{/if}}
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（自動生成） |
+
+---
+
+**移行戦略ドキュメント 終了**
