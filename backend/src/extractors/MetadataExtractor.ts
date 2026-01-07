@@ -6,6 +6,7 @@
 
 import { CobolAnalysisResult } from '../analyzers/CobolAnalyzer.js';
 import { DDLAnalysisResult, TableDefinition } from '../analyzers/DDLAnalyzer.js';
+import { MigrationComplexityScorer, MigrationComplexityScore } from './MigrationComplexityScorer.js';
 
 export interface ProjectMetadata {
   source_analysis: {
@@ -29,6 +30,7 @@ export interface ProjectMetadata {
     };
   };
   complexity_summary: string;
+  migrationComplexity?: MigrationComplexityScore;
   file_type_distribution: Array<{
     type: string;
     count: number;
@@ -60,7 +62,10 @@ export class MetadataExtractor {
    */
   extract(analysisResults: CobolAnalysisResult[], ddlResults?: DDLAnalysisResult): ProjectMetadata {
     const totalLOC = this.calculateTotalLOC(analysisResults);
-    const avgComplexity = this.calculateAverageComplexity(analysisResults);
+
+    // Calculate comprehensive migration complexity
+    const scorer = new MigrationComplexityScorer();
+    const migrationComplexity = scorer.scoreProject(analysisResults);
 
     return {
       source_analysis: {
@@ -83,11 +88,12 @@ export class MetadataExtractor {
           functions: 0
         }
       },
-      complexity_summary: this.generateComplexitySummary(avgComplexity),
+      complexity_summary: `${migrationComplexity.difficulty} difficulty (score: ${migrationComplexity.overall}/100) - ${migrationComplexity.description}`,
+      migrationComplexity,
       file_type_distribution: this.calculateFileTypeDistribution(analysisResults),
       dependencies: this.extractDependencies(analysisResults),
       high_complexity_modules: this.identifyHighComplexityModules(analysisResults),
-      risks: this.assessRisks(analysisResults, avgComplexity)
+      risks: this.assessRisks(analysisResults, migrationComplexity)
     };
   }
 
@@ -171,18 +177,54 @@ export class MetadataExtractor {
       .slice(0, 10); // Top 10
   }
 
-  private assessRisks(results: CobolAnalysisResult[], avgComplexity: number): Array<any> {
+  private assessRisks(results: CobolAnalysisResult[], migrationComplexity: MigrationComplexityScore): Array<any> {
     const risks = [];
 
-    // Risk: High average complexity
-    if (avgComplexity > 20) {
+    // Risk: High migration difficulty
+    if (migrationComplexity.overall >= 60) {
       risks.push({
         id: 'R-001',
-        category: 'Complexity',
-        description: `Average code complexity is ${avgComplexity}, which is higher than recommended threshold (20)`,
+        category: 'Migration Complexity',
+        description: `Migration difficulty score is ${migrationComplexity.overall}/100 (${migrationComplexity.difficulty})`,
+        severity: migrationComplexity.overall >= 80 ? 'Critical' : 'High',
+        impact: 'May lead to longer migration timeline, higher defect rate, and increased resource requirements',
+        mitigation: 'Allocate experienced developers, plan for refactoring, increase code review frequency, consider phased migration'
+      });
+    }
+
+    // Risk: High logic complexity
+    if (migrationComplexity.logicComplexity >= 60) {
+      risks.push({
+        id: 'R-002',
+        category: 'Logic Complexity',
+        description: `Logic complexity score: ${migrationComplexity.logicComplexity}/100. ${migrationComplexity.details.logic.join('; ')}`,
         severity: 'High',
-        impact: 'May lead to longer migration timeline and higher defect rate',
-        mitigation: 'Allocate experienced developers, plan for refactoring, increase code review frequency'
+        impact: 'Complex control flow increases risk of logic errors during migration',
+        mitigation: 'Comprehensive unit testing, code refactoring to simplify logic, peer review of critical sections'
+      });
+    }
+
+    // Risk: High data complexity
+    if (migrationComplexity.dataComplexity >= 60) {
+      risks.push({
+        id: 'R-003',
+        category: 'Data Complexity',
+        description: `Data complexity score: ${migrationComplexity.dataComplexity}/100. ${migrationComplexity.details.data.join('; ')}`,
+        severity: 'High',
+        impact: 'Complex data structures and database operations require careful mapping',
+        mitigation: 'Create detailed data mapping documents, implement data validation tests, use ORM frameworks'
+      });
+    }
+
+    // Risk: COBOL-specific features
+    if (migrationComplexity.cobolSpecificRisk >= 60) {
+      risks.push({
+        id: 'R-004',
+        category: 'COBOL-specific Risk',
+        description: `COBOL-specific risk score: ${migrationComplexity.cobolSpecificRisk}/100. ${migrationComplexity.details.risk.join('; ')}`,
+        severity: 'Critical',
+        impact: 'Legacy COBOL features may not have direct Java equivalents, requiring custom solutions',
+        mitigation: 'Research migration patterns for specific features, develop custom libraries, plan for redesign where necessary'
       });
     }
 
@@ -190,7 +232,7 @@ export class MetadataExtractor {
     const totalLOC = this.calculateTotalLOC(results);
     if (totalLOC > 100000) {
       risks.push({
-        id: 'R-002',
+        id: 'R-005',
         category: 'Scale',
         description: `Large codebase with ${totalLOC.toLocaleString()} lines of code`,
         severity: 'Medium',
@@ -203,7 +245,7 @@ export class MetadataExtractor {
     const totalDeps = results.reduce((sum, r) => sum + r.dependencies.length, 0);
     if (totalDeps > 50) {
       risks.push({
-        id: 'R-003',
+        id: 'R-006',
         category: 'Dependencies',
         description: `High number of inter-module dependencies (${totalDeps})`,
         severity: 'Medium',

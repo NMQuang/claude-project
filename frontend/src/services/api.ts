@@ -9,6 +9,20 @@ const api = axios.create({
   },
 });
 
+export interface MigrationComplexityScore {
+  overall: number;
+  logicComplexity: number;
+  dataComplexity: number;
+  cobolSpecificRisk: number;
+  difficulty: 'Low' | 'Medium' | 'High' | 'Very High';
+  description: string;
+  details: {
+    logic: string[];
+    data: string[];
+    risk: string[];
+  };
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -19,7 +33,17 @@ export interface Project {
   sourceDatabase?: string;
   targetLanguage?: string;
   targetDatabase?: string;
-  metadata?: any;
+  metadata?: {
+    source_analysis?: {
+      total_files?: number;
+      total_loc?: number;
+      database?: {
+        tables?: number;
+      };
+    };
+    complexity_summary?: string;
+    migrationComplexity?: MigrationComplexityScore;
+  };
   ddlMetadata?: any;
   generatedDocuments?: string[];
 }

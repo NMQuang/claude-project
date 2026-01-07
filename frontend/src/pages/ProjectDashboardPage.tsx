@@ -198,26 +198,97 @@ function ProjectDashboardPage() {
         <div className="metrics-panel">
           <h3>Analysis Metrics</h3>
           {project.metadata ? (
-            <div className="metric-grid">
-              <div className="metric">
-                <div className="metric-label">COBOL Files</div>
-                <div className="metric-value">{project.metadata.source_analysis?.total_files || 0}</div>
-              </div>
-              <div className="metric">
-                <div className="metric-label">Lines of Code</div>
-                <div className="metric-value">{project.metadata.source_analysis?.total_loc || 0}</div>
-              </div>
-              <div className="metric">
-                <div className="metric-label">Database Tables</div>
-                <div className="metric-value">{project.metadata.source_analysis?.database?.tables || 0}</div>
-              </div>
-              <div className="metric">
-                <div className="metric-label">Complexity</div>
-                <div className={`metric-value complexity-${project.metadata.complexity_summary?.split(' ')[0]?.toLowerCase() || 'unknown'}`}>
-                  {project.metadata.complexity_summary?.split(' - ')[0] || 'Unknown'}
+            <>
+              <div className="metric-grid">
+                <div className="metric">
+                  <div className="metric-label">COBOL Files</div>
+                  <div className="metric-value">{project.metadata.source_analysis?.total_files || 0}</div>
+                </div>
+                <div className="metric">
+                  <div className="metric-label">Lines of Code</div>
+                  <div className="metric-value">{project.metadata.source_analysis?.total_loc || 0}</div>
+                </div>
+                <div className="metric">
+                  <div className="metric-label">Database Tables</div>
+                  <div className="metric-value">{project.metadata.source_analysis?.database?.tables || 0}</div>
+                </div>
+                <div className="metric">
+                  <div className="metric-label">Migration Difficulty</div>
+                  <div className={`metric-value complexity-${project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown'}`}>
+                    {project.metadata.migrationComplexity?.difficulty || 'Unknown'}
+                  </div>
                 </div>
               </div>
-            </div>
+
+              {project.metadata.migrationComplexity && (
+                <div className="complexity-breakdown">
+                  <h4>Migration Complexity Score: {project.metadata.migrationComplexity.overall}/100</h4>
+                  <p className="complexity-description">{project.metadata.migrationComplexity.description}</p>
+
+                  <div className="complexity-dimensions">
+                    <div className="complexity-dimension">
+                      <div className="dimension-header">
+                        <span className="dimension-name">Logic Complexity</span>
+                        <span className="dimension-score">{project.metadata.migrationComplexity.logicComplexity}/100</span>
+                      </div>
+                      <div className="dimension-bar">
+                        <div
+                          className="dimension-fill logic"
+                          style={{ width: `${project.metadata.migrationComplexity.logicComplexity}%` }}
+                        />
+                      </div>
+                      {project.metadata.migrationComplexity.details.logic.length > 0 && (
+                        <ul className="dimension-details">
+                          {project.metadata.migrationComplexity.details.logic.map((detail, idx) => (
+                            <li key={idx}>{detail}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="complexity-dimension">
+                      <div className="dimension-header">
+                        <span className="dimension-name">Data & SQL Complexity</span>
+                        <span className="dimension-score">{project.metadata.migrationComplexity.dataComplexity}/100</span>
+                      </div>
+                      <div className="dimension-bar">
+                        <div
+                          className="dimension-fill data"
+                          style={{ width: `${project.metadata.migrationComplexity.dataComplexity}%` }}
+                        />
+                      </div>
+                      {project.metadata.migrationComplexity.details.data.length > 0 && (
+                        <ul className="dimension-details">
+                          {project.metadata.migrationComplexity.details.data.map((detail, idx) => (
+                            <li key={idx}>{detail}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="complexity-dimension">
+                      <div className="dimension-header">
+                        <span className="dimension-name">COBOL-specific Risk</span>
+                        <span className="dimension-score">{project.metadata.migrationComplexity.cobolSpecificRisk}/100</span>
+                      </div>
+                      <div className="dimension-bar">
+                        <div
+                          className="dimension-fill risk"
+                          style={{ width: `${project.metadata.migrationComplexity.cobolSpecificRisk}%` }}
+                        />
+                      </div>
+                      {project.metadata.migrationComplexity.details.risk.length > 0 && (
+                        <ul className="dimension-details">
+                          {project.metadata.migrationComplexity.details.risk.map((detail, idx) => (
+                            <li key={idx}>{detail}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="empty-metrics">
               No analysis data yet. Upload files and run analysis.

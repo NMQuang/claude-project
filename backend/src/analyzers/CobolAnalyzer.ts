@@ -17,6 +17,28 @@ export interface CobolAnalysisResult {
   divisions: string[];
   paragraphs: string[];
   dependencies: string[];
+  migrationMetrics: {
+    // Logic Complexity Indicators
+    cyclomaticComplexity: number;
+    nestedIfDepth: number;
+    gotoCount: number;
+    evaluateCount: number;
+    performCount: number;
+
+    // Data & SQL Complexity Indicators
+    copybookCount: number;
+    sqlStatementCount: number;
+    fileOperationCount: number;
+    occursCount: number;
+    redefinesCount: number;
+
+    // COBOL-specific Risk Indicators
+    comp3Count: number;
+    assemblyCallCount: number;
+    complexPicCount: number;
+    sortMergeCount: number;
+    reportWriterUsage: boolean;
+  };
 }
 
 export class CobolAnalyzer {
@@ -27,15 +49,18 @@ export class CobolAnalyzer {
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n');
 
+    const migrationMetrics = this.analyzeMigrationMetrics(lines);
+
     return {
       name: path.basename(filePath, '.cbl').toUpperCase(),
       path: filePath,
       type: 'COBOL Program',
       loc: this.countLOC(lines),
-      complexity: this.estimateComplexity(lines),
+      complexity: migrationMetrics.cyclomaticComplexity,
       divisions: this.extractDivisions(lines),
       paragraphs: this.extractParagraphs(lines),
-      dependencies: this.extractDependencies(lines)
+      dependencies: this.extractDependencies(lines),
+      migrationMetrics
     };
   }
 
@@ -143,5 +168,116 @@ export class CobolAnalyzer {
     }
 
     return [...new Set(dependencies)]; // Remove duplicates
+  }
+
+  /**
+   * Analyze migration-specific metrics
+   */
+  private analyzeMigrationMetrics(lines: string[]) {
+    let cyclomaticComplexity = 1;
+    let nestedIfDepth = 0;
+    let currentIfDepth = 0;
+    let maxIfDepth = 0;
+    let gotoCount = 0;
+    let evaluateCount = 0;
+    let performCount = 0;
+    let copybookCount = 0;
+    let sqlStatementCount = 0;
+    let fileOperationCount = 0;
+    let occursCount = 0;
+    let redefinesCount = 0;
+    let comp3Count = 0;
+    let assemblyCallCount = 0;
+    let complexPicCount = 0;
+    let sortMergeCount = 0;
+    let reportWriterUsage = false;
+
+    for (const line of lines) {
+      const upperLine = line.toUpperCase();
+      const trimmed = line.trim();
+
+      // Skip comments
+      if (trimmed.startsWith('*')) continue;
+
+      // Logic Complexity
+      if (upperLine.includes(' IF ') || upperLine.startsWith('IF ')) {
+        cyclomaticComplexity++;
+        currentIfDepth++;
+        maxIfDepth = Math.max(maxIfDepth, currentIfDepth);
+      }
+      if (upperLine.includes('END-IF')) {
+        currentIfDepth = Math.max(0, currentIfDepth - 1);
+      }
+      if (upperLine.includes('EVALUATE')) {
+        cyclomaticComplexity++;
+        evaluateCount++;
+      }
+      if (upperLine.includes('PERFORM')) {
+        performCount++;
+        if (upperLine.includes('UNTIL')) {
+          cyclomaticComplexity++;
+        }
+      }
+      if (upperLine.includes('WHEN')) {
+        cyclomaticComplexity++;
+      }
+      if (upperLine.match(/\bGO\s+TO\b/) || upperLine.match(/\bGOTO\b/)) {
+        gotoCount++;
+        cyclomaticComplexity++;
+      }
+
+      // Data & SQL Complexity
+      if (upperLine.includes('COPY ')) {
+        copybookCount++;
+      }
+      if (upperLine.includes('EXEC SQL') || upperLine.includes('EXEC-SQL')) {
+        sqlStatementCount++;
+      }
+      if (upperLine.match(/\b(OPEN|READ|WRITE|CLOSE|REWRITE|DELETE)\b/)) {
+        fileOperationCount++;
+      }
+      if (upperLine.includes('OCCURS')) {
+        occursCount++;
+      }
+      if (upperLine.includes('REDEFINES')) {
+        redefinesCount++;
+      }
+
+      // COBOL-specific Risks
+      if (upperLine.match(/\bCOMP-3\b/) || upperLine.match(/\bPACKED-DECIMAL\b/)) {
+        comp3Count++;
+      }
+      if (upperLine.includes('CALL') && (upperLine.includes('ILBOA') || upperLine.includes('ASMX'))) {
+        assemblyCallCount++;
+      }
+      if (upperLine.match(/PIC\s+[^.\s]*[SVP9X]{5,}/)) {
+        // Complex PIC clauses with 5+ format characters
+        complexPicCount++;
+      }
+      if (upperLine.match(/\b(SORT|MERGE|RELEASE|RETURN)\b/)) {
+        sortMergeCount++;
+      }
+      if (upperLine.includes('REPORT') && upperLine.includes('SECTION')) {
+        reportWriterUsage = true;
+      }
+    }
+
+    return {
+      cyclomaticComplexity,
+      nestedIfDepth: maxIfDepth,
+      gotoCount,
+      evaluateCount,
+      performCount,
+      copybookCount,
+      sqlStatementCount,
+      fileOperationCount,
+      occursCount,
+      redefinesCount,
+      comp3Count,
+      assemblyCallCount,
+      complexPicCount,
+      sortMergeCount,
+      reportWriterUsage
+    };
   }
 }

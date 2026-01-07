@@ -155,3 +155,103 @@
 .metric-value.complexity-unknown {
   color: #888;
 }
+
+/* Complexity Breakdown Section */
+.complexity-breakdown {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #333;
+}
+
+.complexity-breakdown h4 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.complexity-description {
+  color: #aaa;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.complexity-dimensions {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.complexity-dimension {
+  background-color: #1a1a1a;
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid #333;
+}
+
+.dimension-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.dimension-name {
+  color: #fff;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.dimension-score {
+  color: #51cf66;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.dimension-bar {
+  height: 8px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.75rem;
+}
+
+.dimension-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.dimension-fill.logic {
+  background: linear-gradient(90deg, #4dabf7 0%, #339af0 100%);
+}
+
+.dimension-fill.data {
+  background: linear-gradient(90deg, #9775fa 0%, #7950f2 100%);
+}
+
+.dimension-fill.risk {
+  background: linear-gradient(90deg, #ff8787 0%, #fa5252 100%);
+}
+
+.dimension-details {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.dimension-details li {
+  color: #aaa;
+  font-size: 0.85rem;
+  padding: 0.4rem 0;
+  padding-left: 1.25rem;
+  position: relative;
+  line-height: 1.4;
+}
+
+.dimension-details li:before {
+  content: "•";
+  position: absolute;
+  left: 0.5rem;
+  color: #666;
+}
