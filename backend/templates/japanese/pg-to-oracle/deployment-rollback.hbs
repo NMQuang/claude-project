@@ -1,0 +1,729 @@
+# デプロイ＆ロールバック計画書
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | デプロイ＆ロールバック計画 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}**のPostgreSQLからOracleデータベースへの移行に関する詳細なデプロイ計画とロールバック手順を提供します。この計画は、最小限のJava変更原則に従いながら、最小限のダウンタイム、データ損失ゼロ、および信頼できるロールバック機能を保証します。
+
+### デプロイアプローチ
+
+**デプロイ戦略:** [要件に基づいて選択]
+- **オプションA:** ビッグバンカットオーバー（単一のメンテナンスウィンドウでの完全な移行）
+- **オプションB:** 段階的移行（モジュール別の移行）
+- **オプションC:** ブルーグリーンデプロイ（移行期間中の並列システム）
+
+**推奨:** 複雑度スコア {{metadata.migrationComplexity.overall}}/100 に基づく
+
+{{#if (gt metadata.migrationComplexity.overall 70)}}
+**推奨: 段階的移行**
+- よりリスクの低いアプローチ
+- 段階的な検証が可能
+- 個別モジュールのロールバックが容易
+{{else}}
+**推奨: ビッグバンカットオーバー**
+- より高速な全体的な移行
+- よりシンプルな調整
+- 単一のカットオーバーイベント
+{{/if}}
+
+---
+
+## 1. デプロイ前チェックリスト
+
+### 1.1 技術的前提条件
+
+- [ ] Oracleデータベースがインストールおよび設定された（バージョン12c+）
+- [ ] データベーススキーマが作成され検証された
+- [ ] すべてのインデックス、制約、トリガーが作成された
+- [ ] データ移行が完了し検証された
+- [ ] アプリケーション成果物がビルドされテストされた
+- [ ] 設定ファイルが更新された（JDBC、Hibernateなど）
+- [ ] すべてのJavaコード変更がアプリケーションサーバーにデプロイされた
+- [ ] データベース接続文字列が設定された
+- [ ] 監視とアラートが設定された
+
+### 1.2 テスト検証
+
+- [ ] すべての単体テストが合格している（100%）
+- [ ] すべての統合テストが合格している（>95%）
+- [ ] パフォーマンステストが完了し承認された
+- [ ] データ整合性検証が完了した（100%の精度）
+- [ ] 負荷テストが正常に完了した
+- [ ] ステージングでロールバック手順がテストされた
+
+### 1.3 チームの準備
+
+- [ ] デプロイチームが特定されブリーフィングを受けた
+- [ ] コミュニケーション計画が確立された
+- [ ] サポートチームが待機している
+- [ ] エスカレーション連絡先が確認された
+- [ ] ロールバック意思決定者が特定された
+
+### 1.4 バックアップとリカバリ
+
+- [ ] 完全なPostgreSQLバックアップが取得された
+- [ ] Oracleデータベースバックアップが取得された
+- [ ] アプリケーションバックアップ（コード + 設定）が完了した
+- [ ] バックアップ復元がテストされ検証された
+- [ ] 目標復旧時間（RTO）が確認された
+
+---
+
+## 2. デプロイタイムライン
+
+### 2.1 デプロイスケジュール
+
+**デプロイ日:** [決定予定]
+**デプロイウィンドウ:** [メンテナンスウィンドウを定義]
+**推定所要時間:** [リハーサルに基づく]
+
+### 2.2 デプロイフェーズ
+
+```mermaid
+gantt
+    title デプロイタイムライン
+    dateFormat HH:mm
+    axisFormat %H:%M
+
+    section 準備
+    デプロイ前チェック    :00:00, 30m
+    最終バックアップ            :00:30, 30m
+
+    section データベースカットオーバー
+    アプリケーション停止         :01:00, 15m
+    最終データ同期          :01:15, 30m
+    Oracleに切り替え         :01:45, 15m
+
+    section アプリケーションデプロイ
+    新しい成果物をデプロイ     :02:00, 30m
+    設定を更新    :02:30, 15m
+    アプリケーション起動        :02:45, 15m
+
+    section 検証
+    スモークテスト              :03:00, 30m
+    データ検証          :03:30, 30m
+    パフォーマンスチェック        :04:00, 30m
+
+    section 本番稼働
+    ユーザーに公開            :04:30, 15m
+    監視                  :04:45, 60m
+```
+
+---
+
+## 3. 詳細なデプロイ手順
+
+### 3.1 フェーズ1: 準備（T-30分）
+
+#### ステップ1.1: デプロイ前検証
+```bash
+#!/bin/bash
+# デプロイ前チェックスクリプト
+
+echo "=== デプロイ前チェック ==="
+
+# Oracleデータベース接続を確認
+sqlplus -s username/password@ORCL <<EOF
+SELECT 'Oracle DB: 接続済み' FROM DUAL;
+EXIT;
+EOF
+
+# アプリケーションヘルスを確認
+curl -f http://app-server:8080/health || echo "警告: アプリヘルスチェックが失敗しました"
+
+# バックアップ完了を確認
+ls -lh /backups/postgresql_backup_$(date +%Y%m%d).sql
+ls -lh /backups/oracle_backup_$(date +%Y%m%d).dmp
+
+echo "=== デプロイ前チェック完了 ==="
+```
+
+#### ステップ1.2: 最終バックアップ
+```bash
+#!/bin/bash
+# 最終バックアップスクリプト
+
+echo "最終PostgreSQLバックアップを取得中..."
+pg_dump -h localhost -U postgres -d mydb -F c -f /backups/final_postgres_$(date +%Y%m%d_%H%M%S).backup
+
+echo "Oracleバックアップを取得中..."
+expdp username/password@ORCL directory=BACKUP_DIR dumpfile=final_oracle_$(date +%Y%m%d_%H%M%S).dmp logfile=backup.log full=y
+
+echo "バックアップ完了"
+```
+
+#### ステップ1.3: コミュニケーション
+```
+# ユーザーへの通知
+件名: 定期メンテナンス - システムダウンタイム
+
+ユーザーの皆様
+
+本日[開始時刻]から[終了時刻]まで、定期メンテナンスのためシステムが停止することをお知らせいたします。
+
+この期間中、アプリケーションは利用できません。ご不便をおかけして申し訳ございません。
+
+ご理解のほどよろしくお願いいたします。
+ITチーム
+```
+
+### 3.2 フェーズ2: アプリケーションシャットダウン（T-0）
+
+#### ステップ2.1: メンテナンスモードを有効化
+```bash
+#!/bin/bash
+# メンテナンスモードを有効化
+
+echo "メンテナンスモードを有効化中..."
+
+# ロードバランサーを更新してメンテナンスページを表示
+# またはアプリケーションプロパティを更新
+curl -X POST http://app-server:8080/admin/maintenance/enable
+
+# アクティブセッションがないことを確認（グレースフルシャットダウンを待つ）
+sleep 30
+
+# アクティブ接続を確認
+psql -h localhost -U postgres -d mydb -c "SELECT COUNT(*) FROM pg_stat_activity WHERE datname='mydb';"
+```
+
+#### ステップ2.2: アプリケーション停止
+```bash
+#!/bin/bash
+# アプリケーションサーバーを停止
+
+echo "アプリケーションを停止中..."
+
+# Spring Bootアプリケーションを停止
+systemctl stop application
+
+# プロセスが停止したことを確認
+ps aux | grep java | grep -v grep || echo "アプリケーションが正常に停止しました"
+
+# PostgreSQLの書き込みを停止（必要に応じて読み取り専用に切り替え）
+# psql -h localhost -U postgres -c "ALTER DATABASE mydb SET default_transaction_read_only = on;"
+```
+
+### 3.3 フェーズ3: データ同期（T+15分）
+
+#### ステップ3.1: 最終デルタ同期
+```bash
+#!/bin/bash
+# 最終データ同期
+
+echo "PostgreSQLからOracleへの最終変更を同期中..."
+
+# AWS DMSを使用している場合、最終レプリケーションを適用
+# カスタムスクリプトを使用している場合、増分同期を実行
+
+# 例: 変更された可能性のある特定のテーブルを同期
+python scripts/sync_delta_changes.py \
+  --source-db postgresql://localhost/mydb \
+  --target-db oracle://localhost:1521/ORCL \
+  --tables users,orders,transactions \
+  --since "2024-01-01 00:00:00"
+
+echo "デルタ同期完了"
+```
+
+#### ステップ3.2: 最終データ検証
+```sql
+-- Oracleで実行
+-- 行数を検証
+SELECT 'users' as table_name, COUNT(*) as oracle_count FROM users
+UNION ALL
+SELECT 'orders', COUNT(*) FROM orders
+UNION ALL
+SELECT 'transactions', COUNT(*) FROM transactions;
+
+-- PostgreSQLの行数と比較（別途実行）
+-- すべての行数が100%一致する必要があります
+```
+
+### 3.4 フェーズ4: データベースカットオーバー（T+45分）
+
+#### ステップ4.1: 接続文字列を更新
+```bash
+#!/bin/bash
+# アプリケーション設定を更新
+
+echo "データベース設定を更新中..."
+
+# 現在の設定をバックアップ
+cp /app/config/application.properties /app/config/application.properties.backup
+
+# Oracle設定に更新
+cp /app/config/application-oracle.properties /app/config/application.properties
+
+# 設定を検証
+grep "spring.datasource.url" /app/config/application.properties
+```
+
+**設定変更:**
+```properties
+# 旧（PostgreSQL）
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.datasource.url=jdbc:postgresql://pg-server:5432/mydb
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+
+# 新（Oracle）
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@oracle-server:1521:ORCL
+spring.jpa.database-platform=org.hibernate.dialect.Oracle12cDialect
+```
+
+### 3.5 フェーズ5: アプリケーションデプロイ（T+60分）
+
+#### ステップ5.1: 新しい成果物をデプロイ
+```bash
+#!/bin/bash
+# Oracleサポート付きアプリケーションをデプロイ
+
+echo "Oracleサポート付きアプリケーションをデプロイ中..."
+
+# 既存のアプリケーションを停止（既に停止済み）
+# 新しいJAR/WARをデプロイ
+cp /deployments/application-oracle.jar /app/application.jar
+
+# 権限を更新
+chown appuser:appuser /app/application.jar
+chmod 755 /app/application.jar
+```
+
+#### ステップ5.2: アプリケーション起動
+```bash
+#!/bin/bash
+# Oracleでアプリケーションを起動
+
+echo "アプリケーションを起動中..."
+
+# Spring Bootアプリケーションを起動
+systemctl start application
+
+# 起動を待つ
+sleep 60
+
+# ヘルスチェック
+http_code=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+
+if [ $http_code -eq 200 ]; then
+  echo "成功: アプリケーションが正常に起動しました"
+else
+  echo "エラー: アプリケーションヘルスチェックが失敗しました - ロールバックを開始"
+  exit 1
+fi
+```
+
+### 3.6 フェーズ6: 検証（T+120分）
+
+#### ステップ6.1: スモークテスト
+```bash
+#!/bin/bash
+# スモークテストスクリプト
+
+echo "スモークテストを実行中..."
+
+# テスト1: ヘルスチェック
+curl -f http://localhost:8080/health || exit 1
+
+# テスト2: データベース接続
+curl -f http://localhost:8080/api/users/count || exit 1
+
+# テスト3: 基本的なCRUD操作
+# 作成
+user_id=$(curl -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"テストユーザー","email":"test@example.com"}' | jq -r '.id')
+
+# 読み取り
+curl -f http://localhost:8080/api/users/$user_id || exit 1
+
+# 更新
+curl -X PUT http://localhost:8080/api/users/$user_id \
+  -H "Content-Type: application/json" \
+  -d '{"name":"更新されたユーザー","email":"test@example.com"}' || exit 1
+
+# 削除
+curl -X DELETE http://localhost:8080/api/users/$user_id || exit 1
+
+echo "すべてのスモークテストが合格しました"
+```
+
+#### ステップ6.2: データ整合性チェック
+```sql
+-- 包括的なデータ検証を実行
+-- 制約を確認
+SELECT constraint_name, status
+FROM user_constraints
+WHERE status != 'ENABLED';
+
+-- 0行を返す必要があります
+
+-- 外部キーの整合性を確認
+SELECT
+  'orders' as table_name,
+  COUNT(*) as orphaned_records
+FROM orders o
+WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = o.user_id);
+
+-- 孤立レコード0を返す必要があります
+```
+
+#### ステップ6.3: パフォーマンス検証
+```bash
+#!/bin/bash
+# パフォーマンス検証
+
+echo "クエリパフォーマンスを確認中..."
+
+# 主要なクエリを実行して応答時間を測定
+for i in {1..10}; do
+  start_time=$(date +%s%N)
+  curl -s http://localhost:8080/api/users > /dev/null
+  end_time=$(date +%s%N)
+
+  duration=$(( (end_time - start_time) / 1000000 ))
+  echo "クエリ $i: ${duration}ms"
+
+  if [ $duration -gt 500 ]; then
+    echo "警告: クエリがパフォーマンス閾値を超えました"
+  fi
+done
+```
+
+### 3.7 フェーズ7: 本番稼働（T+180分）
+
+#### ステップ7.1: メンテナンスモードを無効化
+```bash
+#!/bin/bash
+# 本番稼働
+
+echo "ユーザーにアプリケーションを公開中..."
+
+# メンテナンスモードを無効化
+curl -X POST http://localhost:8080/admin/maintenance/disable
+
+# ロードバランサーを更新
+# アプリケーションサーバーへのトラフィックを有効化
+
+echo "アプリケーションがOracleデータベースで本番稼働しました"
+```
+
+#### ステップ7.2: ユーザーコミュニケーション
+```
+# ユーザーへの通知
+件名: メンテナンス完了 - システム利用可能
+
+ユーザーの皆様
+
+定期メンテナンスが正常に完了しました。システムは現在ご利用いただけます。
+
+問題が発生した場合は、すぐにサポートチームにご連絡ください。
+
+ご協力ありがとうございました。
+ITチーム
+```
+
+### 3.8 フェーズ8: デプロイ後監視（T+180からT+360分）
+
+#### ステップ8.1: 主要メトリクスの監視
+```bash
+#!/bin/bash
+# 継続的な監視スクリプト
+
+echo "デプロイ後のアプリケーションを監視中..."
+
+while true; do
+  # ヘルスチェック
+  health=$(curl -s http://localhost:8080/health | jq -r '.status')
+
+  # エラー率を確認
+  error_rate=$(curl -s http://localhost:8080/metrics | jq -r '.errorRate')
+
+  # 応答時間を確認
+  response_time=$(curl -s http://localhost:8080/metrics | jq -r '.avgResponseTime')
+
+  echo "$(date): Health=$health, ErrorRate=$error_rate%, ResponseTime=${response_time}ms"
+
+  # 閾値を超えた場合にアラート
+  if [ "$error_rate" -gt 1 ]; then
+    echo "アラート: エラー率が閾値を超えています - ロールバックを検討"
+  fi
+
+  sleep 60
+done
+```
+
+#### ステップ8.2: データベース監視
+```sql
+-- Oracleデータベースを監視
+SELECT
+  sql_text,
+  executions,
+  elapsed_time / 1000000 as elapsed_seconds,
+  cpu_time / 1000000 as cpu_seconds
+FROM v$sql
+WHERE elapsed_time > 1000000
+ORDER BY elapsed_time DESC
+FETCH FIRST 10 ROWS ONLY;
+
+-- アクティブセッションを監視
+SELECT
+  username,
+  COUNT(*) as session_count
+FROM v$session
+WHERE username IS NOT NULL
+GROUP BY username;
+```
+
+---
+
+## 4. ロールバック計画
+
+### 4.1 ロールバック判断基準
+
+**以下のいずれかが発生した場合、ロールバックがトリガーされます:**
+
+| 基準 | 閾値 | 優先度 |
+|------|------|--------|
+| データ整合性の問題 | データ損失または破損 | クリティカル |
+| アプリケーションエラー率 | リクエストの>1% | クリティカル |
+| パフォーマンス低下 | ベースラインより>20%遅い | 高 |
+| クリティカル機能の障害 | ビジネスクリティカル機能の故障 | クリティカル |
+| データベース接続障害 | 接続の>5%が失敗 | 高 |
+| 未解決のデプロイ問題 | 2時間のトラブルシューティング後 | 中 |
+
+**ロールバック決定権限:**
+- 技術リード（技術的問題に対して開始可能）
+- プロジェクトマネージャー（タイムラインの問題に対して開始可能）
+- ビジネスオーナー（ビジネスへの影響に対して開始可能）
+
+### 4.2 ロールバック手順
+
+#### ステップ4.2.1: ロールバック宣言
+```bash
+#!/bin/bash
+# ロールバック開始
+
+echo "========================================="
+echo "PostgreSQLへのロールバックを開始"
+echo "========================================="
+echo "時刻: $(date)"
+echo "開始者: [氏名]"
+echo "理由: [理由]"
+echo "========================================="
+
+# ロールバック決定を記録
+echo "$(date) - ロールバック開始 - 理由: [理由]" >> /var/log/deployment.log
+```
+
+#### ステップ4.2.2: アプリケーション停止
+```bash
+#!/bin/bash
+# Oracle接続アプリケーションを停止
+
+echo "アプリケーションを停止中..."
+
+systemctl stop application
+
+# 停止を確認
+ps aux | grep java | grep -v grep && echo "警告: アプリケーションがまだ実行中です"
+
+echo "アプリケーション停止完了"
+```
+
+#### ステップ4.2.3: PostgreSQLに戻す
+```bash
+#!/bin/bash
+# PostgreSQL設定を復元
+
+echo "PostgreSQLに戻しています..."
+
+# 設定バックアップを復元
+cp /app/config/application.properties.backup /app/config/application.properties
+
+# 設定を検証
+grep "spring.datasource.url" /app/config/application.properties
+
+echo "PostgreSQLへの設定が復元されました"
+```
+
+#### ステップ4.2.4: データ変更の同期（ある場合）
+```bash
+#!/bin/bash
+# OracleからPostgreSQLにデータ変更を同期
+
+echo "OracleからPostgreSQLへのデータ変更を同期中..."
+
+# 短期間にOracleに書き込まれたデータがある場合は同期して戻す
+python scripts/oracle_to_postgres_sync.py \
+  --source-db oracle://localhost:1521/ORCL \
+  --target-db postgresql://localhost/mydb \
+  --since "[カットオーバータイムスタンプ]"
+
+echo "データ同期完了"
+```
+
+#### ステップ4.2.5: PostgreSQLでアプリケーションを再起動
+```bash
+#!/bin/bash
+# PostgreSQLでアプリケーションを再起動
+
+echo "PostgreSQLでアプリケーションを再起動中..."
+
+systemctl start application
+
+# 起動を待つ
+sleep 60
+
+# ヘルスを検証
+http_code=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+
+if [ $http_code -eq 200 ]; then
+  echo "成功: アプリケーションが正常にロールバックされました"
+else
+  echo "エラー: ロールバックが失敗しました - 手動介入が必要です"
+  exit 1
+fi
+```
+
+#### ステップ4.2.6: ロールバックの検証
+```bash
+#!/bin/bash
+# ロールバックを検証
+
+echo "ロールバックを検証中..."
+
+# データベース接続をテスト
+curl -f http://localhost:8080/api/users/count || exit 1
+
+# CRUD操作をテスト
+# [デプロイと同じスモークテスト]
+
+# データ整合性を検証
+psql -h localhost -U postgres -d mydb -c "SELECT COUNT(*) FROM users;"
+
+echo "ロールバック検証完了"
+```
+
+#### ステップ4.2.7: ステークホルダーへの通知
+```
+# ロールバック通知
+件名: 緊急 - システムが以前のバージョンにロールバックされました
+
+ステークホルダーの皆様
+
+[理由]により、デプロイがロールバックされました。
+
+システムは現在、以前のPostgreSQLデータベースで実行されており、正常に機能しています。
+
+問題をレビューし次のステップを計画するため、事後レビューをスケジュールします。
+
+現在のステータス: 安定
+次のステップ: [決定予定]
+
+ITチーム
+```
+
+### 4.3 ロールバックタイムライン
+
+**推定ロールバック所要時間:** 30-60分
+
+```
+[ロールバック決定] → [アプリ停止: 5分] → [設定切り替え: 5分] → [データ同期: 10分] → [アプリ起動: 10分] → [検証: 15分] → [通知: 5分]
+```
+
+### 4.4 ロールバック後のアクション
+
+1. **根本原因分析** - 徹底的な調査を実施
+2. **問題の修正** - 特定された問題に対処
+3. **再テスト** - ステージングで包括的なテスト
+4. **デプロイの再スケジュール** - 新しいデプロイ日
+5. **手順の更新** - 学んだ教訓を組み込む
+
+---
+
+## 5. デプロイ後のアクティビティ
+
+### 5.1 1日目の監視（集中的）
+
+**最初の24時間は24/7監視:**
+- 5分ごとのアプリケーションヘルスチェック
+- データベースパフォーマンス監視
+- エラーログ監視
+- ユーザー報告された問題の追跡
+
+### 5.2 1週目の監視（アクティブ）
+
+- 日次パフォーマンスレポート
+- 日次エラーサマリー
+- 必要に応じてデータベース最適化
+- ユーザーフィードバック収集
+
+### 5.3 1か月目の監視（標準）
+
+- 週次パフォーマンスレビュー
+- トレンド分析
+- 最適化の機会
+- 安定化の確認
+
+---
+
+## 6. 連絡先とエスカレーション
+
+### 6.1 デプロイチーム
+
+| 役割 | 氏名 | 電話 | メール |
+|------|------|------|--------|
+| 技術リード | | | |
+| データベース管理者（Oracle） | | | |
+| データベース管理者（PostgreSQL） | | | |
+| アプリケーション開発者 | | | |
+| DevOpsエンジニア | | | |
+| QAリード | | | |
+
+### 6.2 エスカレーションパス
+
+**レベル1:** 技術リード（最初のレスポンダー）
+**レベル2:** プロジェクトマネージャー（調整）
+**レベル3:** IT部長（エグゼクティブ決定）
+**レベル4:** CTO（クリティカルなビジネスへの影響）
+
+---
+
+## 7. 成功基準
+
+### 7.1 デプロイ成功基準
+
+- ✓ 計画されたメンテナンスウィンドウ内でアプリケーションがデプロイされた
+- ✓ すべてのスモークテストが合格
+- ✓ データ整合性が検証された（100%の精度）
+- ✓ パフォーマンスがベースラインと一致
+- ✓ エラー率 < 0.1%
+- ✓ データ損失ゼロ
+- ✓ ロールバック機能が確認された
+
+### 7.2 サインオフ
+
+| ステークホルダー | 役割 | サインオフ | 日付 |
+|----------------|------|-----------|------|
+| | 技術リード | | |
+| | プロジェクトマネージャー | | |
+| | ビジネスオーナー | | |
+| | QAリード | | |
+
+---
+
+**ドキュメント終了**

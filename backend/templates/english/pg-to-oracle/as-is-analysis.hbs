@@ -1,0 +1,338 @@
+# As-Is Analysis Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Document Type** | As-Is Analysis |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+| **Author** | {{author}} |
+
+---
+
+## Executive Summary
+
+This document provides a comprehensive analysis of the current Java application using PostgreSQL database for the **{{project.name}}** migration project. The analysis covers the application architecture, database schema, PostgreSQL-specific features, ORM dependencies, and migration complexity assessment.
+
+### Key Findings
+
+- **Total Java Files:** {{metadata.source_analysis.total_files}}
+- **Total Lines of Code:** {{metadata.source_analysis.total_loc}}
+- **ORM Framework:** {{metadata.source_analysis.ormFramework}}
+- **Source Database:** {{source.database}}
+- **Target Database:** {{target.database}}
+- **Complexity Assessment:** {{metadata.complexity_summary}}
+
+### Migration Complexity (6 Dimensions)
+
+| Dimension | Score | Level |
+|-----------|-------|-------|
+| Schema & Data Type Complexity | {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| SQL & Query Rewrite Complexity | {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| Stored Procedures/Functions/Triggers | {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| Data Volume & Migration Strategy | {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| Application & ORM Dependency | {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| Operational & Runtime Risk | {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| **Overall** | **{{metadata.migrationComplexity.overall}}/100** | **{{metadata.migrationComplexity.difficulty}}** |
+
+---
+
+## 1. System Overview
+
+### 1.1 Application Architecture
+
+**Technology Stack:**
+- **Backend Framework:** Spring Boot / Java EE
+- **ORM Framework:** {{metadata.source_analysis.ormFramework}}
+- **Database:** PostgreSQL
+- **Application Server:** {{source.app_server}}
+
+### 1.2 Migration Principle
+
+**CRITICAL: Minimal Java Changes**
+
+This migration follows the principle of **keeping Java application logic unchanged**. Limited Java changes are restricted to:
+
+1. **Entity Mappings** - Update `@Entity`, `@Table`, `@Column` annotations if type mapping fails
+2. **Repository Queries** - Rewrite SQL in `@Query` annotations and MyBatis XML
+3. **Database Configurations** - Update JDBC driver, connection URL, datasource properties
+
+**NO business logic refactoring is expected or required.**
+
+---
+
+## 2. Source Code Analysis
+
+### 2.1 Java Application Structure
+
+**Total Java Files:** {{metadata.source_analysis.total_files}}
+**Total Lines of Code:** {{metadata.source_analysis.total_loc}}
+
+#### File Distribution by Type
+
+{{#each metadata.source_analysis.javaFiles}}
+- **{{this.type}}:** `{{this.name}}` ({{this.loc}} LOC) - PostgreSQL Dependencies: {{#if this.hasPostgreSQLDependencies}}Yes{{else}}No{{/if}}
+{{/each}}
+
+### 2.2 Required Java Changes
+
+**Files Requiring Change:** {{metadata.javaChanges.summary.filesRequiringChange}}
+**Files Requiring Review:** {{metadata.javaChanges.summary.filesRequiringReview}}
+
+#### Acceptable Java Changes (Database Layer)
+
+**Entity Mappings ({{metadata.javaChanges.acceptable.entityMappings.length}} files):**
+{{#each metadata.javaChanges.acceptable.entityMappings}}
+- {{this}}
+{{/each}}
+
+**Repository Queries ({{metadata.javaChanges.acceptable.repositoryQueries.length}} files):**
+{{#each metadata.javaChanges.acceptable.repositoryQueries}}
+- {{this}}
+{{/each}}
+
+**Configurations ({{metadata.javaChanges.acceptable.configurations.length}} files):**
+{{#each metadata.javaChanges.acceptable.configurations}}
+- {{this}}
+{{/each}}
+
+#### Files Requiring Review
+
+{{#if metadata.javaChanges.requiresReview.length}}
+{{#each metadata.javaChanges.requiresReview}}
+- ⚠️ {{this}}
+{{/each}}
+{{else}}
+✓ No files requiring special review (good architecture - business logic separated from database layer)
+{{/if}}
+
+---
+
+## 3. Database Analysis
+
+### 3.1 Database Schema Summary
+
+| Component | Count |
+|-----------|-------|
+| Tables | {{metadata.source_analysis.database.tables}} |
+| Views | {{metadata.source_analysis.database.views}} |
+| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} |
+| Functions | {{metadata.source_analysis.database.functions}} |
+| Triggers | {{metadata.source_analysis.database.triggers}} |
+| Indexes | {{metadata.source_analysis.database.indexes}} |
+| Sequences | {{metadata.source_analysis.database.sequences}} |
+| Partitioned Tables | {{metadata.source_analysis.database.partitionedTables}} |
+
+### 3.2 PostgreSQL-Specific Features Detected
+
+#### Data Types Usage
+
+{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
+**{{this.type}}** ({{this.count}} occurrences)
+- Tables: {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+- Oracle Mapping Complexity: **{{this.oracleMappingComplexity}}**
+- Suggested Oracle Type: `{{this.suggestedOracleType}}`
+{{/each}}
+
+#### PostgreSQL Extensions
+
+{{#if metadata.source_analysis.postgresqlFeatures.extensions.length}}
+{{#each metadata.source_analysis.postgresqlFeatures.extensions}}
+- **{{this}}** - Requires Oracle equivalent or custom implementation
+{{/each}}
+{{else}}
+No PostgreSQL extensions detected.
+{{/if}}
+
+#### Advanced Index Types
+
+{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
+- **{{this.type}}** ({{this.count}} indexes) - Oracle Support: {{#if this.oracleSupport}}Yes{{else}}No - Requires redesign{{/if}}
+{{/each}}
+
+#### Native Queries in Application
+
+**Total Native Queries:** {{metadata.source_analysis.postgresqlFeatures.nativeQueryCount}}
+
+Native queries will need SQL syntax rewrite for Oracle compatibility (LIMIT→FETCH, array_agg→LISTAGG, etc.)
+
+---
+
+## 4. Migration Complexity Assessment
+
+### 4.1 Overall Complexity
+
+**Overall Score:** {{metadata.migrationComplexity.overall}}/100 ({{metadata.migrationComplexity.difficulty}})
+
+{{metadata.migrationComplexity.description}}
+
+### 4.2 Dimension 1: Schema & Data Type Complexity
+
+**Score:** {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100
+
+**Key Challenges:**
+{{#each metadata.migrationComplexity.details.schemaDataType}}
+- {{this}}
+{{/each}}
+
+**Impact:** Complex PostgreSQL data types (JSONB, ARRAY, HSTORE) may require Entity annotation updates in Java code.
+
+**Mitigation:** Update DDL scripts with Oracle equivalents. Modify Entity class annotations ONLY if automatic type mapping fails.
+
+### 4.3 Dimension 2: SQL & Query Rewrite Complexity
+
+**Score:** {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100
+
+**Key Challenges:**
+{{#each metadata.migrationComplexity.details.sqlQueryRewrite}}
+- {{this}}
+{{/each}}
+
+**Impact:** Extensive SQL query rewrites in @Query annotations and MyBatis XML required.
+
+**Mitigation:** Rewrite SQL with Oracle syntax. **CRITICAL: Keep repository method signatures, parameters, and return types unchanged.**
+
+### 4.4 Dimension 3: Stored Procedures, Functions & Triggers
+
+**Score:** {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100
+
+**Key Challenges:**
+{{#each metadata.migrationComplexity.details.procedureFunctionTrigger}}
+- {{this}}
+{{/each}}
+
+**Impact:** PL/pgSQL to PL/SQL conversion requires careful review and testing.
+
+**Mitigation:** Convert PL/pgSQL to PL/SQL in database layer. If called from Java (@Procedure), update only procedure name/parameters in Repository interface.
+
+### 4.5 Dimension 4: Data Volume & Migration Strategy
+
+**Score:** {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100
+
+**Key Challenges:**
+{{#each metadata.migrationComplexity.details.dataVolumeMigration}}
+- {{this}}
+{{/each}}
+
+**Impact:** Large data volumes require careful migration planning and potential downtime.
+
+**Mitigation:** Use Oracle Data Pump or AWS DMS. Recreate partitioning in Oracle DDL. Update Entity classes only if partition keys change.
+
+### 4.6 Dimension 5: Application & ORM Dependency
+
+**Score:** {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100
+
+**Key Challenges:**
+{{#each metadata.migrationComplexity.details.applicationORMDependency}}
+- {{this}}
+{{/each}}
+
+**Impact:** Database layer Java code requires targeted updates.
+
+**Mitigation:** Update JDBC driver in config files. Rewrite SQL in @Query and MyBatis XML. **Do NOT refactor repository methods or service layer logic.**
+
+### 4.7 Dimension 6: Operational & Runtime Risk
+
+**Score:** {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100
+
+**Key Challenges:**
+{{#each metadata.migrationComplexity.details.operationalRuntimeRisk}}
+- {{this}}
+{{/each}}
+
+**Impact:** PostgreSQL extensions and operational differences may affect application behavior.
+
+**Mitigation:** Replace extensions in DDL with Oracle equivalents. Recreate GIN/GIST indexes. Update DB config files only.
+
+---
+
+## 5. Risk Assessment
+
+{{#each metadata.risks}}
+### Risk {{@index}}: {{this.id}} - {{this.category}}
+
+**Severity:** {{this.severity}}
+
+**Description:** {{this.description}}
+
+**Impact:** {{this.impact}}
+
+**Mitigation Strategy:** {{this.mitigation}}
+
+---
+{{/each}}
+
+## 6. Recommendations
+
+### 6.1 Migration Approach Recommendations
+
+{{#each metadata.migrationComplexity.recommendations}}
+#### {{@index}}. {{this.dimension}} (Severity: {{this.severity}})
+
+**Issue:** {{this.issue}}
+
+**Mitigation:** {{this.mitigation}}
+
+---
+{{/each}}
+
+### 6.2 Key Success Factors
+
+1. **Keep Java Logic Unchanged** - Focus migration efforts on database layer (DDL, SQL, procedures)
+2. **Automated Testing** - Implement comprehensive integration tests for all @Query annotations and repositories
+3. **Database Migration Tools** - Use Oracle Data Pump or AWS DMS for data migration
+4. **Phased Approach** - Migrate and test one module at a time
+5. **Performance Testing** - Validate Oracle query plans match or exceed PostgreSQL performance
+
+---
+
+## 7. Appendix
+
+### 7.1 PostgreSQL to Oracle Data Type Mapping
+
+| PostgreSQL Type | Oracle Equivalent | Notes |
+|----------------|-------------------|-------|
+| SERIAL | NUMBER + SEQUENCE + TRIGGER | Requires trigger creation |
+| BIGSERIAL | NUMBER + SEQUENCE + TRIGGER | Requires trigger creation |
+| BOOLEAN | NUMBER(1) or CHAR(1) | 0/1 or 'Y'/'N' |
+| JSONB | JSON (12c+) or CLOB | May require application changes |
+| JSON | JSON (12c+) or CLOB | May require application changes |
+| ARRAY[] | VARRAY or Nested Table | Complex conversion |
+| HSTORE | Custom key-value table | Requires redesign |
+| UUID | RAW(16) or VARCHAR2(36) | Consider using SYS_GUID() |
+| TEXT | CLOB | Direct mapping |
+| BYTEA | BLOB | Direct mapping |
+
+### 7.2 PostgreSQL Function to Oracle Function Mapping
+
+| PostgreSQL Function | Oracle Equivalent |
+|-------------------|-------------------|
+| array_agg() | LISTAGG() |
+| string_agg() | LISTAGG() |
+| generate_series() | CONNECT BY LEVEL |
+| unnest() | TABLE() function |
+| to_char() with PG format | to_char() with Oracle format |
+| GREATEST() | GREATEST() |
+| LEAST() | LEAST() |
+| regexp_replace() | REGEXP_REPLACE() |
+| COALESCE() | NVL() or COALESCE() |
+
+### 7.3 SQL Syntax Differences
+
+| PostgreSQL Syntax | Oracle Equivalent |
+|------------------|-------------------|
+| LIMIT n OFFSET m | FETCH FIRST n ROWS ONLY + OFFSET m |
+| RETURNING clause | RETURNING clause (different syntax) |
+| ON CONFLICT (upsert) | MERGE statement |
+| ILIKE | UPPER() + LIKE |
+| DISTINCT ON | ROW_NUMBER() OVER |
+| SELECT FOR UPDATE SKIP LOCKED | SELECT FOR UPDATE SKIP LOCKED (11g+) |
+| || (string concat) | || or CONCAT() |
+| BOOLEAN columns | NUMBER(1) or CHAR(1) |
+
+---
+
+**Document End**

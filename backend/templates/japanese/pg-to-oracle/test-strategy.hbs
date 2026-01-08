@@ -1,0 +1,608 @@
+# テスト戦略書
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | テスト戦略 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}**のPostgreSQLからOracleへの移行に関する包括的なテスト戦略を概説します。この戦略は、最小限のJava変更原則に従いながら、データ整合性、機能的正確性、パフォーマンス検証、およびビジネス継続性を確保します。
+
+### テスト目標
+
+1. **データ整合性** - 移行後のデータ精度100%を検証
+2. **機能的正確性** - すべてのアプリケーション機能が同一に動作することを保証
+3. **パフォーマンス検証** - PostgreSQLベースラインのパフォーマンスと一致または上回る
+4. **ビジネスロジック変更ゼロ** - 意図しないロジック変更がないことを検証
+5. **ロールバック準備** - ロールバック手順が正しく機能することを検証
+
+---
+
+## 1. テスト範囲
+
+### 1.1 テスト対象範囲
+
+- ✓ データベーススキーマ検証
+- ✓ データ移行検証
+- ✓ SQLクエリの正確性
+- ✓ ストアドプロシージャ/ファンクション検証
+- ✓ エンティティマッピング検証
+- ✓ リポジトリクエリ検証
+- ✓ 統合テスト（フルスタック）
+- ✓ パフォーマンステスト
+- ✓ 負荷テスト
+- ✓ ロールバックテスト
+
+### 1.2 テスト対象外範囲
+
+- ✗ ビジネスロジック検証（変更なし、既にテスト済み）
+- ✗ UI/UXテスト（変更なし）
+- ✗ セキュリティ侵入テスト（別のアクティビティ）
+- ✗ インフラストラクチャテスト（別のアクティビティ）
+
+---
+
+## 2. テストレベル
+
+### 2.1 単体テスト（データベース層）
+
+#### 2.1.1 DDL検証テスト
+
+**目的:** OracleスキーマがPostgreSQLスキーマ構造と一致することを検証
+
+**テストケース:**
+
+| テストID | テスト説明 | 期待される結果 |
+|---------|-----------|---------------|
+| DDL-001 | テーブル数を検証 | {{metadata.source_analysis.database.tables}} テーブルが作成された |
+| DDL-002 | すべてのテーブルの列定義を検証 | 列の型、NULL可否、デフォルト値が一致 |
+| DDL-003 | 主キー制約を検証 | すべてのPKが正しく作成された |
+| DDL-004 | 外部キー制約を検証 | 正しい参照を持つすべてのFK |
+| DDL-005 | UNIQUE制約を検証 | すべてのUNIQUE制約が作成された |
+| DDL-006 | CHECK制約を検証 | すべてのCHECK制約が適用された |
+| DDL-007 | シーケンス作成を検証 | {{metadata.source_analysis.database.sequences}} シーケンス + 新しいSERIALシーケンス |
+| DDL-008 | SERIAL用トリガー作成を検証 | 自動インクリメントが正しく動作 |
+| DDL-009 | インデックス作成を検証 | 正しいタイプですべてのインデックスが作成された |
+| DDL-010 | ビュー定義を検証 | {{metadata.source_analysis.database.views}} ビューが正しく動作 |
+
+**テストスクリプト例:**
+```sql
+-- テスト: テーブル構造を検証
+SELECT table_name, column_name, data_type, nullable
+FROM user_tab_columns
+WHERE table_name = 'USERS'
+ORDER BY column_id;
+
+-- PostgreSQL構造と比較
+```
+
+#### 2.1.2 ストアドプロシージャ/ファンクションテスト
+
+**テストするファンクション総数:** {{metadata.source_analysis.database.functions}}
+**テストするプロシージャ総数:** {{metadata.source_analysis.database.stored_procedures}}
+
+**テストケース:**
+
+| テストID | ファンクション/プロシージャ | テストシナリオ |
+|---------|-------------------------|---------------|
+| FUNC-001 | [ファンクション名] | 有効な入力で呼び出し、出力がPostgreSQLと一致することを検証 |
+| FUNC-002 | [ファンクション名] | NULL入力で呼び出し、エラー処理を検証 |
+| FUNC-003 | [ファンクション名] | 境界値で呼び出し |
+| FUNC-004 | [ファンクション名] | パフォーマンス（実行時間）を検証 |
+
+**テストスクリプトテンプレート:**
+```plsql
+-- ファンクションをテスト
+DECLARE
+  v_result [TYPE];
+BEGIN
+  v_result := function_name(param1, param2);
+
+  -- 期待される結果をアサート
+  IF v_result != expected_value THEN
+    RAISE_APPLICATION_ERROR(-20001, 'テスト失敗: 予期しない結果');
+  END IF;
+
+  DBMS_OUTPUT.PUT_LINE('テスト合格: ' || v_result);
+END;
+/
+```
+
+### 2.2 統合テスト（Javaアプリケーション層）
+
+#### 2.2.1 エンティティマッピングテスト
+
+**テストするファイル:** {{metadata.javaChanges.acceptable.entityMappings.length}} エンティティクラス
+
+**テスト戦略:** JUnit + Spring Boot Test
+
+**テストケース:**
+
+```java
+@SpringBootTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class EntityMappingTest {
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Test
+    void testUserEntityMapping() {
+        // エンティティを作成
+        User user = new User();
+        user.setName("テストユーザー");
+        user.setEmail("test@example.com");
+
+        // 永続化
+        entityManager.persist(user);
+        entityManager.flush();
+
+        // 検証
+        assertNotNull(user.getId()); // 自動生成されたID
+
+        // 取得
+        User retrieved = entityManager.find(User.class, user.getId());
+        assertEquals("テストユーザー", retrieved.getName());
+    }
+
+    @Test
+    void testJsonbFieldMapping() {
+        // JSONB → CLOB/JSONマッピングをテスト
+        User user = new User();
+        user.setMetadata("{\"role\": \"admin\"}");
+
+        entityManager.persist(user);
+        entityManager.flush();
+
+        User retrieved = entityManager.find(User.class, user.getId());
+        assertEquals("{\"role\": \"admin\"}", retrieved.getMetadata());
+    }
+}
+```
+
+#### 2.2.2 リポジトリクエリテスト
+
+**テストするファイル:** {{metadata.javaChanges.acceptable.repositoryQueries.length}} リポジトリクラス
+
+**テストケース:**
+
+```java
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class UserRepositoryTest {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void testFindByNameQuery() {
+        // セットアップ
+        User user = new User("山田太郎", "yamada@example.com");
+        userRepository.save(user);
+
+        // カスタム@Queryメソッドをテスト
+        List<User> results = userRepository.findByNameContaining("山田");
+
+        // 検証
+        assertEquals(1, results.size());
+        assertEquals("山田太郎", results.get(0).getName());
+    }
+
+    @Test
+    void testPaginationQuery() {
+        // LIMIT/OFFSET → FETCH FIRST変換をテスト
+        PageRequest pageable = PageRequest.of(0, 10);
+        Page<User> page = userRepository.findAll(pageable);
+
+        assertNotNull(page);
+        assertTrue(page.getSize() <= 10);
+    }
+
+    @Test
+    void testNativeQueryWithOracleFunction() {
+        // Oracle固有の関数を使用するクエリをテスト
+        List<User> results = userRepository.findUsersWithUpperCase("山田");
+
+        assertFalse(results.isEmpty());
+    }
+}
+```
+
+#### 2.2.3 サービス層テスト
+
+**テスト戦略:** ビジネスロジックの変更がないことを検証
+
+**テストケース:**
+
+```java
+@SpringBootTest
+class UserServiceTest {
+
+    @Autowired
+    private UserService userService;
+
+    @Test
+    void testBusinessLogicUnchanged() {
+        // 既存のビジネスロジックテストを実行
+        // すべて変更なしで合格する必要があります
+
+        User user = userService.createUser("山田", "yamada@example.com");
+        assertNotNull(user);
+
+        // ビジネスルールが引き続き適用されることを検証
+        assertThrows(ValidationException.class, () -> {
+            userService.createUser("", "invalid");
+        });
+    }
+}
+```
+
+### 2.3 データ移行検証
+
+#### 2.3.1 データ完全性テスト
+
+**テストケース:**
+
+| テストID | テスト説明 | 受入基準 |
+|---------|-----------|---------|
+| DATA-001 | すべてのテーブルの行数検証 | PostgreSQLと100%一致 |
+| DATA-002 | NULL値検証 | NULL値が保持される |
+| DATA-003 | データ型変換検証 | データの切り捨てまたは損失なし |
+| DATA-004 | 特殊文字検証 | Unicode、絵文字が保持される |
+| DATA-005 | JSONBデータ検証 | JSON構造が保持される |
+| DATA-006 | 配列データ検証 | 配列値が正しく変換される |
+| DATA-007 | Booleanデータ検証 | Boolean → NUMBER(1)変換が正しい |
+
+**テストスクリプト:**
+```sql
+-- 行数比較
+WITH pg_counts AS (
+  -- PostgreSQLで実行
+  SELECT 'users' as table_name, COUNT(*) as pg_count FROM users
+),
+oracle_counts AS (
+  -- Oracleで実行
+  SELECT 'users' as table_name, COUNT(*) as oracle_count FROM users
+)
+SELECT
+  p.table_name,
+  p.pg_count,
+  o.oracle_count,
+  CASE
+    WHEN p.pg_count = o.oracle_count THEN '合格'
+    ELSE '不合格'
+  END as status
+FROM pg_counts p
+JOIN oracle_counts o ON p.table_name = o.table_name;
+```
+
+#### 2.3.2 データ整合性テスト
+
+**テストケース:**
+
+```sql
+-- テスト: 参照整合性を検証
+SELECT
+  c.constraint_name,
+  c.table_name,
+  c.constraint_type,
+  CASE
+    WHEN c.status = 'ENABLED' THEN '合格'
+    ELSE '不合格'
+  END as status
+FROM user_constraints c
+WHERE c.constraint_type IN ('P', 'R', 'U');
+
+-- テスト: 孤立レコードがないことを検証
+SELECT
+  'orders' as child_table,
+  COUNT(*) as orphaned_records
+FROM orders o
+WHERE NOT EXISTS (
+  SELECT 1 FROM users u WHERE u.id = o.user_id
+);
+```
+
+### 2.4 パフォーマンステスト
+
+#### 2.4.1 クエリパフォーマンスベースライン
+
+**目的:** OracleパフォーマンスがPostgreSQLベースラインと一致または上回ることを保証
+
+**テストアプローチ:**
+1. PostgreSQLクエリ実行時間を記録
+2. Oracleで同じクエリを実行
+3. 結果を比較
+4. 必要に応じてOracleクエリを最適化
+
+**テストケース:**
+
+| テストID | クエリ説明 | PostgreSQLベースライン | Oracleターゲット | ステータス |
+|---------|-----------|---------------------|---------------|----------|
+| PERF-001 | 単純なSELECTクエリ | 10ms | ≤ 15ms | |
+| PERF-002 | JOINクエリ（2テーブル） | 50ms | ≤ 60ms | |
+| PERF-003 | JOINクエリ（5+テーブル） | 200ms | ≤ 250ms | |
+| PERF-004 | 集約クエリ | 100ms | ≤ 120ms | |
+| PERF-005 | 全文検索 | 80ms | ≤ 100ms | |
+| PERF-006 | ページネーションクエリ | 15ms | ≤ 20ms | |
+
+**テストスクリプト:**
+```java
+@Test
+void testQueryPerformance() {
+    // ウォームアップ
+    userRepository.findAll();
+
+    // 実行時間を測定
+    long startTime = System.currentTimeMillis();
+
+    List<User> results = userRepository.findComplexQuery();
+
+    long executionTime = System.currentTimeMillis() - startTime;
+
+    // パフォーマンス目標をアサート
+    assertTrue(executionTime < 100,
+        "クエリに" + executionTime + "msかかりました、期待値 < 100ms");
+}
+```
+
+#### 2.4.2 負荷テスト
+
+**テストシナリオ:**
+
+| シナリオ | 同時ユーザー数 | 期間 | 成功基準 |
+|---------|--------------|------|---------|
+| 通常負荷 | 100 | 30分 | エラー率0%、平均応答時間 ≤ 200ms |
+| ピーク負荷 | 500 | 15分 | エラー率<1%、平均応答時間 ≤ 500ms |
+| ストレステスト | 1000 | 5分 | エラー率<5%、システムが回復 |
+
+**ツール:** Apache JMeterまたはGatling
+
+**テスト計画:**
+```xml
+<!-- JMeterテスト計画 -->
+<ThreadGroup>
+  <numThreads>100</numThreads>
+  <rampUp>60</rampUp>
+  <loops>-1</loops>
+  <duration>1800</duration>
+</ThreadGroup>
+```
+
+### 2.5 ロールバックテスト
+
+**目的:** ロールバック手順が正しく機能することを検証
+
+**テストケース:**
+
+| テストID | ロールバックシナリオ | 手順 | 期待される結果 |
+|---------|-------------------|-----|---------------|
+| RB-001 | カットオーバー直後の即時ロールバック | Oracleを停止、PostgreSQLを再起動 | 5分以内にアプリケーションが機能する |
+| RB-002 | 1時間後のロールバック | データ変更を同期、ロールバック | データが一貫性を保ち、データ損失ゼロ |
+| RB-003 | 部分的なロールバック（1モジュール） | 1モジュールのみロールバック | 他のモジュールは影響を受けない |
+
+**テストスクリプト:**
+```bash
+#!/bin/bash
+# ロールバックテストスクリプト
+
+echo "ロールバックテストを開始..."
+
+# 1. 現在の状態を記録
+curl http://localhost:8080/api/users > before_rollback.json
+
+# 2. ロールバックを実行
+./scripts/rollback.sh
+
+# 3. アプリケーションが機能していることを検証
+http_code=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+
+if [ $http_code -eq 200 ]; then
+  echo "合格: ロールバック後にアプリケーションが機能しています"
+else
+  echo "不合格: アプリケーションヘルスチェックが失敗しました"
+  exit 1
+fi
+
+# 4. データの一貫性を検証
+curl http://localhost:8080/api/users > after_rollback.json
+diff before_rollback.json after_rollback.json
+```
+
+---
+
+## 3. テスト環境
+
+### 3.1 環境セットアップ
+
+| 環境 | 目的 | データ | Oracleバージョン |
+|------|------|--------|----------------|
+| DEV | 開発と単体テスト | 合成データ | Oracle 12c+ |
+| QA | 統合と機能テスト | サニタイズされた本番コピー | Oracle 12c+ |
+| STAGING | 本番前検証 | 本番クローン | Oracle 12c+（本番と同じ） |
+| PRODUCTION | ライブシステム | 実データ | Oracle 12c+ |
+
+### 3.2 テストデータ戦略
+
+**開発環境:**
+- 合成テストデータを使用
+- すべてのエッジケースをカバー
+- 特殊文字、NULL値を含む
+
+**QA環境:**
+- サニタイズされた本番データ（匿名化）を使用
+- 参照整合性を維持
+- 本番のサブセット（10-20%）
+
+**ステージング環境:**
+- 完全な本番データコピー（匿名化）
+- 各テストサイクル前に更新する必要があります
+
+---
+
+## 4. テスト実行計画
+
+### 4.1 テストフェーズ
+
+**フェーズ1: データベース層テスト（第1-2週）**
+- DDL検証
+- データ移行検証
+- ストアドプロシージャ/ファンクションテスト
+
+**フェーズ2: アプリケーション層テスト（第3-4週）**
+- エンティティマッピングテスト
+- リポジトリクエリテスト
+- 統合テスト
+
+**フェーズ3: エンドツーエンドテスト（第5週）**
+- フルスタックテスト
+- ユーザー受入テスト
+- パフォーマンステスト
+
+**フェーズ4: 負荷＆ストレステスト（第6週）**
+- 負荷テスト
+- ストレステスト
+- 耐久テスト
+
+**フェーズ5: ロールバックテスト（第7週）**
+- ロールバック手順
+- 復旧時間検証
+
+### 4.2 テスト実行スケジュール
+
+```mermaid
+gantt
+    title テスト実行タイムライン
+    dateFormat  YYYY-MM-DD
+    section フェーズ1
+    DDL検証           :2024-01-01, 3d
+    データ移行テスト     :2024-01-04, 4d
+    ストアドプロシージャテスト        :2024-01-08, 5d
+    section フェーズ2
+    エンティティマッピングテスト     :2024-01-15, 5d
+    リポジトリテスト         :2024-01-20, 5d
+    統合テスト        :2024-01-25, 4d
+    section フェーズ3
+    E2Eテスト              :2024-02-01, 7d
+    UAT                      :2024-02-08, 7d
+    section フェーズ4
+    パフォーマンステスト      :2024-02-15, 7d
+```
+
+---
+
+## 5. テスト成果物
+
+### 5.1 テスト成果物
+
+1. **テスト計画** - このドキュメント
+2. **テストケース** - 詳細なテストケース仕様
+3. **テストスクリプト** - 自動化されたテストスクリプト（JUnit、SQL）
+4. **テストデータ** - 合成およびサニタイズされたテストデータ
+5. **テスト結果** - 合格/不合格ステータスを含む実行結果
+6. **不具合報告** - バグ追跡と解決
+7. **パフォーマンスレポート** - パフォーマンスベンチマークと分析
+8. **テストサマリーレポート** - 最終テスト完了レポート
+
+### 5.2 テストメトリクス
+
+**追跡する主要メトリクス:**
+
+| メトリクス | 目標 |
+|-----------|------|
+| テストケースカバレッジ | クリティカルパスの100% |
+| テスト実行率 | 95%自動化、5%手動 |
+| 不具合検出率 | QA環境で>90% |
+| テスト合格率 | >95% |
+| データ精度 | 100% |
+| パフォーマンス低下 | ベースラインから<10% |
+
+---
+
+## 6. 不具合管理
+
+### 6.1 不具合重大度分類
+
+| 重大度 | 説明 | 対応時間 |
+|--------|------|---------|
+| クリティカル | データ損失、システムダウン | 即座（1時間） |
+| 高 | 主要機能が動作しない | 4時間 |
+| 中 | マイナー機能の問題 | 24時間 |
+| 低 | 見た目、ドキュメント | 72時間 |
+
+### 6.2 不具合ワークフロー
+
+```
+[不具合特定] → [JIRAに記録] → [トリアージ] → [割り当て] → [修正] → [再テスト] → [クローズ]
+```
+
+---
+
+## 7. 開始および終了基準
+
+### 7.1 テストの開始基準
+
+- ✓ Oracleデータベーススキーマが作成され検証された
+- ✓ データ移行が完了した
+- ✓ アプリケーションがテスト環境にデプロイされた
+- ✓ テストデータが準備された
+- ✓ テストスクリプトが準備できた
+- ✓ テスト環境が安定している
+
+### 7.2 テストの終了基準
+
+- ✓ すべてのテストケースが実行された
+- ✓ テスト合格率 > 95%
+- ✓ すべてのクリティカルおよび高重大度の不具合が解決された
+- ✓ パフォーマンス目標が達成された
+- ✓ データ整合性が検証された
+- ✓ ロールバック手順がテストされた
+- ✓ ステークホルダーからのサインオフ
+
+---
+
+## 8. リスクと緩和策
+
+| リスク | 影響 | 確率 | 緩和策 |
+|--------|------|------|--------|
+| テスト環境の不安定性 | 高 | 中 | 専用の安定した環境を維持 |
+| 不十分なテストデータ | 中 | 低 | 多様なテストデータセットを準備 |
+| テスト自動化の遅延 | 中 | 中 | 早期に自動化を開始 |
+| パフォーマンス問題の遅い発見 | 高 | 中 | 継続的なパフォーマンステスト |
+| 不十分なロールバックテスト | クリティカル | 低 | 本番稼働前の必須ロールバックテスト |
+
+---
+
+## 9. テストサインオフ
+
+### 9.1 サインオフチェックリスト
+
+- [ ] すべてのテストケースが実行された
+- [ ] 不具合解決が完了した
+- [ ] パフォーマンスが検証された
+- [ ] データ整合性が確認された
+- [ ] ロールバック手順がテストされた
+- [ ] ドキュメントが完成した
+- [ ] ステークホルダーの承認を取得した
+
+### 9.2 サインオフ権限者
+
+| 役割 | 氏名 | 署名 | 日付 |
+|------|------|------|------|
+| テストリード | | | |
+| 技術リード | | | |
+| プロジェクトマネージャー | | | |
+| ビジネスオーナー | | | |
+
+---
+
+**ドキュメント終了**

@@ -1,0 +1,723 @@
+# 移行設計書
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | 移行設計 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}**のPostgreSQLからOracleデータベースへの移行に関する詳細な技術設計を提供します。最小限のJavaアプリケーション変更という原則に従いながら、DDL変換パターン、SQLクエリ変換、Javaコード変更、およびデータ移行手順をカバーしています。
+
+---
+
+## 1. データベーススキーマ設計
+
+### 1.1 スキーマ変換概要
+
+**テーブル総数:** {{metadata.source_analysis.database.tables}}
+**ビュー総数:** {{metadata.source_analysis.database.views}}
+**シーケンス:** {{metadata.source_analysis.database.sequences}}
+
+### 1.2 データタイプマッピング設計
+
+#### 1.2.1 詳細な型変換マトリックス
+
+{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
+#### {{this.type}} 変換
+
+**出現回数:** {{this.count}}
+**影響を受けるテーブル:** {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+**複雑度:** {{this.oracleMappingComplexity}}
+
+**PostgreSQL定義:**
+```sql
+-- スキーマからの例
+{{this.type}} column_name
+```
+
+**Oracle変換:**
+```sql
+{{this.suggestedOracleType}} column_name
+```
+
+**Javaエンティティへの影響:**
+{{#if (eq this.oracleMappingComplexity "Complex")}}
+⚠️ **エンティティアノテーション更新が必要**
+```java
+// 変更前（PostgreSQL）
+@Column(columnDefinition = "{{this.type}}")
+private [Type] fieldName;
+
+// 変更後（Oracle）
+@Column(columnDefinition = "{{this.suggestedOracleType}}")
+@Type(type = "[custom-type-handler]")
+private [Type] fieldName;
+```
+{{else}}
+✓ **エンティティ変更不要** - 自動型マッピングが機能します
+{{/if}}
+
+**移行スクリプト:**
+```sql
+-- 変換ロジック
+-- [必要に応じて具体的な変換SQLを追加]
+```
+
+---
+{{/each}}
+
+#### 1.2.2 SERIAL/BIGSERIALからSEQUENCE + TRIGGERへの設計
+
+**SERIALを持つテーブル:** [分析に基づいてリスト化]
+
+**設計パターン:**
+```sql
+-- ステップ1: シーケンス作成
+CREATE SEQUENCE table_name_seq
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+-- ステップ2: トリガー作成
+CREATE OR REPLACE TRIGGER table_name_bir
+BEFORE INSERT ON table_name
+FOR EACH ROW
+BEGIN
+  IF :NEW.id IS NULL THEN
+    SELECT table_name_seq.NEXTVAL INTO :NEW.id FROM DUAL;
+  END IF;
+END;
+/
+```
+
+**Javaエンティティへの影響:**
+```java
+// 変更前（PostgreSQL）
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+// 変更後（Oracle） - SEQUENCE戦略を使用する場合は変更不要
+@Id
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "table_seq")
+@SequenceGenerator(name = "table_seq", sequenceName = "table_name_seq", allocationSize = 1)
+private Long id;
+```
+
+### 1.3 インデックス変換設計
+
+{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
+#### {{this.type}} インデックス変換 ({{this.count}} インデックス)
+
+**Oracleサポート:** {{#if this.oracleSupport}}ネイティブ{{else}}代替アプローチ{{/if}}
+
+{{#if (eq this.type "GIN")}}
+**使用ケース:** 全文検索または配列インデックス
+
+**Oracleソリューション:**
+```sql
+-- オプション1: Oracle Textインデックス
+CREATE INDEX idx_name ON table_name(column_name)
+INDEXTYPE IS CTXSYS.CONTEXT;
+
+-- オプション2: 関数ベースインデックス
+CREATE INDEX idx_name ON table_name(UPPER(column_name));
+```
+{{else if (eq this.type "GIST")}}
+**使用ケース:** 幾何学/空間データ
+
+**Oracleソリューション:**
+```sql
+-- Oracle Spatialインデックス
+CREATE INDEX idx_name ON table_name(geometry_column)
+INDEXTYPE IS MDSYS.SPATIAL_INDEX;
+```
+{{else if (eq this.type "BRIN")}}
+**使用ケース:** 物理的順序と論理的順序の間に相関関係がある非常に大きなテーブル
+
+**Oracleソリューション:**
+```sql
+-- ローカルインデックスでパーティショニングを使用
+-- 範囲でテーブルをパーティション化
+ALTER TABLE table_name
+  PARTITION BY RANGE (date_column) (
+    PARTITION p1 VALUES LESS THAN (DATE '2023-01-01'),
+    PARTITION p2 VALUES LESS THAN (DATE '2024-01-01')
+  );
+
+-- ローカルインデックスを作成
+CREATE INDEX idx_name ON table_name(column_name) LOCAL;
+```
+{{/if}}
+
+---
+{{/each}}
+
+### 1.4 制約の変換
+
+**PostgreSQL固有の制約の設計パターン:**
+
+#### CHECK制約
+```sql
+-- PostgreSQL
+ALTER TABLE table_name ADD CONSTRAINT check_status
+  CHECK (status IN ('active', 'inactive'));
+
+-- Oracle（同じ構文）
+ALTER TABLE table_name ADD CONSTRAINT check_status
+  CHECK (status IN ('active', 'inactive'));
+```
+
+#### EXCLUSION制約
+```sql
+-- PostgreSQL（直接的なOracle同等なし）
+-- UNIQUE制約 + トリガーを使用して再設計
+-- またはアプリケーションレベルの検証
+```
+
+---
+
+## 2. SQLクエリ変換設計
+
+### 2.1 クエリパターン変換
+
+**ネイティブクエリ総数:** {{metadata.source_analysis.postgresqlFeatures.nativeQueryCount}}
+
+#### 2.1.1 LIMIT/OFFSETパターン
+
+**PostgreSQL:**
+```sql
+SELECT * FROM users ORDER BY created_at DESC LIMIT 10 OFFSET 20;
+```
+
+**Oracle 12c+:**
+```sql
+SELECT * FROM users ORDER BY created_at DESC
+OFFSET 20 ROWS FETCH FIRST 10 ROWS ONLY;
+```
+
+**Javaリポジトリ:**
+```java
+// 変更前
+@Query("SELECT u FROM User u ORDER BY u.createdAt DESC LIMIT :limit OFFSET :offset")
+List<User> findUsers(@Param("limit") int limit, @Param("offset") int offset);
+
+// 変更後
+@Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
+List<User> findUsers(Pageable pageable);  // 代わりにSpring Data Pageableを使用
+```
+
+#### 2.1.2 配列集約パターン
+
+**PostgreSQL:**
+```sql
+SELECT category, array_agg(name) as names
+FROM products
+GROUP BY category;
+```
+
+**Oracle:**
+```sql
+SELECT category, LISTAGG(name, ',') WITHIN GROUP (ORDER BY name) as names
+FROM products
+GROUP BY category;
+```
+
+**Javaリポジトリへの影響:**
+```java
+// 配列が使用されていた場合、戻り値の型の調整が必要な場合があります
+// PostgreSQL: String[]
+// Oracle: String（カンマ区切り）
+```
+
+#### 2.1.3 JSONB操作
+
+**PostgreSQL:**
+```sql
+SELECT * FROM users WHERE metadata->>'role' = 'admin';
+SELECT metadata->'address'->>'city' FROM users;
+```
+
+**Oracle 12c+:**
+```sql
+SELECT * FROM users WHERE JSON_VALUE(metadata, '$.role') = 'admin';
+SELECT JSON_VALUE(metadata, '$.address.city') FROM users;
+```
+
+#### 2.1.4 RETURNING句
+
+**PostgreSQL:**
+```sql
+INSERT INTO users (name, email) VALUES ('John', 'john@example.com') RETURNING id;
+```
+
+**Oracle:**
+```sql
+INSERT INTO users (name, email) VALUES ('John', 'john@example.com') RETURNING id INTO :id;
+```
+
+**MyBatis XML:**
+```xml
+<!-- 変更前（PostgreSQL） -->
+<insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+  INSERT INTO users (name, email) VALUES (#{name}, #{email})
+</insert>
+
+<!-- 変更後（Oracle） - 同じ、Oracle dialectで動作 -->
+<insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+  INSERT INTO users (name, email) VALUES (#{name}, #{email})
+</insert>
+```
+
+#### 2.1.5 UPSERT（ON CONFLICT）
+
+**PostgreSQL:**
+```sql
+INSERT INTO users (id, name, email) VALUES (1, 'John', 'john@example.com')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email;
+```
+
+**Oracle:**
+```sql
+MERGE INTO users u
+USING (SELECT 1 as id, 'John' as name, 'john@example.com' as email FROM DUAL) s
+ON (u.id = s.id)
+WHEN MATCHED THEN UPDATE SET u.name = s.name, u.email = s.email
+WHEN NOT MATCHED THEN INSERT (id, name, email) VALUES (s.id, s.name, s.email);
+```
+
+#### 2.1.6 大文字小文字を区別しない検索（ILIKE）
+
+**PostgreSQL:**
+```sql
+SELECT * FROM users WHERE name ILIKE '%john%';
+```
+
+**Oracle:**
+```sql
+SELECT * FROM users WHERE UPPER(name) LIKE UPPER('%john%');
+-- またはパフォーマンスのために関数ベースインデックスを使用
+CREATE INDEX idx_users_name_upper ON users(UPPER(name));
+```
+
+---
+
+## 3. ストアドプロシージャ/ファンクション移行設計
+
+### 3.1 PL/pgSQLからPL/SQLへの変換パターン
+
+**ファンクション総数:** {{metadata.source_analysis.database.functions}}
+**プロシージャ総数:** {{metadata.source_analysis.database.stored_procedures}}
+
+#### 3.1.1 ファンクション構文変換
+
+**PostgreSQL PL/pgSQL:**
+```plpgsql
+CREATE OR REPLACE FUNCTION get_user_count(p_status VARCHAR)
+RETURNS INTEGER AS $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM users WHERE status = p_status;
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Oracle PL/SQL:**
+```plsql
+CREATE OR REPLACE FUNCTION get_user_count(p_status VARCHAR2)
+RETURN NUMBER AS
+  v_count NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM users WHERE status = p_status;
+  RETURN v_count;
+END get_user_count;
+/
+```
+
+#### 3.1.2 RETURNS TABLE変換
+
+**PostgreSQL:**
+```plpgsql
+CREATE OR REPLACE FUNCTION get_active_users()
+RETURNS TABLE(id INTEGER, name VARCHAR, email VARCHAR) AS $$
+BEGIN
+  RETURN QUERY SELECT id, name, email FROM users WHERE status = 'active';
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Oracle（パイプライン関数）:**
+```plsql
+-- TYPEを定義
+CREATE OR REPLACE TYPE user_row AS OBJECT (
+  id NUMBER,
+  name VARCHAR2(100),
+  email VARCHAR2(100)
+);
+/
+
+CREATE OR REPLACE TYPE user_table AS TABLE OF user_row;
+/
+
+-- パイプライン関数
+CREATE OR REPLACE FUNCTION get_active_users
+RETURN user_table PIPELINED AS
+BEGIN
+  FOR rec IN (SELECT id, name, email FROM users WHERE status = 'active') LOOP
+    PIPE ROW(user_row(rec.id, rec.name, rec.email));
+  END LOOP;
+  RETURN;
+END;
+/
+```
+
+**Javaリポジトリへの影響:**
+```java
+// Javaがこのプロシージャを呼び出す場合、変更された場合はプロシージャ名のみを更新
+// メソッドシグネチャと戻り値の型は変更なし
+```
+
+#### 3.1.3 動的SQL変換
+
+**PostgreSQL:**
+```plpgsql
+EXECUTE 'SELECT * FROM ' || table_name || ' WHERE id = $1' USING user_id;
+```
+
+**Oracle:**
+```plsql
+EXECUTE IMMEDIATE 'SELECT * FROM ' || table_name || ' WHERE id = :1' USING user_id;
+```
+
+#### 3.1.4 プロシージャ内の配列処理
+
+**PostgreSQL:**
+```plpgsql
+CREATE FUNCTION process_ids(p_ids INTEGER[]) RETURNS VOID AS $$
+DECLARE
+  v_id INTEGER;
+BEGIN
+  FOREACH v_id IN ARRAY p_ids LOOP
+    -- 各IDを処理
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Oracle（VARRAYまたはネストされたテーブルを使用）:**
+```plsql
+-- 型を定義
+CREATE OR REPLACE TYPE number_array AS TABLE OF NUMBER;
+/
+
+CREATE OR REPLACE PROCEDURE process_ids(p_ids IN number_array) AS
+  v_id NUMBER;
+BEGIN
+  FOR i IN 1..p_ids.COUNT LOOP
+    v_id := p_ids(i);
+    -- 各IDを処理
+  END LOOP;
+END;
+/
+```
+
+---
+
+## 4. Javaアプリケーション設計変更
+
+### 4.1 設定変更
+
+#### 4.1.1 application.properties / application.yml
+
+**変更前（PostgreSQL）:**
+```properties
+# DataSource
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
+spring.datasource.username=postgres
+spring.datasource.password=password
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+
+# Connection Pool
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+```
+
+**変更後（Oracle）:**
+```properties
+# DataSource
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@localhost:1521:ORCL
+spring.datasource.username=myuser
+spring.datasource.password=password
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.Oracle12cDialect
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+
+# Connection Pool（Oracleに合わせて調整）
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.connection-timeout=30000
+```
+
+#### 4.1.2 pom.xml依存関係
+
+**変更前:**
+```xml
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+</dependency>
+```
+
+**変更後:**
+```xml
+<dependency>
+    <groupId>com.oracle.database.jdbc</groupId>
+    <artifactId>ojdbc8</artifactId>
+    <version>21.1.0.0</version>
+</dependency>
+```
+
+### 4.2 エンティティマッピング変更
+
+**更新が必要なファイル:** {{metadata.javaChanges.acceptable.entityMappings.length}}
+
+{{#each metadata.javaChanges.acceptable.entityMappings}}
+#### ファイル: {{this}}
+
+**必要な変更:**
+- `@Column(columnDefinition = ...)`アノテーションをレビュー
+- PostgreSQL固有の型が使用されていた場合は更新
+- すべてのビジネスメソッドは変更しない
+
+{{/each}}
+
+### 4.3 リポジトリクエリ変更
+
+**更新が必要なファイル:** {{metadata.javaChanges.acceptable.repositoryQueries.length}}
+
+{{#each metadata.javaChanges.acceptable.repositoryQueries}}
+#### ファイル: {{this}}
+
+**必要な変更:**
+- Oracle SQL構文で`@Query`アノテーションを更新
+- PostgreSQL関数をOracle同等に置き換え
+- **メソッドシグネチャは変更しない**
+- **戻り値の型は変更しない**
+
+**必要なテスト:**
+- 各クエリの単体テスト
+- Oracleデータベースとの統合テスト
+
+{{/each}}
+
+---
+
+## 5. データ移行設計
+
+### 5.1 移行ツールの選択
+
+**推奨ツール:** [複雑度スコアとデータ量に基づく]
+
+{{#if (gt metadata.migrationComplexity.dataVolumeMigrationComplexity 60)}}
+**プライマリ: AWS Database Migration Service（DMS）**
+- 継続的なレプリケーションをサポート
+- 異種移行を処理
+- 最小限のダウンタイム
+
+**バックアップ: Oracle Data Pump + カスタムスクリプト**
+- 複雑なデータ変換用
+- プロセスの完全な制御
+{{else}}
+**プライマリ: Oracle SQL Developer + Ora2Pg**
+- より小さなデータセットのためのより簡単なセットアップ
+- 一度限りの移行に適している
+
+**バックアップ: カスタムETLスクリプト**
+- 特別なデータ変換用
+{{/if}}
+
+### 5.2 データ変換設計
+
+#### 5.2.1 JSONBからJSON/CLOBへの変換
+
+```python
+# Python変換スクリプト
+import json
+
+def transform_jsonb(pg_jsonb_value):
+    # PostgreSQL JSONBからOracle JSON
+    # JSON構造を検証する必要がある場合があります
+    return json.dumps(pg_jsonb_value)
+```
+
+#### 5.2.2 ArrayからVARRAYへの変換
+
+```sql
+-- 変換アプローチ
+-- オプション1: カンマ区切り値として保存
+SELECT array_to_string(array_column, ',') FROM pg_table;
+
+-- オプション2: 別テーブルに正規化（推奨）
+-- Oracleでジャンクションテーブルを作成
+```
+
+#### 5.2.3 BooleanからNUMBER(1)への変換
+
+```sql
+-- 変換SQL
+SELECT
+  id,
+  CASE WHEN boolean_column THEN 1 ELSE 0 END as boolean_column
+FROM pg_table;
+```
+
+### 5.3 データ検証設計
+
+**検証チェックポイント:**
+1. **行数検証** - すべてのテーブルの行数を比較
+2. **チェックサム検証** - データ整合性を検証
+3. **参照整合性** - 外部キーを検証
+4. **データサンプリング** - ランダムサンプル検証（10%）
+5. **ビジネスルール** - ビジネス制約を検証
+
+**検証スクリプトテンプレート:**
+```sql
+-- 行数比較
+SELECT 'PostgreSQL' as source, COUNT(*) as row_count FROM pg_table
+UNION ALL
+SELECT 'Oracle' as source, COUNT(*) as row_count FROM oracle_table;
+
+-- データサンプリング
+SELECT * FROM
+  (SELECT * FROM oracle_table ORDER BY DBMS_RANDOM.VALUE)
+WHERE ROWNUM <= 100;
+```
+
+---
+
+## 6. ロールバック設計
+
+### 6.1 ロールバックシナリオ
+
+**シナリオ1: データ整合性の問題**
+- 検出: チェックサムが一致しない
+- アクション: PostgreSQLにロールバック、調査
+
+**シナリオ2: パフォーマンス低下**
+- 検出: 応答時間が閾値を超える
+- アクション: ロールバック、実行計画を分析
+
+**シナリオ3: アプリケーションエラー**
+- 検出: エラー率が1%を超える
+- アクション: 即座にロールバック
+
+### 6.2 ロールバック手順
+
+```bash
+# ロールバックスクリプト
+#!/bin/bash
+
+echo "PostgreSQLへのロールバックを開始..."
+
+# 1. Oracle接続を停止
+systemctl stop application
+
+# 2. アプリケーション設定をPostgreSQLに更新
+cp config/application-postgres.properties config/application.properties
+
+# 3. アプリケーションを再起動
+systemctl start application
+
+# 4. 検証
+curl -f http://localhost:8080/health || exit 1
+
+echo "ロールバックが正常に完了しました"
+```
+
+---
+
+## 7. パフォーマンス最適化設計
+
+### 7.1 クエリ最適化
+
+**設計原則:**
+1. **実行計画を分析** - Oracle EXPLAIN PLANを使用
+2. **適切なインデックスを作成** - クエリパターンに基づく
+3. **JOIN操作を最適化** - 結合順序をレビュー
+4. **バインド変数を使用** - ハードパースを防ぐ
+
+**最適化例:**
+```sql
+-- 実行計画を確認
+EXPLAIN PLAN FOR
+SELECT * FROM users WHERE UPPER(email) LIKE UPPER('%@example.com%');
+
+-- 計画を表示
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+-- 必要に応じて関数ベースインデックスを追加
+CREATE INDEX idx_users_email_upper ON users(UPPER(email));
+```
+
+### 7.2 コネクションプールチューニング
+
+**Oracle固有の設定:**
+```properties
+# Oracle用の最適設定
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.idle-timeout=600000
+spring.datasource.hikari.max-lifetime=1800000
+```
+
+---
+
+## 8. 監視とアラート設計
+
+### 8.1 監視する主要メトリクス
+
+1. **データベースパフォーマンス**
+   - クエリ応答時間
+   - アクティブセッション
+   - 待機イベント
+
+2. **アプリケーションパフォーマンス**
+   - API応答時間
+   - エラー率
+   - スループット
+
+3. **データ整合性**
+   - 行数
+   - 制約違反
+
+### 8.2 アラート閾値
+
+| メトリクス | 警告閾値 | クリティカル閾値 |
+|-----------|---------|-----------------|
+| クエリ応答時間 | >500ms | >2000ms |
+| エラー率 | >0.1% | >1% |
+| コネクションプール使用率 | >80% | >95% |
+
+---
+
+**ドキュメント終了**

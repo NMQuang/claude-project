@@ -1,0 +1,723 @@
+# Migration Design Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Document Type** | Migration Design |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+| **Author** | {{author}} |
+
+---
+
+## Executive Summary
+
+This document provides detailed technical design for migrating **{{project.name}}** from PostgreSQL to Oracle database. It covers DDL conversion patterns, SQL query transformations, Java code modifications, and data migration procedures while adhering to the principle of minimal Java application changes.
+
+---
+
+## 1. Database Schema Design
+
+### 1.1 Schema Conversion Overview
+
+**Total Tables:** {{metadata.source_analysis.database.tables}}
+**Total Views:** {{metadata.source_analysis.database.views}}
+**Sequences:** {{metadata.source_analysis.database.sequences}}
+
+### 1.2 Data Type Mapping Design
+
+#### 1.2.1 Detailed Type Conversion Matrix
+
+{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
+#### {{this.type}} Conversion
+
+**Occurrences:** {{this.count}}
+**Affected Tables:** {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+**Complexity:** {{this.oracleMappingComplexity}}
+
+**PostgreSQL Definition:**
+```sql
+-- Example from your schema
+{{this.type}} column_name
+```
+
+**Oracle Conversion:**
+```sql
+{{this.suggestedOracleType}} column_name
+```
+
+**Java Entity Impact:**
+{{#if (eq this.oracleMappingComplexity "Complex")}}
+⚠️ **Entity Annotation Update Required**
+```java
+// Before (PostgreSQL)
+@Column(columnDefinition = "{{this.type}}")
+private [Type] fieldName;
+
+// After (Oracle)
+@Column(columnDefinition = "{{this.suggestedOracleType}}")
+@Type(type = "[custom-type-handler]")
+private [Type] fieldName;
+```
+{{else}}
+✓ **No Entity Change Required** - Automatic type mapping works
+{{/if}}
+
+**Migration Script:**
+```sql
+-- Conversion logic
+-- [Add specific conversion SQL if needed]
+```
+
+---
+{{/each}}
+
+#### 1.2.2 SERIAL/BIGSERIAL to SEQUENCE + TRIGGER Design
+
+**Tables with SERIAL:** [List based on analysis]
+
+**Design Pattern:**
+```sql
+-- Step 1: Create Sequence
+CREATE SEQUENCE table_name_seq
+START WITH 1
+INCREMENT BY 1
+NOCACHE
+NOCYCLE;
+
+-- Step 2: Create Trigger
+CREATE OR REPLACE TRIGGER table_name_bir
+BEFORE INSERT ON table_name
+FOR EACH ROW
+BEGIN
+  IF :NEW.id IS NULL THEN
+    SELECT table_name_seq.NEXTVAL INTO :NEW.id FROM DUAL;
+  END IF;
+END;
+/
+```
+
+**Java Entity Impact:**
+```java
+// Before (PostgreSQL)
+@Id
+@GeneratedValue(strategy = GenerationType.IDENTITY)
+private Long id;
+
+// After (Oracle) - No change needed if using SEQUENCE strategy
+@Id
+@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "table_seq")
+@SequenceGenerator(name = "table_seq", sequenceName = "table_name_seq", allocationSize = 1)
+private Long id;
+```
+
+### 1.3 Index Conversion Design
+
+{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
+#### {{this.type}} Index Conversion ({{this.count}} indexes)
+
+**Oracle Support:** {{#if this.oracleSupport}}Native{{else}}Alternative Approach{{/if}}
+
+{{#if (eq this.type "GIN")}}
+**Use Case:** Full-text search or array indexing
+
+**Oracle Solution:**
+```sql
+-- Option 1: Oracle Text Index
+CREATE INDEX idx_name ON table_name(column_name)
+INDEXTYPE IS CTXSYS.CONTEXT;
+
+-- Option 2: Function-based index
+CREATE INDEX idx_name ON table_name(UPPER(column_name));
+```
+{{else if (eq this.type "GIST")}}
+**Use Case:** Geometric/spatial data
+
+**Oracle Solution:**
+```sql
+-- Oracle Spatial Index
+CREATE INDEX idx_name ON table_name(geometry_column)
+INDEXTYPE IS MDSYS.SPATIAL_INDEX;
+```
+{{else if (eq this.type "BRIN")}}
+**Use Case:** Very large tables with correlation between physical and logical order
+
+**Oracle Solution:**
+```sql
+-- Use partitioning with local indexes
+-- Partition table by range
+ALTER TABLE table_name
+  PARTITION BY RANGE (date_column) (
+    PARTITION p1 VALUES LESS THAN (DATE '2023-01-01'),
+    PARTITION p2 VALUES LESS THAN (DATE '2024-01-01')
+  );
+
+-- Create local index
+CREATE INDEX idx_name ON table_name(column_name) LOCAL;
+```
+{{/if}}
+
+---
+{{/each}}
+
+### 1.4 Constraint Conversion
+
+**Design Pattern for PostgreSQL-specific Constraints:**
+
+#### CHECK Constraints
+```sql
+-- PostgreSQL
+ALTER TABLE table_name ADD CONSTRAINT check_status
+  CHECK (status IN ('active', 'inactive'));
+
+-- Oracle (same syntax)
+ALTER TABLE table_name ADD CONSTRAINT check_status
+  CHECK (status IN ('active', 'inactive'));
+```
+
+#### EXCLUSION Constraints
+```sql
+-- PostgreSQL (no direct Oracle equivalent)
+-- Redesign using unique constraints + triggers
+-- Or application-level validation
+```
+
+---
+
+## 2. SQL Query Transformation Design
+
+### 2.1 Query Pattern Conversion
+
+**Total Native Queries:** {{metadata.source_analysis.postgresqlFeatures.nativeQueryCount}}
+
+#### 2.1.1 LIMIT/OFFSET Pattern
+
+**PostgreSQL:**
+```sql
+SELECT * FROM users ORDER BY created_at DESC LIMIT 10 OFFSET 20;
+```
+
+**Oracle 12c+:**
+```sql
+SELECT * FROM users ORDER BY created_at DESC
+OFFSET 20 ROWS FETCH FIRST 10 ROWS ONLY;
+```
+
+**Java Repository:**
+```java
+// Before
+@Query("SELECT u FROM User u ORDER BY u.createdAt DESC LIMIT :limit OFFSET :offset")
+List<User> findUsers(@Param("limit") int limit, @Param("offset") int offset);
+
+// After
+@Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
+List<User> findUsers(Pageable pageable);  // Use Spring Data Pageable instead
+```
+
+#### 2.1.2 Array Aggregation Pattern
+
+**PostgreSQL:**
+```sql
+SELECT category, array_agg(name) as names
+FROM products
+GROUP BY category;
+```
+
+**Oracle:**
+```sql
+SELECT category, LISTAGG(name, ',') WITHIN GROUP (ORDER BY name) as names
+FROM products
+GROUP BY category;
+```
+
+**Java Repository Impact:**
+```java
+// Return type may need adjustment if array was being used
+// PostgreSQL: String[]
+// Oracle: String (comma-separated)
+```
+
+#### 2.1.3 JSONB Operations
+
+**PostgreSQL:**
+```sql
+SELECT * FROM users WHERE metadata->>'role' = 'admin';
+SELECT metadata->'address'->>'city' FROM users;
+```
+
+**Oracle 12c+:**
+```sql
+SELECT * FROM users WHERE JSON_VALUE(metadata, '$.role') = 'admin';
+SELECT JSON_VALUE(metadata, '$.address.city') FROM users;
+```
+
+#### 2.1.4 RETURNING Clause
+
+**PostgreSQL:**
+```sql
+INSERT INTO users (name, email) VALUES ('John', 'john@example.com') RETURNING id;
+```
+
+**Oracle:**
+```sql
+INSERT INTO users (name, email) VALUES ('John', 'john@example.com') RETURNING id INTO :id;
+```
+
+**MyBatis XML:**
+```xml
+<!-- Before (PostgreSQL) -->
+<insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+  INSERT INTO users (name, email) VALUES (#{name}, #{email})
+</insert>
+
+<!-- After (Oracle) - Same, works with Oracle dialect -->
+<insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+  INSERT INTO users (name, email) VALUES (#{name}, #{email})
+</insert>
+```
+
+#### 2.1.5 UPSERT (ON CONFLICT)
+
+**PostgreSQL:**
+```sql
+INSERT INTO users (id, name, email) VALUES (1, 'John', 'john@example.com')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email;
+```
+
+**Oracle:**
+```sql
+MERGE INTO users u
+USING (SELECT 1 as id, 'John' as name, 'john@example.com' as email FROM DUAL) s
+ON (u.id = s.id)
+WHEN MATCHED THEN UPDATE SET u.name = s.name, u.email = s.email
+WHEN NOT MATCHED THEN INSERT (id, name, email) VALUES (s.id, s.name, s.email);
+```
+
+#### 2.1.6 Case-Insensitive Search (ILIKE)
+
+**PostgreSQL:**
+```sql
+SELECT * FROM users WHERE name ILIKE '%john%';
+```
+
+**Oracle:**
+```sql
+SELECT * FROM users WHERE UPPER(name) LIKE UPPER('%john%');
+-- Or use function-based index for performance
+CREATE INDEX idx_users_name_upper ON users(UPPER(name));
+```
+
+---
+
+## 3. Stored Procedure/Function Migration Design
+
+### 3.1 PL/pgSQL to PL/SQL Conversion Patterns
+
+**Total Functions:** {{metadata.source_analysis.database.functions}}
+**Total Procedures:** {{metadata.source_analysis.database.stored_procedures}}
+
+#### 3.1.1 Function Syntax Conversion
+
+**PostgreSQL PL/pgSQL:**
+```plpgsql
+CREATE OR REPLACE FUNCTION get_user_count(p_status VARCHAR)
+RETURNS INTEGER AS $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM users WHERE status = p_status;
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Oracle PL/SQL:**
+```plsql
+CREATE OR REPLACE FUNCTION get_user_count(p_status VARCHAR2)
+RETURN NUMBER AS
+  v_count NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM users WHERE status = p_status;
+  RETURN v_count;
+END get_user_count;
+/
+```
+
+#### 3.1.2 RETURNS TABLE Conversion
+
+**PostgreSQL:**
+```plpgsql
+CREATE OR REPLACE FUNCTION get_active_users()
+RETURNS TABLE(id INTEGER, name VARCHAR, email VARCHAR) AS $$
+BEGIN
+  RETURN QUERY SELECT id, name, email FROM users WHERE status = 'active';
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Oracle (Pipelined Function):**
+```plsql
+-- Define TYPE
+CREATE OR REPLACE TYPE user_row AS OBJECT (
+  id NUMBER,
+  name VARCHAR2(100),
+  email VARCHAR2(100)
+);
+/
+
+CREATE OR REPLACE TYPE user_table AS TABLE OF user_row;
+/
+
+-- Pipelined Function
+CREATE OR REPLACE FUNCTION get_active_users
+RETURN user_table PIPELINED AS
+BEGIN
+  FOR rec IN (SELECT id, name, email FROM users WHERE status = 'active') LOOP
+    PIPE ROW(user_row(rec.id, rec.name, rec.email));
+  END LOOP;
+  RETURN;
+END;
+/
+```
+
+**Java Repository Impact:**
+```java
+// If Java calls this procedure, update only the procedure name if changed
+// Method signature and return type remain unchanged
+```
+
+#### 3.1.3 Dynamic SQL Conversion
+
+**PostgreSQL:**
+```plpgsql
+EXECUTE 'SELECT * FROM ' || table_name || ' WHERE id = $1' USING user_id;
+```
+
+**Oracle:**
+```plsql
+EXECUTE IMMEDIATE 'SELECT * FROM ' || table_name || ' WHERE id = :1' USING user_id;
+```
+
+#### 3.1.4 Array Handling in Procedures
+
+**PostgreSQL:**
+```plpgsql
+CREATE FUNCTION process_ids(p_ids INTEGER[]) RETURNS VOID AS $$
+DECLARE
+  v_id INTEGER;
+BEGIN
+  FOREACH v_id IN ARRAY p_ids LOOP
+    -- Process each ID
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+**Oracle (Using VARRAY or Nested Table):**
+```plsql
+-- Define type
+CREATE OR REPLACE TYPE number_array AS TABLE OF NUMBER;
+/
+
+CREATE OR REPLACE PROCEDURE process_ids(p_ids IN number_array) AS
+  v_id NUMBER;
+BEGIN
+  FOR i IN 1..p_ids.COUNT LOOP
+    v_id := p_ids(i);
+    -- Process each ID
+  END LOOP;
+END;
+/
+```
+
+---
+
+## 4. Java Application Design Changes
+
+### 4.1 Configuration Changes
+
+#### 4.1.1 application.properties / application.yml
+
+**Before (PostgreSQL):**
+```properties
+# DataSource
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
+spring.datasource.username=postgres
+spring.datasource.password=password
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+
+# Connection Pool
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+```
+
+**After (Oracle):**
+```properties
+# DataSource
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@localhost:1521:ORCL
+spring.datasource.username=myuser
+spring.datasource.password=password
+
+# JPA/Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.Oracle12cDialect
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+
+# Connection Pool (adjust for Oracle)
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.connection-timeout=30000
+```
+
+#### 4.1.2 pom.xml Dependencies
+
+**Before:**
+```xml
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+</dependency>
+```
+
+**After:**
+```xml
+<dependency>
+    <groupId>com.oracle.database.jdbc</groupId>
+    <artifactId>ojdbc8</artifactId>
+    <version>21.1.0.0</version>
+</dependency>
+```
+
+### 4.2 Entity Mapping Changes
+
+**Files Requiring Update:** {{metadata.javaChanges.acceptable.entityMappings.length}}
+
+{{#each metadata.javaChanges.acceptable.entityMappings}}
+#### File: {{this}}
+
+**Required Changes:**
+- Review `@Column(columnDefinition = ...)` annotations
+- Update if PostgreSQL-specific type was used
+- Keep all business methods unchanged
+
+{{/each}}
+
+### 4.3 Repository Query Changes
+
+**Files Requiring Update:** {{metadata.javaChanges.acceptable.repositoryQueries.length}}
+
+{{#each metadata.javaChanges.acceptable.repositoryQueries}}
+#### File: {{this}}
+
+**Required Changes:**
+- Update `@Query` annotations with Oracle SQL syntax
+- Replace PostgreSQL functions with Oracle equivalents
+- **Keep method signatures unchanged**
+- **Keep return types unchanged**
+
+**Testing Required:**
+- Unit test for each query
+- Integration test with Oracle database
+
+{{/each}}
+
+---
+
+## 5. Data Migration Design
+
+### 5.1 Migration Tool Selection
+
+**Recommended Tool:** [Based on complexity score and data volume]
+
+{{#if (gt metadata.migrationComplexity.dataVolumeMigrationComplexity 60)}}
+**Primary: AWS Database Migration Service (DMS)**
+- Supports continuous replication
+- Handles heterogeneous migrations
+- Minimal downtime
+
+**Backup: Oracle Data Pump + Custom Scripts**
+- For complex data transformations
+- Full control over process
+{{else}}
+**Primary: Oracle SQL Developer + Ora2Pg**
+- Simpler setup for smaller datasets
+- Good for one-time migration
+
+**Backup: Custom ETL Scripts**
+- For special data transformations
+{{/if}}
+
+### 5.2 Data Transformation Design
+
+#### 5.2.1 JSONB to JSON/CLOB Transformation
+
+```python
+# Python transformation script
+import json
+
+def transform_jsonb(pg_jsonb_value):
+    # PostgreSQL JSONB to Oracle JSON
+    # May need to validate JSON structure
+    return json.dumps(pg_jsonb_value)
+```
+
+#### 5.2.2 Array to VARRAY Transformation
+
+```sql
+-- Transformation approach
+-- Option 1: Store as comma-separated values
+SELECT array_to_string(array_column, ',') FROM pg_table;
+
+-- Option 2: Normalize to separate table (recommended)
+-- Create junction table in Oracle
+```
+
+#### 5.2.3 Boolean to NUMBER(1) Transformation
+
+```sql
+-- Transformation SQL
+SELECT
+  id,
+  CASE WHEN boolean_column THEN 1 ELSE 0 END as boolean_column
+FROM pg_table;
+```
+
+### 5.3 Data Validation Design
+
+**Validation Checkpoints:**
+1. **Row Count Validation** - Compare counts for all tables
+2. **Checksum Validation** - Verify data integrity
+3. **Referential Integrity** - Validate foreign keys
+4. **Data Sampling** - Random sample verification (10%)
+5. **Business Rules** - Validate business constraints
+
+**Validation Script Template:**
+```sql
+-- Row count comparison
+SELECT 'PostgreSQL' as source, COUNT(*) as row_count FROM pg_table
+UNION ALL
+SELECT 'Oracle' as source, COUNT(*) as row_count FROM oracle_table;
+
+-- Data sampling
+SELECT * FROM
+  (SELECT * FROM oracle_table ORDER BY DBMS_RANDOM.VALUE)
+WHERE ROWNUM <= 100;
+```
+
+---
+
+## 6. Rollback Design
+
+### 6.1 Rollback Scenarios
+
+**Scenario 1: Data Integrity Issues**
+- Detection: Checksums don't match
+- Action: Rollback to PostgreSQL, investigate
+
+**Scenario 2: Performance Degradation**
+- Detection: Response times exceed threshold
+- Action: Rollback, analyze execution plans
+
+**Scenario 3: Application Errors**
+- Detection: Error rate exceeds 1%
+- Action: Immediate rollback
+
+### 6.2 Rollback Procedures
+
+```bash
+# Rollback script
+#!/bin/bash
+
+echo "Initiating rollback to PostgreSQL..."
+
+# 1. Stop Oracle connections
+systemctl stop application
+
+# 2. Update application config to PostgreSQL
+cp config/application-postgres.properties config/application.properties
+
+# 3. Restart application
+systemctl start application
+
+# 4. Validate
+curl -f http://localhost:8080/health || exit 1
+
+echo "Rollback completed successfully"
+```
+
+---
+
+## 7. Performance Optimization Design
+
+### 7.1 Query Optimization
+
+**Design Principles:**
+1. **Analyze Execution Plans** - Use Oracle EXPLAIN PLAN
+2. **Create Appropriate Indexes** - Based on query patterns
+3. **Optimize JOIN Operations** - Review join order
+4. **Use Bind Variables** - Prevent hard parsing
+
+**Example Optimization:**
+```sql
+-- Check execution plan
+EXPLAIN PLAN FOR
+SELECT * FROM users WHERE UPPER(email) LIKE UPPER('%@example.com%');
+
+-- View plan
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+
+-- Add function-based index if needed
+CREATE INDEX idx_users_email_upper ON users(UPPER(email));
+```
+
+### 7.2 Connection Pool Tuning
+
+**Oracle-Specific Settings:**
+```properties
+# Optimal for Oracle
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.idle-timeout=600000
+spring.datasource.hikari.max-lifetime=1800000
+```
+
+---
+
+## 8. Monitoring and Alerting Design
+
+### 8.1 Key Metrics to Monitor
+
+1. **Database Performance**
+   - Query response times
+   - Active sessions
+   - Wait events
+
+2. **Application Performance**
+   - API response times
+   - Error rates
+   - Throughput
+
+3. **Data Integrity**
+   - Row counts
+   - Constraint violations
+
+### 8.2 Alert Thresholds
+
+| Metric | Warning Threshold | Critical Threshold |
+|--------|------------------|-------------------|
+| Query Response Time | >500ms | >2000ms |
+| Error Rate | >0.1% | >1% |
+| Connection Pool Utilization | >80% | >95% |
+
+---
+
+**Document End**

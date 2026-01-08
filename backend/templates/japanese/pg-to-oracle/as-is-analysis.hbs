@@ -1,0 +1,338 @@
+# 現状分析書
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | 現状分析 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}**移行プロジェクトにおける、PostgreSQLデータベースを使用した現在のJavaアプリケーションの包括的な分析を提供します。分析は、アプリケーションアーキテクチャ、データベーススキーマ、PostgreSQL固有の機能、ORM依存関係、および移行複雑度の評価をカバーしています。
+
+### 主要な調査結果
+
+- **Javaファイル総数:** {{metadata.source_analysis.total_files}}
+- **総コード行数:** {{metadata.source_analysis.total_loc}}
+- **ORMフレームワーク:** {{metadata.source_analysis.ormFramework}}
+- **ソースデータベース:** {{source.database}}
+- **ターゲットデータベース:** {{target.database}}
+- **複雑度評価:** {{metadata.complexity_summary}}
+
+### 移行複雑度（6次元）
+
+| 次元 | スコア | レベル |
+|------|-------|-------|
+| スキーマ＆データタイプの複雑度 | {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| SQL＆クエリ書き換えの複雑度 | {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| ストアドプロシージャ/ファンクション/トリガー | {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| データ量＆移行戦略 | {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| アプリケーション＆ORM依存性 | {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| 運用＆ランタイムリスク | {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
+| **総合** | **{{metadata.migrationComplexity.overall}}/100** | **{{metadata.migrationComplexity.difficulty}}** |
+
+---
+
+## 1. システム概要
+
+### 1.1 アプリケーションアーキテクチャ
+
+**技術スタック:**
+- **バックエンドフレームワーク:** Spring Boot / Java EE
+- **ORMフレームワーク:** {{metadata.source_analysis.ormFramework}}
+- **データベース:** PostgreSQL
+- **アプリケーションサーバー:** {{source.app_server}}
+
+### 1.2 移行原則
+
+**重要: Javaの変更を最小限に**
+
+この移行は、**Javaアプリケーションロジックを変更しない**という原則に従います。限定的なJava変更は以下に制限されます:
+
+1. **エンティティマッピング** - 型マッピングが失敗した場合に`@Entity`、`@Table`、`@Column`アノテーションを更新
+2. **リポジトリクエリ** - `@Query`アノテーションとMyBatis XMLでSQLを書き換え
+3. **データベース設定** - JDBCドライバ、接続URL、データソースプロパティを更新
+
+**ビジネスロジックのリファクタリングは期待されず、必要ありません。**
+
+---
+
+## 2. ソースコード分析
+
+### 2.1 Javaアプリケーション構造
+
+**Javaファイル総数:** {{metadata.source_analysis.total_files}}
+**総コード行数:** {{metadata.source_analysis.total_loc}}
+
+#### タイプ別ファイル分布
+
+{{#each metadata.source_analysis.javaFiles}}
+- **{{this.type}}:** `{{this.name}}` ({{this.loc}} LOC) - PostgreSQL依存: {{#if this.hasPostgreSQLDependencies}}あり{{else}}なし{{/if}}
+{{/each}}
+
+### 2.2 必要なJava変更
+
+**変更が必要なファイル:** {{metadata.javaChanges.summary.filesRequiringChange}}
+**レビューが必要なファイル:** {{metadata.javaChanges.summary.filesRequiringReview}}
+
+#### 許容可能なJava変更（データベース層）
+
+**エンティティマッピング ({{metadata.javaChanges.acceptable.entityMappings.length}} ファイル):**
+{{#each metadata.javaChanges.acceptable.entityMappings}}
+- {{this}}
+{{/each}}
+
+**リポジトリクエリ ({{metadata.javaChanges.acceptable.repositoryQueries.length}} ファイル):**
+{{#each metadata.javaChanges.acceptable.repositoryQueries}}
+- {{this}}
+{{/each}}
+
+**設定ファイル ({{metadata.javaChanges.acceptable.configurations.length}} ファイル):**
+{{#each metadata.javaChanges.acceptable.configurations}}
+- {{this}}
+{{/each}}
+
+#### レビューが必要なファイル
+
+{{#if metadata.javaChanges.requiresReview.length}}
+{{#each metadata.javaChanges.requiresReview}}
+- ⚠️ {{this}}
+{{/each}}
+{{else}}
+✓ 特別なレビューが必要なファイルはありません（良好なアーキテクチャ - ビジネスロジックがデータベース層から分離されています）
+{{/if}}
+
+---
+
+## 3. データベース分析
+
+### 3.1 データベーススキーマ概要
+
+| コンポーネント | 数 |
+|--------------|-----|
+| テーブル | {{metadata.source_analysis.database.tables}} |
+| ビュー | {{metadata.source_analysis.database.views}} |
+| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} |
+| ファンクション | {{metadata.source_analysis.database.functions}} |
+| トリガー | {{metadata.source_analysis.database.triggers}} |
+| インデックス | {{metadata.source_analysis.database.indexes}} |
+| シーケンス | {{metadata.source_analysis.database.sequences}} |
+| パーティションテーブル | {{metadata.source_analysis.database.partitionedTables}} |
+
+### 3.2 検出されたPostgreSQL固有機能
+
+#### データタイプの使用状況
+
+{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
+**{{this.type}}** ({{this.count}} 件)
+- テーブル: {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+- Oracleマッピング複雑度: **{{this.oracleMappingComplexity}}**
+- 推奨Oracleタイプ: `{{this.suggestedOracleType}}`
+{{/each}}
+
+#### PostgreSQL拡張機能
+
+{{#if metadata.source_analysis.postgresqlFeatures.extensions.length}}
+{{#each metadata.source_analysis.postgresqlFeatures.extensions}}
+- **{{this}}** - Oracle同等機能またはカスタム実装が必要
+{{/each}}
+{{else}}
+PostgreSQL拡張機能は検出されませんでした。
+{{/if}}
+
+#### 高度なインデックスタイプ
+
+{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
+- **{{this.type}}** ({{this.count}} インデックス) - Oracleサポート: {{#if this.oracleSupport}}あり{{else}}なし - 再設計が必要{{/if}}
+{{/each}}
+
+#### アプリケーション内のネイティブクエリ
+
+**ネイティブクエリ総数:** {{metadata.source_analysis.postgresqlFeatures.nativeQueryCount}}
+
+ネイティブクエリは、Oracle互換性のためにSQL構文の書き換えが必要です（LIMIT→FETCH、array_agg→LISTAGGなど）
+
+---
+
+## 4. 移行複雑度評価
+
+### 4.1 全体的な複雑度
+
+**総合スコア:** {{metadata.migrationComplexity.overall}}/100 ({{metadata.migrationComplexity.difficulty}})
+
+{{metadata.migrationComplexity.description}}
+
+### 4.2 次元1: スキーマ＆データタイプの複雑度
+
+**スコア:** {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.schemaDataType}}
+- {{this}}
+{{/each}}
+
+**影響:** 複雑なPostgreSQLデータタイプ（JSONB、ARRAY、HSTORE）は、Javaコードのエンティティアノテーション更新が必要になる可能性があります。
+
+**緩和策:** OracleのDDLスクリプトで同等のものに更新します。自動型マッピングが失敗した場合のみ、エンティティクラスのアノテーションを変更します。
+
+### 4.3 次元2: SQL＆クエリ書き換えの複雑度
+
+**スコア:** {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.sqlQueryRewrite}}
+- {{this}}
+{{/each}}
+
+**影響:** @QueryアノテーションとMyBatis XMLで広範なSQLクエリの書き換えが必要です。
+
+**緩和策:** Oracle構文でSQLを書き換えます。**重要: リポジトリメソッドのシグネチャ、パラメータ、戻り値の型は変更しないでください。**
+
+### 4.4 次元3: ストアドプロシージャ、ファンクション＆トリガー
+
+**スコア:** {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.procedureFunctionTrigger}}
+- {{this}}
+{{/each}}
+
+**影響:** PL/pgSQLからPL/SQLへの変換は、慎重なレビューとテストが必要です。
+
+**緩和策:** データベース層でPL/pgSQLをPL/SQLに変換します。Javaから呼び出される場合（@Procedure）、リポジトリインターフェースのプロシージャ名/パラメータのみを更新します。
+
+### 4.5 次元4: データ量＆移行戦略
+
+**スコア:** {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.dataVolumeMigration}}
+- {{this}}
+{{/each}}
+
+**影響:** 大量のデータは、慎重な移行計画と潜在的なダウンタイムが必要です。
+
+**緩和策:** Oracle Data PumpまたはAWS DMSを使用します。Oracle DDLでパーティショニングを再作成します。パーティションキーが変更された場合のみ、エンティティクラスを更新します。
+
+### 4.6 次元5: アプリケーション＆ORM依存性
+
+**スコア:** {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.applicationORMDependency}}
+- {{this}}
+{{/each}}
+
+**影響:** データベース層のJavaコードには、ターゲットを絞った更新が必要です。
+
+**緩和策:** 設定ファイルでJDBCドライバを更新します。@QueryとMyBatis XMLでSQLを書き換えます。**リポジトリメソッドやサービス層のロジックはリファクタリングしないでください。**
+
+### 4.7 次元6: 運用＆ランタイムリスク
+
+**スコア:** {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.operationalRuntimeRisk}}
+- {{this}}
+{{/each}}
+
+**影響:** PostgreSQL拡張機能と運用上の違いは、アプリケーションの動作に影響を与える可能性があります。
+
+**緩和策:** DDLでOracle同等の拡張機能に置き換えます。GIN/GISTインデックスを再作成します。DB設定ファイルのみを更新します。
+
+---
+
+## 5. リスク評価
+
+{{#each metadata.risks}}
+### リスク {{@index}}: {{this.id}} - {{this.category}}
+
+**重大度:** {{this.severity}}
+
+**説明:** {{this.description}}
+
+**影響:** {{this.impact}}
+
+**緩和戦略:** {{this.mitigation}}
+
+---
+{{/each}}
+
+## 6. 推奨事項
+
+### 6.1 移行アプローチの推奨事項
+
+{{#each metadata.migrationComplexity.recommendations}}
+#### {{@index}}. {{this.dimension}} (重大度: {{this.severity}})
+
+**問題:** {{this.issue}}
+
+**緩和策:** {{this.mitigation}}
+
+---
+{{/each}}
+
+### 6.2 成功の鍵となる要因
+
+1. **Javaロジックを変更しない** - データベース層（DDL、SQL、プロシージャ）に移行の取り組みを集中させる
+2. **自動テスト** - すべての@Queryアノテーションとリポジトリに対する包括的な統合テストを実装
+3. **データベース移行ツール** - データ移行にOracle Data PumpまたはAWS DMSを使用
+4. **段階的アプローチ** - 一度に1つのモジュールを移行してテスト
+5. **パフォーマンステスト** - OracleクエリプランがPostgreSQLのパフォーマンスと一致または上回ることを検証
+
+---
+
+## 7. 付録
+
+### 7.1 PostgreSQLからOracleへのデータタイプマッピング
+
+| PostgreSQLタイプ | Oracle同等 | 備考 |
+|-----------------|-----------|------|
+| SERIAL | NUMBER + SEQUENCE + TRIGGER | トリガー作成が必要 |
+| BIGSERIAL | NUMBER + SEQUENCE + TRIGGER | トリガー作成が必要 |
+| BOOLEAN | NUMBER(1) または CHAR(1) | 0/1 または 'Y'/'N' |
+| JSONB | JSON (12c+) または CLOB | アプリケーション変更が必要な場合あり |
+| JSON | JSON (12c+) または CLOB | アプリケーション変更が必要な場合あり |
+| ARRAY[] | VARRAY または Nested Table | 複雑な変換 |
+| HSTORE | カスタムキー値テーブル | 再設計が必要 |
+| UUID | RAW(16) または VARCHAR2(36) | SYS_GUID()の使用を検討 |
+| TEXT | CLOB | 直接マッピング |
+| BYTEA | BLOB | 直接マッピング |
+
+### 7.2 PostgreSQL関数からOracle関数へのマッピング
+
+| PostgreSQL関数 | Oracle同等 |
+|---------------|-----------|
+| array_agg() | LISTAGG() |
+| string_agg() | LISTAGG() |
+| generate_series() | CONNECT BY LEVEL |
+| unnest() | TABLE() 関数 |
+| to_char() (PG形式) | to_char() (Oracle形式) |
+| GREATEST() | GREATEST() |
+| LEAST() | LEAST() |
+| regexp_replace() | REGEXP_REPLACE() |
+| COALESCE() | NVL() または COALESCE() |
+
+### 7.3 SQL構文の違い
+
+| PostgreSQL構文 | Oracle同等 |
+|---------------|-----------|
+| LIMIT n OFFSET m | FETCH FIRST n ROWS ONLY + OFFSET m |
+| RETURNING句 | RETURNING句（構文が異なる） |
+| ON CONFLICT (upsert) | MERGE文 |
+| ILIKE | UPPER() + LIKE |
+| DISTINCT ON | ROW_NUMBER() OVER |
+| SELECT FOR UPDATE SKIP LOCKED | SELECT FOR UPDATE SKIP LOCKED (11g+) |
+| \|\| (文字列連結) | \|\| または CONCAT() |
+| BOOLEAN列 | NUMBER(1) または CHAR(1) |
+
+---
+
+**ドキュメント終了**

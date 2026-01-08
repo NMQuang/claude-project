@@ -1,0 +1,450 @@
+# 移行戦略書
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **移行タイプ** | {{project.migration_type}} |
+| **ドキュメントタイプ** | 移行戦略 |
+| **生成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+| **作成者** | {{author}} |
+
+---
+
+## エグゼクティブサマリー
+
+本ドキュメントは、**{{project.name}}**アプリケーションのPostgreSQLからOracleデータベースへの移行に関する包括的な移行戦略を概説します。この戦略は、**Javaアプリケーションの変更を最小限に抑える**ことを強調し、ビジネスロジックを保持しながらデータベース層に移行の取り組みを集中させます。
+
+### 移行原則
+
+1. **Javaアプリケーションロジックを変更しない** - ビジネスロジックのリファクタリングなし
+2. **データベース層の移行のみ** - DDL、SQLクエリ、ストアドプロシージャに焦点を当てる
+3. **許容可能なJava変更:** エンティティマッピング、リポジトリクエリ、DB設定
+4. **リスク緩和** - 各段階で包括的なテストを伴う段階的アプローチ
+
+### 移行タイムライン概要
+
+- **フェーズ1:** データベーススキーマ移行（DDL変換）
+- **フェーズ2:** アプリケーション層の更新（最小限のJava変更）
+- **フェーズ3:** ストアドプロシージャ＆ファンクション変換
+- **フェーズ4:** データ移行
+- **フェーズ5:** テスト＆検証
+- **フェーズ6:** デプロイ＆カットオーバー
+
+---
+
+## 1. 移行アプローチ
+
+### 1.1 全体戦略
+
+**移行タイプ:** 最小限のアプリケーション変更を伴うデータベースプラットフォーム移行
+
+**アプローチ:** ビッグバン対段階的
+- **推奨:** アプリケーションモジュール別の段階的移行
+- **根拠:** リスクを軽減し、反復的なテストを可能にし、モジュール別のロールバックを実現
+
+### 1.2 主要な制約条件
+
+1. **ビジネス継続性:** カットオーバー中のダウンタイムを最小限に抑える
+2. **データ整合性:** データ損失許容度ゼロ
+3. **アプリケーション安定性:** ビジネスロジックの変更なし
+4. **パフォーマンス:** PostgreSQLのベースラインパフォーマンスを維持または改善
+5. **タイムライン:** [プロジェクトタイムラインを定義]
+
+---
+
+## 2. データベース移行戦略
+
+### 2.1 スキーマ移行アプローチ
+
+#### フェーズ1: DDL変換
+
+**複雑度スコア:** {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100
+
+**手順:**
+1. **PostgreSQL DDLの抽出** - pg_dumpを使用して現在のスキーマを抽出
+2. **データタイプの変換** - PostgreSQLタイプをOracle同等にマッピング
+3. **制約の再作成** - CHECK、FOREIGN KEY、UNIQUE制約を変換
+4. **シーケンスの処理** - SERIAL/BIGSERIALをトリガー付きOracle SEQUENCEに変換
+5. **インデックスの再作成** - GIN/GIST/BRINをOracleインデックスタイプに変換
+
+**ツール:**
+- PostgreSQL移行プラグイン付きOracle SQL Developer
+- Ora2Pg（オープンソース移行ツール）
+- カスタム変換スクリプト
+
+**データタイプ変換戦略:**
+
+{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
+**{{this.type}}** → **{{this.suggestedOracleType}}**
+- 複雑度: {{this.oracleMappingComplexity}}
+- 影響を受けるテーブル: {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
+- 必要なアクション: {{#if (eq this.oracleMappingComplexity "Complex")}}カスタム変換ロジックが必要{{else}}直接マッピング{{/if}}
+{{/each}}
+
+#### フェーズ2: インデックス戦略
+
+**現在のインデックスタイプ:**
+{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
+- **{{this.type}}** ({{this.count}} インデックス) - Oracleサポート: {{#if this.oracleSupport}}ネイティブ{{else}}代替アプローチが必要{{/if}}
+{{/each}}
+
+**変換計画:**
+- **GINインデックス** → Oracle Textインデックスまたは関数ベースインデックス
+- **GISTインデックス** → Oracle Spatialインデックス（ジオメトリ用）またはB-tree
+- **BRINインデックス** → ローカルインデックス付きパーティションテーブル
+- **部分インデックス（WHERE句）** → 関数ベースインデックスまたはパーティショニング
+
+#### フェーズ3: ストアドプロシージャ＆ファンクション
+
+**複雑度スコア:** {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100
+
+**ファンクション/プロシージャ総数:** {{metadata.source_analysis.database.functions}} ファンクション + {{metadata.source_analysis.database.stored_procedures}} プロシージャ
+
+**変換戦略:**
+1. **PL/pgSQLコードの分析** - PostgreSQL固有の構文を特定
+2. **PL/SQLへの変換** - Oracle構文を使用して書き換え
+3. **動的SQLの処理** - SQLインジェクション防止のための特別な注意
+4. **RETURNS TABLEの変換** - SYS_REFCURSORまたはパイプライン関数を使用
+5. **各ファンクションのテスト** - すべてのプロシージャの単体テスト
+
+**主要な課題:**
+{{#each metadata.migrationComplexity.details.procedureFunctionTrigger}}
+- {{this}}
+{{/each}}
+
+### 2.2 データ移行戦略
+
+**複雑度スコア:** {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100
+
+**テーブル総数:** {{metadata.source_analysis.database.tables}}
+**パーティションテーブル:** {{metadata.source_analysis.database.partitionedTables}}
+
+#### データ移行ツール
+
+**オプション1: Oracle Data Pump（大規模データセットに推奨）**
+- pg_dump（CSV形式）を使用してPostgreSQLからデータを抽出
+- Oracleフォーマットにデータを変換
+- Oracle Data Pump（impdp）を使用してロード
+- 大容量（>100GB）に最速
+
+**オプション2: AWS Database Migration Service（DMS）**
+- 継続的なレプリケーションをサポート
+- 最小限のダウンタイム移行
+- 段階的移行アプローチに適している
+- 異種移行を処理
+
+**オプション3: カスタムETLスクリプト**
+- 変換ロジックの完全な制御
+- 複雑なデータ変換に適している
+- 特殊なケース（JSONB、ARRAY変換）に使用
+
+#### データ移行フェーズ
+
+**フェーズ1: 初期データロード**
+1. アプリケーションをオフラインにするか、読み取り専用に設定
+2. PostgreSQLデータのエクスポート
+3. データの変換（型変換の処理）
+4. Oracleへのロード
+5. 行数とチェックサムの検証
+
+**フェーズ2: デルタ同期**（段階的アプローチを使用する場合）
+1. 初期ロード中のPostgreSQLの変更をキャプチャ
+2. Oracleにデルタ変更を適用
+3. カットオーバーウィンドウまで繰り返し
+
+**フェーズ3: 最終カットオーバー**
+1. PostgreSQLの書き込みを停止
+2. 最終デルタを適用
+3. アプリケーションをOracleに切り替え
+4. 検証
+
+---
+
+## 3. アプリケーション層移行戦略
+
+### 3.1 最小限のJava変更原則
+
+**重要なルール:** Javaアプリケーションロジックを変更しないでください。
+
+**ORMフレームワーク:** {{metadata.source_analysis.ormFramework}}
+
+### 3.2 必要なJava変更（データベース層のみ）
+
+#### 3.2.1 エンティティマッピング
+
+**更新が必要なファイル:** {{metadata.javaChanges.acceptable.entityMappings.length}}
+
+**変更:**
+- データタイプマッピングが必要な場合、`@Column`アノテーションを更新
+- カスタム型ハンドラー用に`@Type`アノテーションを追加（JSONB → JSON）
+- テーブル名が変更された場合、`@Table`アノテーションを更新
+- **エンティティのビジネスメソッドは変更しない**
+
+**例:**
+```java
+// 変更前（PostgreSQL）
+@Column(columnDefinition = "jsonb")
+private String metadata;
+
+// 変更後（Oracle）
+@Column(columnDefinition = "CLOB")
+@Type(type = "json")
+private String metadata;
+```
+
+#### 3.2.2 リポジトリクエリ
+
+**更新が必要なファイル:** {{metadata.javaChanges.acceptable.repositoryQueries.length}}
+
+**変更:**
+- Oracle構文用に`@Query`アノテーションでSQLを書き換え
+- MyBatis XMLマッパーファイルを更新
+- PostgreSQL関数をOracle同等に置き換え
+- **メソッドシグネチャ、パラメータ、戻り値の型は変更しない**
+
+**一般的なSQL書き換え:**
+- `LIMIT n` → `FETCH FIRST n ROWS ONLY`
+- `array_agg()` → `LISTAGG()`
+- `RETURNING` → `RETURNING`（構文が異なる）
+- `ON CONFLICT` → `MERGE`文
+- `ILIKE` → `UPPER() LIKE UPPER()`
+
+#### 3.2.3 データベース設定
+
+**更新が必要なファイル:** {{metadata.javaChanges.acceptable.configurations.length}}
+
+**変更:**
+1. **JDBCドライバ:**
+   ```properties
+   # 変更前
+   spring.datasource.driver-class-name=org.postgresql.Driver
+   spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
+
+   # 変更後
+   spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+   spring.datasource.url=jdbc:oracle:thin:@localhost:1521:ORCL
+   ```
+
+2. **Hibernate Dialect:**
+   ```properties
+   # 変更前
+   spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+
+   # 変更後
+   spring.jpa.database-platform=org.hibernate.dialect.Oracle12cDialect
+   ```
+
+3. **コネクションプール設定:**
+   - Oracle最適設定に更新
+   - Oracleライセンスに基づいて最大プールサイズを調整
+
+#### 3.2.4 レビューが必要なファイル
+
+{{#if metadata.javaChanges.requiresReview.length}}
+**⚠️ 警告: 以下のファイルにはビジネスロジックのデータベース依存関係があります:**
+
+{{#each metadata.javaChanges.requiresReview}}
+- {{this}}
+{{/each}}
+
+**必要なアクション:** これらのファイルを慎重にレビューしてください。サービス/コントローラー層は、直接的なデータベース依存関係を持つべきではありません。
+{{else}}
+✓ 特別なレビューが必要なファイルはありません - 関心事の良好な分離。
+{{/if}}
+
+### 3.3 ORMフレームワーク固有の戦略
+
+**検出されたフレームワーク:** {{metadata.source_analysis.ormFramework}}
+
+{{#if (eq metadata.source_analysis.ormFramework "Spring Data JPA")}}
+**Spring Data JPA戦略:**
+- Oracle SQLで`@Query`アノテーションを更新
+- すべてのカスタムクエリをテスト
+- JPAエンティティマッピングがOracleで動作することを検証
+- リポジトリメソッドシグネチャの変更なし
+{{else if (eq metadata.source_analysis.ormFramework "MyBatis")}}
+**MyBatis戦略:**
+- すべてのXMLマッパーファイルを更新
+- PostgreSQL固有のSQL構文を置き換え
+- すべてのselect/insert/update/delete文をテスト
+- マッパーインターフェースメソッドの変更なし
+{{else if (eq metadata.source_analysis.ormFramework "Hibernate")}}
+**Hibernate戦略:**
+- Hibernate Dialect設定を更新
+- すべてのHQLおよびCriteriaクエリをテスト
+- エンティティマッピングを検証
+- DAO/リポジトリクラスの変更なし
+{{/if}}
+
+---
+
+## 4. PostgreSQL拡張機能の移行
+
+{{#if metadata.source_analysis.postgresqlFeatures.extensions.length}}
+**検出された拡張機能:** {{metadata.source_analysis.postgresqlFeatures.extensions.length}}
+
+{{#each metadata.source_analysis.postgresqlFeatures.extensions}}
+### 拡張機能: {{this}}
+
+**Oracle同等:**
+{{#if (eq this "uuid-ossp")}}
+- Oracle `SYS_GUID()`関数を使用
+- またはOracle UUIDパッケージをインストール
+{{else if (eq this "pg_trgm")}}
+- 全文検索にOracle Textを使用
+- CONTEXTインデックスを設定
+{{else if (eq this "PostGIS")}}
+- Oracle Spatial and Graphを使用
+- ジオメトリデータをSDO_GEOMETRYに移行
+{{else if (eq this "hstore")}}
+- キー値テーブルとして再設計
+- またはOracle JSON_TABLEを使用
+{{else}}
+- この拡張機能にはカスタム調査が必要
+{{/if}}
+
+{{/each}}
+{{else}}
+PostgreSQL拡張機能は検出されませんでした - 移行が簡素化されます。
+{{/if}}
+
+---
+
+## 5. テスト戦略概要
+
+### 5.1 テストフェーズ
+
+**フェーズ1: 単体テスト**
+- すべてのエンティティマッピングをテスト
+- すべてのリポジトリクエリをテスト
+- すべてのストアドプロシージャ/ファンクションをテスト
+
+**フェーズ2: 統合テスト**
+- すべてのサービス層操作をテスト
+- トランザクション管理をテスト
+- コネクションプーリングをテスト
+
+**フェーズ3: パフォーマンステスト**
+- クエリ実行時間を比較
+- Oracle実行計画を検証
+- 本番同様のデータでロードテスト
+
+**フェーズ4: データ検証**
+- 行数検証
+- データ整合性チェック
+- 参照整合性検証
+
+詳細なテスト計画については、テスト戦略ドキュメントを参照してください。
+
+---
+
+## 6. ロールバック戦略
+
+### 6.1 ロールバックトリガー
+
+**以下の場合にロールバックが開始されます:**
+1. 重大なデータ整合性の問題を検出
+2. ベースラインから20%を超えるパフォーマンス低下
+3. アプリケーションエラーが閾値を超える
+4. ビジネスクリティカルな機能の障害
+
+### 6.2 ロールバックプロセス
+
+**手順:**
+1. Oracleデータベース接続を停止
+2. アプリケーションをPostgreSQLに戻す
+3. Oracleからの変更データをPostgreSQLに同期（必要に応じて）
+4. アプリケーションを再起動
+5. 機能を検証
+
+**ロールバック時間の見積もり:** [デプロイアプローチに基づいて定義]
+
+---
+
+## 7. リスク緩和戦略
+
+{{#each metadata.risks}}
+### リスク: {{this.category}}
+
+**重大度:** {{this.severity}}
+**説明:** {{this.description}}
+
+**緩和策:**
+{{this.mitigation}}
+
+---
+{{/each}}
+
+---
+
+## 8. リソース要件
+
+### 8.1 チーム要件
+
+| 役割 | 責任 | 推定工数 |
+|------|------|----------|
+| データベースアーキテクト | DDL変換、ストアドプロシージャ移行 | [見積もり] |
+| バックエンド開発者 | Javaコード更新（最小限）、テスト | [見積もり] |
+| DBA（PostgreSQL） | データ抽出、検証 | [見積もり] |
+| DBA（Oracle） | スキーマ作成、最適化 | [見積もり] |
+| QAエンジニア | テスト、検証 | [見積もり] |
+| DevOpsエンジニア | デプロイ、監視 | [見積もり] |
+
+### 8.2 インフラストラクチャ要件
+
+| コンポーネント | 仕様 |
+|--------------|------|
+| Oracleデータベース | バージョン12c+（JSONサポート用） |
+| サーバーハードウェア | [PostgreSQL使用状況に基づいて定義] |
+| ストレージ | [データ量に基づいて定義] |
+| ネットワーク | データ移行用の高速接続 |
+| バックアップインフラ | Oracle RMANまたは同等 |
+
+### 8.3 ツール要件
+
+- Oracle SQL Developer
+- Ora2Pg移行ツール
+- AWS DMS（クラウド移行を使用する場合）
+- Oracle Data Pumpユーティリティ
+- バージョン管理用Git
+- 追跡用JIRAまたは同等
+
+---
+
+## 9. 成功基準
+
+### 9.1 技術的成功基準
+
+- ✓ 100%のデータ整合性ですべてのデータベーステーブルが移行された
+- ✓ すべてのストアドプロシージャ/ファンクションが変換されテストされた
+- ✓ すべてのアプリケーションクエリが正しい結果を返す
+- ✓ パフォーマンスがPostgreSQLのベースラインと一致または上回る
+- ✓ ビジネスロジックの変更なし
+- ✓ すべての統合テストが合格
+- ✓ 移行中のデータ損失ゼロ
+
+### 9.2 ビジネス成功基準
+
+- ✓ 許容可能なウィンドウ内のアプリケーションダウンタイム
+- ✓ エンドユーザー機能への影響なし
+- ✓ ビジネスプロセスが中断なく継続
+- ✓ コンプライアンスおよび監査要件を満たす
+
+---
+
+## 10. 次のステップ
+
+1. **戦略のレビューと承認** - ステークホルダーのサインオフ
+2. **詳細な移行設計** - 詳細な技術設計ドキュメントを作成
+3. **環境のセットアップ** - 開発、QA、ステージング、本番
+4. **テスト計画の作成** - 詳細なテストケースとシナリオ
+5. **開発の開始** - DDL変換とJava更新
+6. **パイロット移行** - まず重要でないモジュールでテスト
+7. **完全な移行** - 学んだ教訓に基づいて実行
+
+---
+
+**ドキュメント終了**

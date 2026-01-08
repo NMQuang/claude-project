@@ -1,0 +1,729 @@
+# Deployment & Rollback Plan
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Document Type** | Deployment & Rollback Plan |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+| **Author** | {{author}} |
+
+---
+
+## Executive Summary
+
+This document provides a detailed deployment plan and rollback procedures for migrating **{{project.name}}** from PostgreSQL to Oracle database. The plan ensures minimal downtime, zero data loss, and reliable rollback capability while adhering to the minimal Java changes principle.
+
+### Deployment Approach
+
+**Deployment Strategy:** [Select based on requirements]
+- **Option A:** Big Bang Cutover (Complete migration in single maintenance window)
+- **Option B:** Phased Migration (Module-by-module migration)
+- **Option C:** Blue-Green Deployment (Parallel systems during transition)
+
+**Recommended:** Based on complexity score {{metadata.migrationComplexity.overall}}/100
+
+{{#if (gt metadata.migrationComplexity.overall 70)}}
+**Recommended: Phased Migration**
+- Lower risk approach
+- Allows for incremental validation
+- Easier rollback of individual modules
+{{else}}
+**Recommended: Big Bang Cutover**
+- Faster overall migration
+- Simpler coordination
+- Single cutover event
+{{/if}}
+
+---
+
+## 1. Pre-Deployment Checklist
+
+### 1.1 Technical Prerequisites
+
+- [ ] Oracle database installed and configured (Version 12c+)
+- [ ] Database schema created and validated
+- [ ] All indexes, constraints, triggers created
+- [ ] Data migration completed and validated
+- [ ] Application artifacts built and tested
+- [ ] Configuration files updated (JDBC, Hibernate, etc.)
+- [ ] All Java code changes deployed to application servers
+- [ ] Database connection strings configured
+- [ ] Monitoring and alerting configured
+
+### 1.2 Testing Validation
+
+- [ ] All unit tests passing (100%)
+- [ ] All integration tests passing (>95%)
+- [ ] Performance testing completed and approved
+- [ ] Data integrity validation completed (100% accuracy)
+- [ ] Load testing completed successfully
+- [ ] Rollback procedures tested in staging
+
+### 1.3 Team Readiness
+
+- [ ] Deployment team identified and briefed
+- [ ] Communication plan established
+- [ ] Support team on standby
+- [ ] Escalation contacts confirmed
+- [ ] Rollback decision makers identified
+
+### 1.4 Backup and Recovery
+
+- [ ] Full PostgreSQL backup taken
+- [ ] Oracle database backup taken
+- [ ] Application backup (code + config) completed
+- [ ] Backup restoration tested and validated
+- [ ] Recovery time objectives (RTO) confirmed
+
+---
+
+## 2. Deployment Timeline
+
+### 2.1 Deployment Schedule
+
+**Deployment Date:** [To be determined]
+**Deployment Window:** [Define maintenance window]
+**Estimated Duration:** [Based on rehearsal]
+
+### 2.2 Deployment Phases
+
+```mermaid
+gantt
+    title Deployment Timeline
+    dateFormat HH:mm
+    axisFormat %H:%M
+
+    section Preparation
+    Pre-deployment checks    :00:00, 30m
+    Final backups            :00:30, 30m
+
+    section Database Cutover
+    Stop application         :01:00, 15m
+    Final data sync          :01:15, 30m
+    Switch to Oracle         :01:45, 15m
+
+    section Application Deployment
+    Deploy new artifacts     :02:00, 30m
+    Update configurations    :02:30, 15m
+    Start application        :02:45, 15m
+
+    section Validation
+    Smoke tests              :03:00, 30m
+    Data validation          :03:30, 30m
+    Performance check        :04:00, 30m
+
+    section Go-Live
+    Open to users            :04:30, 15m
+    Monitor                  :04:45, 60m
+```
+
+---
+
+## 3. Detailed Deployment Steps
+
+### 3.1 Phase 1: Preparation (T-30 minutes)
+
+#### Step 1.1: Pre-Deployment Verification
+```bash
+#!/bin/bash
+# Pre-deployment check script
+
+echo "=== Pre-Deployment Checks ==="
+
+# Check Oracle database connectivity
+sqlplus -s username/password@ORCL <<EOF
+SELECT 'Oracle DB: CONNECTED' FROM DUAL;
+EXIT;
+EOF
+
+# Check application health
+curl -f http://app-server:8080/health || echo "WARNING: App health check failed"
+
+# Verify backup completion
+ls -lh /backups/postgresql_backup_$(date +%Y%m%d).sql
+ls -lh /backups/oracle_backup_$(date +%Y%m%d).dmp
+
+echo "=== Pre-Deployment Checks Complete ==="
+```
+
+#### Step 1.2: Final Backups
+```bash
+#!/bin/bash
+# Final backup script
+
+echo "Taking final PostgreSQL backup..."
+pg_dump -h localhost -U postgres -d mydb -F c -f /backups/final_postgres_$(date +%Y%m%d_%H%M%S).backup
+
+echo "Taking Oracle backup..."
+expdp username/password@ORCL directory=BACKUP_DIR dumpfile=final_oracle_$(date +%Y%m%d_%H%M%S).dmp logfile=backup.log full=y
+
+echo "Backups complete"
+```
+
+#### Step 1.3: Communication
+```
+# Notification to users
+Subject: Scheduled Maintenance - System Downtime
+
+Dear Users,
+
+This is to inform you that the system will be undergoing scheduled maintenance tonight from [START TIME] to [END TIME].
+
+During this period, the application will be unavailable. We apologize for any inconvenience.
+
+Thank you for your understanding.
+IT Team
+```
+
+### 3.2 Phase 2: Application Shutdown (T-0)
+
+#### Step 2.1: Enable Maintenance Mode
+```bash
+#!/bin/bash
+# Enable maintenance mode
+
+echo "Enabling maintenance mode..."
+
+# Update load balancer to show maintenance page
+# Or update application property
+curl -X POST http://app-server:8080/admin/maintenance/enable
+
+# Verify no active sessions (wait for graceful shutdown)
+sleep 30
+
+# Check active connections
+psql -h localhost -U postgres -d mydb -c "SELECT COUNT(*) FROM pg_stat_activity WHERE datname='mydb';"
+```
+
+#### Step 2.2: Stop Application
+```bash
+#!/bin/bash
+# Stop application servers
+
+echo "Stopping application..."
+
+# Stop Spring Boot application
+systemctl stop application
+
+# Verify process stopped
+ps aux | grep java | grep -v grep || echo "Application stopped successfully"
+
+# Stop PostgreSQL writes (switch to read-only if needed)
+# psql -h localhost -U postgres -c "ALTER DATABASE mydb SET default_transaction_read_only = on;"
+```
+
+### 3.3 Phase 3: Data Synchronization (T+15 minutes)
+
+#### Step 3.1: Final Delta Sync
+```bash
+#!/bin/bash
+# Final data synchronization
+
+echo "Syncing final changes from PostgreSQL to Oracle..."
+
+# If using AWS DMS, apply final replication
+# If using custom scripts, run incremental sync
+
+# Example: Sync specific tables that may have changed
+python scripts/sync_delta_changes.py \
+  --source-db postgresql://localhost/mydb \
+  --target-db oracle://localhost:1521/ORCL \
+  --tables users,orders,transactions \
+  --since "2024-01-01 00:00:00"
+
+echo "Delta sync complete"
+```
+
+#### Step 3.2: Final Data Validation
+```sql
+-- Run on Oracle
+-- Validate row counts
+SELECT 'users' as table_name, COUNT(*) as oracle_count FROM users
+UNION ALL
+SELECT 'orders', COUNT(*) FROM orders
+UNION ALL
+SELECT 'transactions', COUNT(*) FROM transactions;
+
+-- Compare with PostgreSQL counts (run separately)
+-- All counts must match 100%
+```
+
+### 3.4 Phase 4: Database Cutover (T+45 minutes)
+
+#### Step 4.1: Update Connection Strings
+```bash
+#!/bin/bash
+# Update application configuration
+
+echo "Updating database configuration..."
+
+# Backup current config
+cp /app/config/application.properties /app/config/application.properties.backup
+
+# Update to Oracle config
+cp /app/config/application-oracle.properties /app/config/application.properties
+
+# Verify configuration
+grep "spring.datasource.url" /app/config/application.properties
+```
+
+**Configuration Changes:**
+```properties
+# OLD (PostgreSQL)
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.datasource.url=jdbc:postgresql://pg-server:5432/mydb
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+
+# NEW (Oracle)
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.datasource.url=jdbc:oracle:thin:@oracle-server:1521:ORCL
+spring.jpa.database-platform=org.hibernate.dialect.Oracle12cDialect
+```
+
+### 3.5 Phase 5: Application Deployment (T+60 minutes)
+
+#### Step 5.1: Deploy New Artifacts
+```bash
+#!/bin/bash
+# Deploy updated application
+
+echo "Deploying application with Oracle support..."
+
+# Stop existing application (already stopped)
+# Deploy new JAR/WAR
+cp /deployments/application-oracle.jar /app/application.jar
+
+# Update permissions
+chown appuser:appuser /app/application.jar
+chmod 755 /app/application.jar
+```
+
+#### Step 5.2: Start Application
+```bash
+#!/bin/bash
+# Start application with Oracle
+
+echo "Starting application..."
+
+# Start Spring Boot application
+systemctl start application
+
+# Wait for startup
+sleep 60
+
+# Check health
+http_code=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+
+if [ $http_code -eq 200 ]; then
+  echo "SUCCESS: Application started successfully"
+else
+  echo "ERROR: Application health check failed - INITIATE ROLLBACK"
+  exit 1
+fi
+```
+
+### 3.6 Phase 6: Validation (T+120 minutes)
+
+#### Step 6.1: Smoke Tests
+```bash
+#!/bin/bash
+# Smoke test script
+
+echo "Running smoke tests..."
+
+# Test 1: Health check
+curl -f http://localhost:8080/health || exit 1
+
+# Test 2: Database connectivity
+curl -f http://localhost:8080/api/users/count || exit 1
+
+# Test 3: Basic CRUD operations
+# Create
+user_id=$(curl -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test User","email":"test@example.com"}' | jq -r '.id')
+
+# Read
+curl -f http://localhost:8080/api/users/$user_id || exit 1
+
+# Update
+curl -X PUT http://localhost:8080/api/users/$user_id \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Updated User","email":"test@example.com"}' || exit 1
+
+# Delete
+curl -X DELETE http://localhost:8080/api/users/$user_id || exit 1
+
+echo "All smoke tests passed"
+```
+
+#### Step 6.2: Data Integrity Check
+```sql
+-- Run comprehensive data validation
+-- Check constraints
+SELECT constraint_name, status
+FROM user_constraints
+WHERE status != 'ENABLED';
+
+-- Should return 0 rows
+
+-- Check foreign key integrity
+SELECT
+  'orders' as table_name,
+  COUNT(*) as orphaned_records
+FROM orders o
+WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = o.user_id);
+
+-- Should return 0 orphaned records
+```
+
+#### Step 6.3: Performance Validation
+```bash
+#!/bin/bash
+# Performance validation
+
+echo "Checking query performance..."
+
+# Run key queries and measure response time
+for i in {1..10}; do
+  start_time=$(date +%s%N)
+  curl -s http://localhost:8080/api/users > /dev/null
+  end_time=$(date +%s%N)
+
+  duration=$(( (end_time - start_time) / 1000000 ))
+  echo "Query $i: ${duration}ms"
+
+  if [ $duration -gt 500 ]; then
+    echo "WARNING: Query exceeded performance threshold"
+  fi
+done
+```
+
+### 3.7 Phase 7: Go-Live (T+180 minutes)
+
+#### Step 7.1: Disable Maintenance Mode
+```bash
+#!/bin/bash
+# Go live
+
+echo "Opening application to users..."
+
+# Disable maintenance mode
+curl -X POST http://localhost:8080/admin/maintenance/disable
+
+# Update load balancer
+# Enable traffic to application servers
+
+echo "Application is now live on Oracle database"
+```
+
+#### Step 7.2: User Communication
+```
+# Notification to users
+Subject: Maintenance Complete - System Available
+
+Dear Users,
+
+The scheduled maintenance has been completed successfully. The system is now available for use.
+
+If you experience any issues, please contact the support team immediately.
+
+Thank you for your patience.
+IT Team
+```
+
+### 3.8 Phase 8: Post-Deployment Monitoring (T+180 to T+360 minutes)
+
+#### Step 8.1: Monitor Key Metrics
+```bash
+#!/bin/bash
+# Continuous monitoring script
+
+echo "Monitoring application post-deployment..."
+
+while true; do
+  # Check health
+  health=$(curl -s http://localhost:8080/health | jq -r '.status')
+
+  # Check error rate
+  error_rate=$(curl -s http://localhost:8080/metrics | jq -r '.errorRate')
+
+  # Check response time
+  response_time=$(curl -s http://localhost:8080/metrics | jq -r '.avgResponseTime')
+
+  echo "$(date): Health=$health, ErrorRate=$error_rate%, ResponseTime=${response_time}ms"
+
+  # Alert if thresholds exceeded
+  if [ "$error_rate" -gt 1 ]; then
+    echo "ALERT: Error rate exceeds threshold - Consider rollback"
+  fi
+
+  sleep 60
+done
+```
+
+#### Step 8.2: Database Monitoring
+```sql
+-- Monitor Oracle database
+SELECT
+  sql_text,
+  executions,
+  elapsed_time / 1000000 as elapsed_seconds,
+  cpu_time / 1000000 as cpu_seconds
+FROM v$sql
+WHERE elapsed_time > 1000000
+ORDER BY elapsed_time DESC
+FETCH FIRST 10 ROWS ONLY;
+
+-- Monitor active sessions
+SELECT
+  username,
+  COUNT(*) as session_count
+FROM v$session
+WHERE username IS NOT NULL
+GROUP BY username;
+```
+
+---
+
+## 4. Rollback Plan
+
+### 4.1 Rollback Decision Criteria
+
+**Rollback will be triggered if ANY of the following occur:**
+
+| Criteria | Threshold | Priority |
+|----------|-----------|----------|
+| Data integrity issue | Any data loss or corruption | CRITICAL |
+| Application error rate | >1% of requests | CRITICAL |
+| Performance degradation | >20% slower than baseline | HIGH |
+| Critical functionality failure | Any business-critical feature broken | CRITICAL |
+| Database connection failures | >5% of connections failing | HIGH |
+| Unresolved deployment issues | After 2 hours of troubleshooting | MEDIUM |
+
+**Rollback Decision Authority:**
+- Technical Lead (can initiate for technical issues)
+- Project Manager (can initiate for timeline issues)
+- Business Owner (can initiate for business impact)
+
+### 4.2 Rollback Procedure
+
+#### Step 4.2.1: Declare Rollback
+```bash
+#!/bin/bash
+# Rollback initiation
+
+echo "========================================="
+echo "INITIATING ROLLBACK TO POSTGRESQL"
+echo "========================================="
+echo "Time: $(date)"
+echo "Initiated by: [Name]"
+echo "Reason: [Reason]"
+echo "========================================="
+
+# Log rollback decision
+echo "$(date) - ROLLBACK INITIATED - Reason: [Reason]" >> /var/log/deployment.log
+```
+
+#### Step 4.2.2: Stop Application
+```bash
+#!/bin/bash
+# Stop Oracle-connected application
+
+echo "Stopping application..."
+
+systemctl stop application
+
+# Verify stopped
+ps aux | grep java | grep -v grep && echo "WARNING: Application still running"
+
+echo "Application stopped"
+```
+
+#### Step 4.2.3: Switch Back to PostgreSQL
+```bash
+#!/bin/bash
+# Restore PostgreSQL configuration
+
+echo "Switching back to PostgreSQL..."
+
+# Restore configuration backup
+cp /app/config/application.properties.backup /app/config/application.properties
+
+# Verify configuration
+grep "spring.datasource.url" /app/config/application.properties
+
+echo "Configuration restored to PostgreSQL"
+```
+
+#### Step 4.2.4: Sync Data Changes (if any)
+```bash
+#!/bin/bash
+# Sync any data changes from Oracle back to PostgreSQL
+
+echo "Syncing data changes from Oracle to PostgreSQL..."
+
+# If data was written to Oracle during the brief period, sync it back
+python scripts/oracle_to_postgres_sync.py \
+  --source-db oracle://localhost:1521/ORCL \
+  --target-db postgresql://localhost/mydb \
+  --since "[cutover timestamp]"
+
+echo "Data sync complete"
+```
+
+#### Step 4.2.5: Restart Application on PostgreSQL
+```bash
+#!/bin/bash
+# Restart application with PostgreSQL
+
+echo "Restarting application with PostgreSQL..."
+
+systemctl start application
+
+# Wait for startup
+sleep 60
+
+# Verify health
+http_code=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
+
+if [ $http_code -eq 200 ]; then
+  echo "SUCCESS: Application rolled back successfully"
+else
+  echo "ERROR: Rollback failed - Manual intervention required"
+  exit 1
+fi
+```
+
+#### Step 4.2.6: Validate Rollback
+```bash
+#!/bin/bash
+# Validate rollback
+
+echo "Validating rollback..."
+
+# Test database connectivity
+curl -f http://localhost:8080/api/users/count || exit 1
+
+# Test CRUD operations
+# [Same smoke tests as deployment]
+
+# Verify data integrity
+psql -h localhost -U postgres -d mydb -c "SELECT COUNT(*) FROM users;"
+
+echo "Rollback validation complete"
+```
+
+#### Step 4.2.7: Notify Stakeholders
+```
+# Rollback notification
+Subject: URGENT - System Rolled Back to Previous Version
+
+Dear Stakeholders,
+
+The deployment has been rolled back due to [REASON].
+
+The system is now running on the previous PostgreSQL database and is functioning normally.
+
+We will schedule a post-mortem to review the issues and plan next steps.
+
+Current Status: STABLE
+Next Steps: [To be determined]
+
+IT Team
+```
+
+### 4.3 Rollback Timeline
+
+**Estimated Rollback Duration:** 30-60 minutes
+
+```
+[ROLLBACK DECISION] → [STOP APP: 5 min] → [SWITCH CONFIG: 5 min] → [SYNC DATA: 10 min] → [START APP: 10 min] → [VALIDATE: 15 min] → [NOTIFY: 5 min]
+```
+
+### 4.4 Post-Rollback Actions
+
+1. **Root Cause Analysis** - Conduct thorough investigation
+2. **Fix Issues** - Address identified problems
+3. **Re-test** - Comprehensive testing in staging
+4. **Reschedule Deployment** - New deployment date
+5. **Update Procedures** - Incorporate lessons learned
+
+---
+
+## 5. Post-Deployment Activities
+
+### 5.1 Day 1 Monitoring (Intensive)
+
+**24/7 monitoring for first 24 hours:**
+- Application health checks every 5 minutes
+- Database performance monitoring
+- Error log monitoring
+- User reported issues tracking
+
+### 5.2 Week 1 Monitoring (Active)
+
+- Daily performance reports
+- Daily error summaries
+- Database optimization if needed
+- User feedback collection
+
+### 5.3 Month 1 Monitoring (Standard)
+
+- Weekly performance reviews
+- Trend analysis
+- Optimization opportunities
+- Stabilization confirmation
+
+---
+
+## 6. Contacts and Escalation
+
+### 6.1 Deployment Team
+
+| Role | Name | Phone | Email |
+|------|------|-------|-------|
+| Technical Lead | | | |
+| Database Administrator (Oracle) | | | |
+| Database Administrator (PostgreSQL) | | | |
+| Application Developer | | | |
+| DevOps Engineer | | | |
+| QA Lead | | | |
+
+### 6.2 Escalation Path
+
+**Level 1:** Technical Lead (First responder)
+**Level 2:** Project Manager (Coordination)
+**Level 3:** IT Director (Executive decision)
+**Level 4:** CTO (Critical business impact)
+
+---
+
+## 7. Success Criteria
+
+### 7.1 Deployment Success Criteria
+
+- ✓ Application deployed within planned maintenance window
+- ✓ All smoke tests passing
+- ✓ Data integrity validated (100% accuracy)
+- ✓ Performance meets baseline
+- ✓ Error rate < 0.1%
+- ✓ Zero data loss
+- ✓ Rollback capability confirmed
+
+### 7.2 Sign-Off
+
+| Stakeholder | Role | Sign-Off | Date |
+|------------|------|----------|------|
+| | Technical Lead | | |
+| | Project Manager | | |
+| | Business Owner | | |
+| | QA Lead | | |
+
+---
+
+**Document End**
