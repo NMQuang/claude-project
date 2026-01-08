@@ -234,6 +234,31 @@
   background: linear-gradient(90deg, #ff8787 0%, #fa5252 100%);
 }
 
+/* PostgreSQL-to-Oracle dimension colors (6 dimensions) */
+.dimension-fill.dimension1 {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa); /* Blue - Schema & Data Types */
+}
+
+.dimension-fill.dimension2 {
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa); /* Purple - SQL Rewrite */
+}
+
+.dimension-fill.dimension3 {
+  background: linear-gradient(90deg, #ec4899, #f472b6); /* Pink - Procedures & Functions */
+}
+
+.dimension-fill.dimension4 {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24); /* Amber - Data Volume */
+}
+
+.dimension-fill.dimension5 {
+  background: linear-gradient(90deg, #10b981, #34d399); /* Green - Application & ORM */
+}
+
+.dimension-fill.dimension6 {
+  background: linear-gradient(90deg, #ef4444, #f87171); /* Red - Operational Risk */
+}
+
 .dimension-details {
   list-style: none;
   padding: 0;

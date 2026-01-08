@@ -23,15 +23,28 @@ export class DocumentGenerator {
 
   /**
    * Generate a document from template
+   * @param documentType - Type of document (as-is-analysis, migration-strategy, etc.)
+   * @param data - Data to populate template
+   * @param language - Language code ('en' or 'ja')
+   * @param migrationType - Optional migration type (e.g., 'COBOL-to-Java', 'PostgreSQL-to-Oracle')
    */
-  async generate(documentType: string, data: any, language: string = 'en'): Promise<string> {
+  async generate(documentType: string, data: any, language: string = 'en', migrationType?: string): Promise<string> {
     // Map language codes to folder names
     const languageFolder = language === 'ja' ? 'japanese' : 'english';
 
-    // Try language-specific folder first, then fallback to English
+    // Map migration type to subfolder name
+    const migrationSubfolder = this.getMigrationSubfolder(migrationType || data.project?.migration_type);
+
+    // Try paths in order of priority:
+    // 1. Language + Migration Type specific
+    // 2. English + Migration Type specific
+    // 3. Language only (legacy fallback for backward compatibility)
+    // 4. English only (fallback)
     const tryPaths = [
-      path.join(languageFolder, `${documentType}.hbs`),  // Preferred: language-specific folder
-      path.join('english', `${documentType}.hbs`)        // Fallback: English folder
+      path.join(languageFolder, migrationSubfolder, `${documentType}.hbs`),
+      path.join('english', migrationSubfolder, `${documentType}.hbs`),
+      path.join(languageFolder, `${documentType}.hbs`),  // Legacy fallback
+      path.join('english', `${documentType}.hbs`)         // Legacy fallback
     ];
 
     let templatePath: string | null = null;
@@ -44,13 +57,33 @@ export class DocumentGenerator {
     }
 
     if (!templatePath) {
-      throw new Error(`Template not found for ${documentType} in any language`);
+      throw new Error(`Template not found for ${documentType} in any language (migration type: ${migrationSubfolder})`);
     }
 
     const templateSource = fs.readFileSync(templatePath, 'utf-8');
     const template = Handlebars.compile(templateSource);
 
     return template(data);
+  }
+
+  /**
+   * Map migration type to subfolder name
+   */
+  private getMigrationSubfolder(migrationType?: string): string {
+    if (!migrationType) {
+      return 'cobol-to-java'; // Default for backward compatibility
+    }
+
+    // Normalize migration type names to folder names
+    const typeMap: { [key: string]: string } = {
+      'COBOL-to-Java': 'cobol-to-java',
+      'PostgreSQL-to-Oracle': 'pg-to-oracle',
+      'PL1-to-Java': 'pl1-to-java',
+      'Oracle-to-PostgreSQL': 'oracle-to-pg',
+      'MySQL-to-Oracle': 'mysql-to-oracle'
+    };
+
+    return typeMap[migrationType] || 'cobol-to-java'; // Default fallback
   }
 
   /**

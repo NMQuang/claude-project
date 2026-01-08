@@ -9,7 +9,7 @@ const api = axios.create({
   },
 });
 
-export interface MigrationComplexityScore {
+export interface CobolMigrationComplexityScore {
   overall: number;
   logicComplexity: number;
   dataComplexity: number;
@@ -20,6 +20,26 @@ export interface MigrationComplexityScore {
     logic: string[];
     data: string[];
     risk: string[];
+  };
+}
+
+export interface PostgreSQLMigrationComplexityScore {
+  overall: number;
+  schemaDataTypeComplexity: number;
+  sqlQueryRewriteComplexity: number;
+  procedureFunctionTriggerComplexity: number;
+  dataVolumeMigrationComplexity: number;
+  applicationORMDependencyComplexity: number;
+  operationalRuntimeRiskComplexity: number;
+  difficulty: 'Low' | 'Medium' | 'High' | 'Very High';
+  description: string;
+  details: {
+    schemaDataType: string[];
+    sqlQueryRewrite: string[];
+    procedureFunctionTrigger: string[];
+    dataVolumeMigration: string[];
+    applicationORMDependency: string[];
+    operationalRuntimeRisk: string[];
   };
 }
 
@@ -42,7 +62,7 @@ export interface Project {
       };
     };
     complexity_summary?: string;
-    migrationComplexity?: MigrationComplexityScore;
+    migrationComplexity?: CobolMigrationComplexityScore | PostgreSQLMigrationComplexityScore;
   };
   ddlMetadata?: any;
   generatedDocuments?: string[];

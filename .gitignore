@@ -27,7 +27,12 @@ Thumbs.db
 
 # Output
 output/
+outputs/
 *.log
+
+# Project data folders
+samples/
+uploads/
 
 # Test coverage
 coverage/

@@ -1,7 +1,7 @@
 /**
- * Migration Complexity Scorer
+ * COBOL Migration Complexity Scorer
  *
- * Calculates comprehensive migration difficulty score based on multiple dimensions:
+ * Calculates comprehensive migration difficulty score for COBOL-to-Java migration based on multiple dimensions:
  * 1. Logic Complexity (cyclomatic complexity, control flow)
  * 2. Data & SQL Complexity (database operations, data structures)
  * 3. COBOL-specific Risk (legacy constructs, platform dependencies)
@@ -9,7 +9,7 @@
 
 import { CobolAnalysisResult } from '../analyzers/CobolAnalyzer.js';
 
-export interface MigrationComplexityScore {
+export interface CobolMigrationComplexityScore {
   overall: number; // 0-100
   logicComplexity: number; // 0-100
   dataComplexity: number; // 0-100
@@ -23,11 +23,11 @@ export interface MigrationComplexityScore {
   };
 }
 
-export class MigrationComplexityScorer {
+export class CobolMigrationComplexityScorer {
   /**
    * Calculate migration complexity score for a single file
    */
-  scoreFile(result: CobolAnalysisResult): MigrationComplexityScore {
+  scoreFile(result: CobolAnalysisResult): CobolMigrationComplexityScore {
     const metrics = result.migrationMetrics;
     const loc = result.loc;
 
@@ -65,7 +65,7 @@ export class MigrationComplexityScorer {
   /**
    * Calculate average migration complexity for multiple files
    */
-  scoreProject(results: CobolAnalysisResult[]): MigrationComplexityScore {
+  scoreProject(results: CobolAnalysisResult[]): CobolMigrationComplexityScore {
     if (results.length === 0) {
       return this.emptyScore();
     }
@@ -250,7 +250,7 @@ export class MigrationComplexityScorer {
     return details;
   }
 
-  private emptyScore(): MigrationComplexityScore {
+  private emptyScore(): CobolMigrationComplexityScore {
     return {
       overall: 0,
       logicComplexity: 0,

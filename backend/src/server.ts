@@ -13,6 +13,9 @@ import { fileURLToPath } from 'url';
 // Import analyzers and generators
 import { CobolAnalyzer } from './analyzers/CobolAnalyzer.js';
 import { DDLAnalyzer } from './analyzers/DDLAnalyzer.js';
+import { JavaAnalyzer } from './analyzers/JavaAnalyzer.js';
+import { PostgreSQLDDLAnalyzer } from './analyzers/PostgreSQLDDLAnalyzer.js';
+import { ORMConfigAnalyzer } from './analyzers/ORMConfigAnalyzer.js';
 import { MetadataExtractor } from './extractors/MetadataExtractor.js';
 import { DocumentGenerator } from './generators/DocumentGenerator.js';
 
@@ -154,42 +157,98 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
 
     const uploadDir = path.join(__dirname, '../uploads', project.id);
 
-    // Analyze COBOL files
-    const cobolAnalyzer = new CobolAnalyzer();
-    const cobolFiles = getAllFiles(uploadDir, '.cbl');
+    // Route based on migration type
+    if (project.migrationType === 'COBOL-to-Java') {
+      // Existing COBOL analysis logic
+      const cobolAnalyzer = new CobolAnalyzer();
+      const cobolFiles = getAllFiles(uploadDir, '.cbl');
 
-    const analysisResults = [];
-    for (const file of cobolFiles) {
-      const result = await cobolAnalyzer.analyze(file);
-      analysisResults.push(result);
-    }
-
-    // Analyze DDL files
-    let ddlResults = undefined;
-    const ddlAnalyzer = new DDLAnalyzer();
-    const ddlFiles = getAllFiles(uploadDir, '.sql');
-
-    if (ddlFiles.length > 0) {
-      for (const file of ddlFiles) {
-        const result = await ddlAnalyzer.analyze(file);
-        ddlResults = result; // In production, merge multiple DDL files
+      const analysisResults = [];
+      for (const file of cobolFiles) {
+        const result = await cobolAnalyzer.analyze(file);
+        analysisResults.push(result);
       }
+
+      // Analyze DDL files
+      let ddlResults = undefined;
+      const ddlAnalyzer = new DDLAnalyzer();
+      const ddlFiles = getAllFiles(uploadDir, '.sql');
+
+      if (ddlFiles.length > 0) {
+        for (const file of ddlFiles) {
+          const result = await ddlAnalyzer.analyze(file);
+          ddlResults = result; // In production, merge multiple DDL files
+        }
+      }
+
+      // Extract metadata
+      const extractor = new MetadataExtractor();
+      const metadata = extractor.extract(analysisResults, ddlResults);
+
+      // Save to project
+      project.metadata = metadata;
+      project.ddlMetadata = ddlResults;
+      project.status = 'Analyzed';
+
+      res.json({
+        message: 'Analysis complete',
+        metadata,
+        ddlMetadata: ddlResults
+      });
+
+    } else if (project.migrationType === 'PostgreSQL-to-Oracle') {
+      // NEW: PostgreSQL-to-Oracle analysis
+
+      // 1. Analyze Java files
+      const javaAnalyzer = new JavaAnalyzer();
+      const javaFiles = getAllFiles(uploadDir, '.java');
+
+      const javaResults = [];
+      for (const file of javaFiles) {
+        const result = await javaAnalyzer.analyze(file);
+        javaResults.push(result);
+      }
+
+      // 2. Analyze PostgreSQL DDL
+      const pgDDLAnalyzer = new PostgreSQLDDLAnalyzer();
+      const ddlFiles = getAllFiles(uploadDir, '.sql');
+
+      let ddlResult = undefined;
+      if (ddlFiles.length > 0) {
+        for (const file of ddlFiles) {
+          const result = await pgDDLAnalyzer.analyze(file);
+          ddlResult = result; // In production, merge multiple DDL files
+        }
+      }
+
+      // 3. Analyze ORM config files
+      const ormAnalyzer = new ORMConfigAnalyzer();
+      const ormFiles = getAllFiles(uploadDir, ['.xml', '.yml', '.yaml']);
+
+      const ormResults = [];
+      for (const file of ormFiles) {
+        const result = await ormAnalyzer.analyze(file);
+        ormResults.push(result);
+      }
+
+      // 4. Extract metadata
+      const extractor = new MetadataExtractor();
+      const metadata = extractor.extractPostgreSQL(javaResults, ddlResult, ormResults);
+
+      // Save to project
+      project.metadata = metadata;
+      project.ddlMetadata = ddlResult;
+      project.status = 'Analyzed';
+
+      res.json({
+        message: 'PostgreSQL-to-Oracle analysis complete',
+        metadata,
+        ddlMetadata: ddlResult
+      });
+
+    } else {
+      return res.status(400).json({ error: `Unsupported migration type: ${project.migrationType}` });
     }
-
-    // Extract metadata
-    const extractor = new MetadataExtractor();
-    const metadata = extractor.extract(analysisResults, ddlResults);
-
-    // Save to project
-    project.metadata = metadata;
-    project.ddlMetadata = ddlResults;
-    project.status = 'Analyzed';
-
-    res.json({
-      message: 'Analysis complete',
-      metadata,
-      ddlMetadata: ddlResults
-    });
 
   } catch (error) {
     project.status = 'Error';
@@ -406,12 +465,13 @@ app.delete('/api/projects/:id', (req, res) => {
 // Error handling
 app.use(errorHandler);
 
-// Utility function
-function getAllFiles(dirPath: string, extension: string): string[] {
+// Utility function - supports single extension or array of extensions
+function getAllFiles(dirPath: string, extensions: string | string[]): string[] {
   if (!fs.existsSync(dirPath)) {
     return [];
   }
 
+  const extArray = Array.isArray(extensions) ? extensions : [extensions];
   const files: string[] = [];
   const items = fs.readdirSync(dirPath);
 
@@ -420,9 +480,12 @@ function getAllFiles(dirPath: string, extension: string): string[] {
     const stat = fs.statSync(fullPath);
 
     if (stat.isDirectory()) {
-      files.push(...getAllFiles(fullPath, extension));
-    } else if (item.endsWith(extension)) {
-      files.push(fullPath);
+      files.push(...getAllFiles(fullPath, extArray));
+    } else {
+      // Check if file ends with any of the extensions
+      if (extArray.some(ext => item.endsWith(ext))) {
+        files.push(fullPath);
+      }
     }
   }
 

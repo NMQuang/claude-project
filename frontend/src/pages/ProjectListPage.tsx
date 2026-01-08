@@ -3,6 +3,48 @@ import { useNavigate } from 'react-router-dom'
 import { getProjects, createProject, type Project } from '../services/api'
 import './ProjectListPage.css'
 
+// Migration Types Configuration
+// Add new migration types here - they will automatically appear in the dropdown
+interface MigrationType {
+  value: string;
+  label: string;
+  sourceLanguage?: string;
+  targetLanguage?: string;
+}
+
+const MIGRATION_TYPES: MigrationType[] = [
+  {
+    value: 'COBOL-to-Java',
+    label: 'COBOL to Java',
+    sourceLanguage: 'COBOL',
+    targetLanguage: 'Java 17'
+  },
+  {
+    value: 'PostgreSQL-to-Oracle',
+    label: 'PostgreSQL to Oracle',
+    sourceLanguage: 'PostgreSQL',
+    targetLanguage: 'Oracle'
+  },
+  {
+    value: 'PL1-to-Java',
+    label: 'PL/I to Java',
+    sourceLanguage: 'PL/I',
+    targetLanguage: 'Java 17'
+  },
+  {
+    value: 'Oracle-to-PostgreSQL',
+    label: 'Oracle to PostgreSQL',
+    sourceLanguage: 'Oracle',
+    targetLanguage: 'PostgreSQL'
+  },
+  {
+    value: 'MySQL-to-Oracle',
+    label: 'MySQL to Oracle',
+    sourceLanguage: 'MySQL',
+    targetLanguage: 'Oracle'
+  }
+];
+
 function ProjectListPage() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
@@ -114,10 +156,9 @@ function ProjectListPage() {
                 value={newProject.migrationType}
                 onChange={(e) => setNewProject({ ...newProject, migrationType: e.target.value })}
               >
-                <option value="COBOL-to-Java">COBOL to Java</option>
-                <option value="PL1-to-Java">PL/I to Java</option>
-                <option value="Oracle-to-PostgreSQL">Oracle to PostgreSQL</option>
-                <option value="MySQL-to-Oracle">MySQL to Oracle</option>
+                {MIGRATION_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
               </select>
             </div>
             <div className="modal-actions">

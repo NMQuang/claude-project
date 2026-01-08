@@ -6,7 +6,8 @@ import {
   analyzeProject,
   generateDocument,
   downloadDocument,
-  type Project
+  type Project,
+  type PostgreSQLMigrationComplexityScore
 } from '../services/api'
 import './ProjectDashboardPage.css'
 
@@ -14,6 +15,13 @@ interface DocumentStatus {
   id: string
   name: string
   generated: boolean
+}
+
+interface ComplexityDimensionProps {
+  name: string
+  score: number
+  details: string[]
+  colorClass: string
 }
 
 function ProjectDashboardPage() {
@@ -92,7 +100,7 @@ function ProjectDashboardPage() {
     if (!id) return
     try {
       setAnalyzing(true)
-      const result = await analyzeProject(id)
+      await analyzeProject(id)
       alert('Analysis complete!')
       loadProject()
     } catch (error) {
@@ -130,6 +138,95 @@ function ProjectDashboardPage() {
       console.error('Failed to download document:', error)
       alert('Failed to download document')
     }
+  }
+
+  // Reusable component for dimension display
+  const ComplexityDimension = ({ name, score, details, colorClass }: ComplexityDimensionProps) => (
+    <div className="complexity-dimension">
+      <div className="dimension-header">
+        <span className="dimension-name">{name}</span>
+        <span className="dimension-score">{score}/100</span>
+      </div>
+      <div className="dimension-bar">
+        <div className={`dimension-fill ${colorClass}`} style={{ width: `${score}%` }} />
+      </div>
+      {details && details.length > 0 && (
+        <ul className="dimension-details">
+          {details.map((detail, idx) => <li key={idx}>{detail}</li>)}
+        </ul>
+      )}
+    </div>
+  )
+
+  // Dynamic renderer based on migration type
+  const renderComplexityDimensions = (complexity: any, migrationType: string) => {
+    if (migrationType === 'COBOL-to-Java') {
+      return (
+        <>
+          <ComplexityDimension
+            name="Logic Complexity"
+            score={complexity.logicComplexity}
+            details={complexity.details.logic}
+            colorClass="logic"
+          />
+          <ComplexityDimension
+            name="Data & SQL Complexity"
+            score={complexity.dataComplexity}
+            details={complexity.details.data}
+            colorClass="data"
+          />
+          <ComplexityDimension
+            name="COBOL-specific Risk"
+            score={complexity.cobolSpecificRisk}
+            details={complexity.details.risk}
+            colorClass="risk"
+          />
+        </>
+      )
+    } else if (migrationType === 'PostgreSQL-to-Oracle') {
+      const pgComplexity = complexity as PostgreSQLMigrationComplexityScore
+      return (
+        <>
+          <ComplexityDimension
+            name="Schema & Data Type Complexity"
+            score={pgComplexity.schemaDataTypeComplexity}
+            details={pgComplexity.details.schemaDataType}
+            colorClass="dimension1"
+          />
+          <ComplexityDimension
+            name="SQL & Query Rewrite Complexity"
+            score={pgComplexity.sqlQueryRewriteComplexity}
+            details={pgComplexity.details.sqlQueryRewrite}
+            colorClass="dimension2"
+          />
+          <ComplexityDimension
+            name="Stored Procedures, Functions & Triggers"
+            score={pgComplexity.procedureFunctionTriggerComplexity}
+            details={pgComplexity.details.procedureFunctionTrigger}
+            colorClass="dimension3"
+          />
+          <ComplexityDimension
+            name="Data Volume & Migration Strategy"
+            score={pgComplexity.dataVolumeMigrationComplexity}
+            details={pgComplexity.details.dataVolumeMigration}
+            colorClass="dimension4"
+          />
+          <ComplexityDimension
+            name="Application & ORM Dependencies"
+            score={pgComplexity.applicationORMDependencyComplexity}
+            details={pgComplexity.details.applicationORMDependency}
+            colorClass="dimension5"
+          />
+          <ComplexityDimension
+            name="Operational & Runtime Risks"
+            score={pgComplexity.operationalRuntimeRiskComplexity}
+            details={pgComplexity.details.operationalRuntimeRisk}
+            colorClass="dimension6"
+          />
+        </>
+      )
+    }
+    return null
   }
 
   if (loading) {
@@ -174,7 +271,7 @@ function ProjectDashboardPage() {
             ref={fileInputRef}
             onChange={handleFileSelect}
             multiple
-            accept=".cbl,.sql"
+            accept=".cbl,.sql,.java,.xml,.yml,.yaml"
             style={{ display: 'none' }}
           />
           <button
@@ -226,65 +323,7 @@ function ProjectDashboardPage() {
                   <p className="complexity-description">{project.metadata.migrationComplexity.description}</p>
 
                   <div className="complexity-dimensions">
-                    <div className="complexity-dimension">
-                      <div className="dimension-header">
-                        <span className="dimension-name">Logic Complexity</span>
-                        <span className="dimension-score">{project.metadata.migrationComplexity.logicComplexity}/100</span>
-                      </div>
-                      <div className="dimension-bar">
-                        <div
-                          className="dimension-fill logic"
-                          style={{ width: `${project.metadata.migrationComplexity.logicComplexity}%` }}
-                        />
-                      </div>
-                      {project.metadata.migrationComplexity.details.logic.length > 0 && (
-                        <ul className="dimension-details">
-                          {project.metadata.migrationComplexity.details.logic.map((detail, idx) => (
-                            <li key={idx}>{detail}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-
-                    <div className="complexity-dimension">
-                      <div className="dimension-header">
-                        <span className="dimension-name">Data & SQL Complexity</span>
-                        <span className="dimension-score">{project.metadata.migrationComplexity.dataComplexity}/100</span>
-                      </div>
-                      <div className="dimension-bar">
-                        <div
-                          className="dimension-fill data"
-                          style={{ width: `${project.metadata.migrationComplexity.dataComplexity}%` }}
-                        />
-                      </div>
-                      {project.metadata.migrationComplexity.details.data.length > 0 && (
-                        <ul className="dimension-details">
-                          {project.metadata.migrationComplexity.details.data.map((detail, idx) => (
-                            <li key={idx}>{detail}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-
-                    <div className="complexity-dimension">
-                      <div className="dimension-header">
-                        <span className="dimension-name">COBOL-specific Risk</span>
-                        <span className="dimension-score">{project.metadata.migrationComplexity.cobolSpecificRisk}/100</span>
-                      </div>
-                      <div className="dimension-bar">
-                        <div
-                          className="dimension-fill risk"
-                          style={{ width: `${project.metadata.migrationComplexity.cobolSpecificRisk}%` }}
-                        />
-                      </div>
-                      {project.metadata.migrationComplexity.details.risk.length > 0 && (
-                        <ul className="dimension-details">
-                          {project.metadata.migrationComplexity.details.risk.map((detail, idx) => (
-                            <li key={idx}>{detail}</li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                    {renderComplexityDimensions(project.metadata.migrationComplexity, project.migrationType)}
                   </div>
                 </div>
               )}
