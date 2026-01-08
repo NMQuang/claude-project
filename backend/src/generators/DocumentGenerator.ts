@@ -119,5 +119,35 @@ export class DocumentGenerator {
     Handlebars.registerHelper('json', (context: any) => {
       return JSON.stringify(context, null, 2);
     });
+
+    // Helper: Equality comparison
+    Handlebars.registerHelper('eq', (a: any, b: any) => {
+      return a === b;
+    });
+
+    // Helper: Greater than comparison
+    Handlebars.registerHelper('gt', (a: number, b: number) => {
+      return a > b;
+    });
+
+    // Helper: Less than comparison
+    Handlebars.registerHelper('lt', (a: number, b: number) => {
+      return a < b;
+    });
+
+    // Helper: Greater than or equal comparison
+    Handlebars.registerHelper('gte', (a: number, b: number) => {
+      return a >= b;
+    });
+
+    // Helper: Less than or equal comparison
+    Handlebars.registerHelper('lte', (a: number, b: number) => {
+      return a <= b;
+    });
+
+    // Helper: Not equal comparison
+    Handlebars.registerHelper('ne', (a: any, b: any) => {
+      return a !== b;
+    });
   }
 }
