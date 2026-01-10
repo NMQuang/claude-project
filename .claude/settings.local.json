@@ -4,6 +4,8 @@
       "Bash(npm install)",
       "Bash(npm run build:*)",
       "Bash(node dist/index.js:*)"
-    ]
-  }
+    ],
+    "defaultMode": "bypassPermissions"
+  },
+  "language": "vietnamese"
 }

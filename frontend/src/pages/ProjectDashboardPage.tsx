@@ -9,6 +9,7 @@ import {
   type Project,
   type PostgreSQLMigrationComplexityScore
 } from '../services/api'
+import { filterFilesByMigrationType, getAcceptAttribute } from '../utils/fileFilters'
 import './ProjectDashboardPage.css'
 
 interface DocumentStatus {
@@ -28,6 +29,7 @@ function ProjectDashboardPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(true)
@@ -79,18 +81,85 @@ function ProjectDashboardPage() {
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
-    if (!files || !id) return
+    if (!files || !id || !project) return
+
+    // Filter files based on migration type
+    const { validFiles, skippedCount, skippedFiles } = filterFilesByMigrationType(files, project.migrationType)
+
+    if (validFiles.length === 0) {
+      alert('No valid files selected for this migration type')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
 
     try {
       setUploadingFiles(true)
-      await uploadFiles(id, files)
-      alert(`${files.length} file(s) uploaded successfully`)
+
+      // Convert File array to FileList-like object
+      const dataTransfer = new DataTransfer()
+      validFiles.forEach(file => dataTransfer.items.add(file))
+
+      await uploadFiles(id, dataTransfer.files)
+
+      let message = `${validFiles.length} file(s) uploaded successfully`
+      if (skippedCount > 0) {
+        message += `\n\n${skippedCount} file(s) skipped (not relevant for ${project.migrationType} migration):`
+        message += '\n' + skippedFiles.slice(0, 10).join('\n')
+        if (skippedFiles.length > 10) {
+          message += `\n... and ${skippedFiles.length - 10} more`
+        }
+      }
+      alert(message)
+
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
     } catch (error) {
       console.error('Failed to upload files:', error)
       alert('Failed to upload files')
+    } finally {
+      setUploadingFiles(false)
+    }
+  }
+
+  const handleFolderSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || !id || !project) return
+
+    // Filter files based on migration type
+    const { validFiles, skippedCount, skippedFiles } = filterFilesByMigrationType(files, project.migrationType)
+
+    if (validFiles.length === 0) {
+      alert('No valid files found in folder for this migration type')
+      if (folderInputRef.current) {
+        folderInputRef.current.value = ''
+      }
+      return
+    }
+
+    try {
+      setUploadingFiles(true)
+
+      // Convert File array to FileList-like object while preserving webkitRelativePath
+      const dataTransfer = new DataTransfer()
+      validFiles.forEach(file => dataTransfer.items.add(file))
+
+      await uploadFiles(id, dataTransfer.files, true)
+
+      let message = `${validFiles.length} file(s) from folder uploaded successfully`
+      if (skippedCount > 0) {
+        message += `\n\n${skippedCount} file(s) skipped (images, txt, and other files not relevant for ${project.migrationType} migration)`
+      }
+      alert(message)
+
+      if (folderInputRef.current) {
+        folderInputRef.current.value = ''
+      }
+    } catch (error) {
+      console.error('Failed to upload folder:', error)
+      alert('Failed to upload folder')
     } finally {
       setUploadingFiles(false)
     }
@@ -271,7 +340,14 @@ function ProjectDashboardPage() {
             ref={fileInputRef}
             onChange={handleFileSelect}
             multiple
-            accept=".cbl,.sql,.java,.xml,.yml,.yaml"
+            accept={getAcceptAttribute(project.migrationType)}
+            style={{ display: 'none' }}
+          />
+          <input
+            type="file"
+            ref={folderInputRef}
+            onChange={handleFolderSelect}
+            {...{ webkitdirectory: '', directory: '' } as any}
             style={{ display: 'none' }}
           />
           <button
@@ -280,6 +356,13 @@ function ProjectDashboardPage() {
             disabled={uploadingFiles}
           >
             {uploadingFiles ? 'Uploading...' : 'Upload Files'}
+          </button>
+          <button
+            className="btn-secondary"
+            onClick={() => folderInputRef.current?.click()}
+            disabled={uploadingFiles}
+          >
+            {uploadingFiles ? 'Uploading...' : 'Upload Folder'}
           </button>
           <button
             className="btn-primary"
@@ -298,16 +381,32 @@ function ProjectDashboardPage() {
             <>
               <div className="metric-grid">
                 <div className="metric">
-                  <div className="metric-label">COBOL Files</div>
-                  <div className="metric-value">{project.metadata.source_analysis?.total_files || 0}</div>
+                  <div className="metric-label">
+                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
+                      ? 'Database Tables'
+                      : 'Source Files'}
+                  </div>
+                  <div className="metric-value">
+                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
+                      ? (project.metadata.source_analysis?.database?.tables || 0)
+                      : (project.metadata.source_analysis?.total_files || 0)}
+                  </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">Lines of Code</div>
                   <div className="metric-value">{project.metadata.source_analysis?.total_loc || 0}</div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Database Tables</div>
-                  <div className="metric-value">{project.metadata.source_analysis?.database?.tables || 0}</div>
+                  <div className="metric-label">
+                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
+                      ? 'Stored Procedures/Functions'
+                      : 'Database Tables'}
+                  </div>
+                  <div className="metric-value">
+                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
+                      ? ((project.metadata.source_analysis?.database?.procedures || 0) + (project.metadata.source_analysis?.database?.functions || 0))
+                      : (project.metadata.source_analysis?.database?.tables || 0)}
+                  </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">Migration Difficulty</div>

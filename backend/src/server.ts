@@ -18,6 +18,7 @@ import { PostgreSQLDDLAnalyzer } from './analyzers/PostgreSQLDDLAnalyzer.js';
 import { ORMConfigAnalyzer } from './analyzers/ORMConfigAnalyzer.js';
 import { MetadataExtractor } from './extractors/MetadataExtractor.js';
 import { DocumentGenerator } from './generators/DocumentGenerator.js';
+import { isValidFileForMigrationType, getAllowedExtensions } from './utils/fileFilters.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +48,29 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const projectId = req.params.id;
+  const project = projects.get(projectId);
+
+  if (!project) {
+    cb(new Error('Project not found'));
+    return;
+  }
+
+  // Validate file extension based on migration type
+  if (!isValidFileForMigrationType(file.originalname, project.migrationType)) {
+    const allowedExtensions = getAllowedExtensions(project.migrationType);
+    cb(new Error(`File type not allowed for ${project.migrationType} migration. Allowed types: ${allowedExtensions.join(', ')}`));
+    return;
+  }
+
+  cb(null, true);
+};
+
+const upload = multer({
+  storage,
+  fileFilter
+});
 
 // In-memory storage for projects (replace with database in production)
 interface Project {
@@ -125,22 +148,30 @@ app.post('/api/projects', (req, res) => {
 });
 
 // Upload files to project
-app.post('/api/projects/:id/upload', upload.array('files'), async (req, res) => {
-  const project = projects.get(req.params.id);
+app.post('/api/projects/:id/upload', (req, res) => {
+  upload.array('files')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
+    }
 
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
+    const project = projects.get(req.params.id);
 
-  const files = req.files as Express.Multer.File[];
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
 
-  res.json({
-    message: 'Files uploaded successfully',
-    files: files.map(f => ({
-      filename: f.filename,
-      size: f.size,
-      path: f.path
-    }))
+    const files = req.files as Express.Multer.File[];
+
+    res.json({
+      message: 'Files uploaded successfully',
+      files: files.map(f => ({
+        filename: f.filename,
+        size: f.size,
+        path: f.path
+      }))
+    });
   });
 });
 

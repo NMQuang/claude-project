@@ -59,6 +59,8 @@ export interface Project {
       total_loc?: number;
       database?: {
         tables?: number;
+        procedures?: number;
+        functions?: number;
       };
     };
     complexity_summary?: string;
@@ -115,10 +117,14 @@ export const deleteProject = async (id: string): Promise<void> => {
 };
 
 // File Upload
-export const uploadFiles = async (projectId: string, files: FileList): Promise<any> => {
+export const uploadFiles = async (projectId: string, files: FileList, isFolder: boolean = false): Promise<any> => {
   const formData = new FormData();
   Array.from(files).forEach(file => {
     formData.append('files', file);
+    // When uploading a folder, preserve the relative path structure
+    if (isFolder && (file as any).webkitRelativePath) {
+      formData.append('filePaths', (file as any).webkitRelativePath);
+    }
   });
 
   const response = await api.post(`/projects/${projectId}/upload`, formData, {
