@@ -129,7 +129,7 @@ function ProjectDashboardPage() {
     if (!files || !id || !project) return
 
     // Filter files based on migration type
-    const { validFiles, skippedCount, skippedFiles } = filterFilesByMigrationType(files, project.migrationType)
+    const { validFiles, skippedCount } = filterFilesByMigrationType(files, project.migrationType)
 
     if (validFiles.length === 0) {
       alert('No valid files found in folder for this migration type')
