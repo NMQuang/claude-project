@@ -1,0 +1,378 @@
+# マイグレーション戦略ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **マイグレーションタイプ** | {{project.migration_type}} |
+| **ソース技術** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **ターゲット技術** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **ドキュメントタイプ** | マイグレーション戦略 |
+| **作成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+
+---
+
+## エグゼクティブサマリー
+
+**ソース:** {{metadata.source_analysis.total_files}}個のソースファイルの現状分析から派生
+
+### マイグレーション範囲サマリー
+
+| メトリクス | 値 | ソース参照 |
+|------------|------|------------|
+| 総ソースファイル数 | {{metadata.source_analysis.total_files}} | 現状分析 |
+| 総コード行数 | {{metadata.source_analysis.total_loc}} | 現状分析 |
+| 複雑度スコア | {{metadata.migrationComplexity.overall}}/100 | 複雑度分析 |
+| 難易度レベル | {{metadata.migrationComplexity.difficulty}} | 複雑度分析 |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{metadata.source_analysis.database.tables}} | スキーマ分析 |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | スキーマ分析 |{{/if}}
+
+---
+
+## 1. マイグレーション範囲
+
+### 1.1 対象コンポーネント
+
+**ソース:** ソース分析から抽出
+
+{{#if scope.in_scope}}
+| コンポーネント | タイプ | 件数 | ソースエビデンス |
+|----------------|--------|------|------------------|
+{{#each scope.in_scope}}
+| {{this.name}} | {{this.type}} | {{this.count}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+| コンポーネント | タイプ | 件数 | ソースエビデンス |
+|----------------|--------|------|------------------|
+| ソースファイル | {{source.language}} | {{metadata.source_analysis.total_files}} | ディレクトリスキャン |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{source.database}} | {{metadata.source_analysis.database.tables}} | スキーマ抽出 |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| ストアドプロシージャ | {{source.database}} | {{metadata.source_analysis.database.stored_procedures}} | スキーマ抽出 |{{/if}}
+{{/if}}
+
+### 1.2 対象外コンポーネント
+
+{{#if scope.out_scope}}
+| コンポーネント | 理由 | ドキュメント参照 |
+|----------------|------|------------------|
+{{#each scope.out_scope}}
+| {{this.name}} | {{this.reason}} | {{this.reference}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 対象外項目は手動定義が必要です。
+{{/if}}
+
+---
+
+## 2. マイグレーションアプローチ選定
+
+### 2.1 ソース分析に基づくアプローチ推奨
+
+**ソース:** 複雑度と依存関係分析
+
+{{#if strategy.selected_approach}}
+| 基準 | 分析結果 | 推奨への影響 |
+|------|----------|--------------|
+{{#each strategy.criteria_analysis}}
+| {{this.criteria}} | {{this.result}} | {{this.impact}} |
+{{/each}}
+
+**選定アプローチ:** {{strategy.selected_approach}}
+
+**エビデンスに基づく根拠:**
+{{#each strategy.rationale}}
+- {{this.point}} (ソース: {{this.evidence}})
+{{/each}}
+{{else}}
+| 基準 | 分析結果 | ソース |
+|------|----------|--------|
+| 総LOC | {{metadata.source_analysis.total_loc}} | ファイル分析 |
+| 複雑度スコア | {{metadata.migrationComplexity.overall}}/100 | 複雑度分析 |
+| コンポーネント結合度 | {{metadata.coupling_level}} | 依存関係分析 |
+{{#if metadata.source_analysis.database.tables}}| データベースサイズ | {{metadata.source_analysis.database.tables}}テーブル | スキーマ分析 |{{/if}}
+
+> **アプローチ選定は上記メトリクスに基づく手動レビューが必要です。**
+{{/if}}
+
+---
+
+## 3. コンポーネントマイグレーション戦略
+
+### 3.1 依存関係に基づくマイグレーション順序
+
+**ソース:** ソースコードからの依存関係分析
+
+{{#if strategy.migration_order}}
+| 優先度 | コンポーネント | 依存関係 | 理由 | ソース参照 |
+|--------|----------------|----------|------|------------|
+{{#each strategy.migration_order}}
+| {{this.priority}} | {{this.component}} | {{this.dependencies}} | {{this.reason}} | `{{this.source_ref}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** マイグレーション順序は依存関係分析の完了が必要です。
+{{/if}}
+
+---
+
+## 4. コードマイグレーション戦略
+
+### 4.1 言語/技術マッピング
+
+**ソース:** ソースコードパターン分析
+
+{{#if mappings.code}}
+| ソースパターン | ターゲットパターン | 発生回数 | ソース例 |
+|----------------|-------------------|----------|----------|
+{{#each mappings.code}}
+| {{this.source}} | {{this.target}} | {{this.count}} | {{this.examples}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** コードマッピングはソース分析に基づく手動定義が必要です。
+{{/if}}
+
+### 4.2 変換ルール
+
+{{#if mappings.conversion_rules}}
+{{#each mappings.conversion_rules}}
+#### ルール: {{this.name}}
+
+**ソースパターン:** `{{this.source_pattern}}`
+
+**ターゲットパターン:** `{{this.target_pattern}}`
+
+**適用先:** {{this.applies_to}}件
+
+**ソースエビデンス:**
+- 発見場所: {{this.found_in}}
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 変換ルールはソースコードパターン抽出が必要です。
+{{/if}}
+
+---
+
+## 5. データベースマイグレーション戦略
+
+{{#if source.database}}
+
+### 5.1 スキーママイグレーションアプローチ
+
+**ソース:** データベーススキーマ分析
+
+{{#if db_migration.schema_analysis}}
+| オブジェクトタイプ | 件数 | 複雑度 | アプローチ | ソース |
+|--------------------|------|--------|------------|--------|
+{{#each db_migration.schema_analysis}}
+| {{this.type}} | {{this.count}} | {{this.complexity}} | {{this.approach}} | スキーマ抽出 |
+{{/each}}
+{{else}}
+| オブジェクトタイプ | 件数 | ソース |
+|--------------------|------|--------|
+| テーブル | {{metadata.source_analysis.database.tables}} | スキーマ抽出 |
+| ビュー | {{metadata.source_analysis.database.views}} | スキーマ抽出 |
+| インデックス | {{metadata.source_analysis.database.indexes}} | スキーマ抽出 |
+| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | スキーマ抽出 |
+| ファンクション | {{metadata.source_analysis.database.functions}} | スキーマ抽出 |
+| トリガー | {{metadata.source_analysis.database.triggers}} | スキーマ抽出 |
+{{/if}}
+
+### 5.2 データ型マッピング
+
+**ソース:** DDL分析
+
+{{#if mappings.database}}
+| ソース型 ({{source.database}}) | ターゲット型 ({{target.database}}) | 発生回数 | 変換メモ | ソーステーブル |
+|--------------------------------|-----------------------------------|----------|----------|----------------|
+{{#each mappings.database}}
+| {{this.source}} | {{this.target}} | {{this.count}} | {{this.notes}} | {{this.tables}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** データ型マッピングはDDL分析が必要です。
+{{/if}}
+
+### 5.3 ストアドプロシージャ/ファンクション戦略
+
+**ソース:** プロシージャ分析
+
+{{#if db_migration.procedure_strategy}}
+| プロシージャ名 | LOC | 複雑度 | 戦略 | ソースファイル |
+|----------------|-----|--------|------|----------------|
+{{#each db_migration.procedure_strategy}}
+| {{this.name}} | {{this.loc}} | {{this.complexity}} | {{this.strategy}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** ストアドプロシージャ戦略はプロシージャ分析が必要です。
+{{/if}}
+
+{{else}}
+> **該当なし:** このマイグレーションにはデータベースコンポーネントがありません。
+{{/if}}
+
+---
+
+## 6. リスク軽減戦略
+
+### 6.1 ソース分析から特定されたリスク
+
+**ソース:** 現状分析と複雑度評価
+
+{{#if risks}}
+| リスクID | カテゴリ | 説明 | 確率 | 影響 | ソースエビデンス |
+|----------|----------|------|------|------|------------------|
+{{#each risks}}
+| {{this.id}} | {{this.category}} | {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** リスクは分析結果からの手動特定が必要です。
+{{/if}}
+
+### 6.2 軽減アクション
+
+{{#if mitigation_actions}}
+| リスクID | 軽減アクション | 検証方法 |
+|----------|----------------|----------|
+{{#each mitigation_actions}}
+| {{this.risk_id}} | {{this.action}} | {{this.verification}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 軽減アクションは手動定義が必要です。
+{{/if}}
+
+---
+
+## 7. 品質保証戦略
+
+### 7.1 ソース分析に基づくテスト範囲
+
+**ソース:** コンポーネントと複雑度分析
+
+{{#if qa.testing_scope}}
+| テスト領域 | コンポーネント数 | 複雑度 | テストアプローチ | ソース参照 |
+|------------|------------------|--------|------------------|------------|
+{{#each qa.testing_scope}}
+| {{this.area}} | {{this.count}} | {{this.complexity}} | {{this.approach}} | {{this.source}} |
+{{/each}}
+{{else}}
+| テスト領域 | 値 | ソース |
+|------------|------|--------|
+| テスト対象総ファイル数 | {{metadata.source_analysis.total_files}} | ファイル分析 |
+| 高複雑度コンポーネント | {{metadata.high_complexity_count}} | 複雑度分析 |
+{{#if metadata.source_analysis.database.stored_procedures}}| テスト対象ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | スキーマ分析 |{{/if}}
+{{/if}}
+
+---
+
+## 8. リソース要件
+
+### 8.1 ソースメトリクスに基づく工数見積もり
+
+**ソース:** LOCと複雑度分析
+
+{{#if resources.effort_estimate}}
+| コンポーネント | メトリクス | 見積もり工数 | 根拠 |
+|----------------|------------|--------------|------|
+{{#each resources.effort_estimate}}
+| {{this.component}} | {{this.metric}} | {{this.effort}} | {{this.basis}} |
+{{/each}}
+{{else}}
+| メトリクス | 値 | 工数係数 |
+|------------|------|----------|
+| 総LOC | {{metadata.source_analysis.total_loc}} | LOC変換率に基づく |
+| 複雑度スコア | {{metadata.migrationComplexity.overall}}/100 | 複雑度乗数 |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{metadata.source_analysis.database.tables}} | テーブル変換率に基づく |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | プロシージャ変換率に基づく |{{/if}}
+{{/if}}
+
+---
+
+## 9. マイグレーションフェーズ
+
+### 9.1 依存関係に基づくフェーズ定義
+
+{{#if phases}}
+{{#each phases}}
+#### フェーズ {{@index}}: {{this.name}}
+
+**コンポーネント:**
+{{#each this.components}}
+- {{this.name}} ({{this.loc}} LOC, 複雑度: {{this.complexity}})
+{{/each}}
+
+**依存関係:** {{this.dependencies}}
+
+**開始条件:**
+{{#each this.entry_criteria}}
+- {{this}}
+{{/each}}
+
+**完了条件:**
+{{#each this.exit_criteria}}
+- {{this}}
+{{/each}}
+
+**ソース参照:** {{this.source_reference}}
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** フェーズ定義は依存関係分析の完了が必要です。
+{{/if}}
+
+---
+
+## 10. 成功基準
+
+### 10.1 技術的成功基準
+
+**ソース:** ソース分析メトリクスから派生
+
+{{#if success_criteria.technical}}
+| 基準 | 目標 | 測定方法 | ソースベースライン |
+|------|------|----------|-------------------|
+{{#each success_criteria.technical}}
+| {{this.criteria}} | {{this.target}} | {{this.measurement}} | {{this.baseline}} |
+{{/each}}
+{{else}}
+| 基準 | 目標 | ベースラインソース |
+|------|------|-------------------|
+| 機能パリティ | 100% | ソースシステムテストケース |
+| コードカバレッジ | ≥80% | - |
+| パフォーマンス | ≥ソースシステム | ソースシステムメトリクス |
+| データ整合性 | 100% | ソースデータベース |
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: ソース分析サマリー
+
+| メトリクス | 値 |
+|------------|------|
+| 分析日 | {{generated_date}} |
+| 分析ファイル総数 | {{metadata.source_analysis.total_files}} |
+| 総LOC | {{metadata.source_analysis.total_loc}} |
+| 複雑度スコア | {{metadata.migrationComplexity.overall}}/100 |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{metadata.source_analysis.database.tables}} |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} |{{/if}}
+
+---
+
+## トレーサビリティノート
+
+このドキュメントのすべての戦略的推奨事項は、実際のソース分析結果から派生しています。各推奨事項には、それをサポートする分析を示す「ソースエビデンス」または「ソース参照」列が含まれています。「ソースに見つかりません」とマークされた項目は、手動分析または意思決定が必要です。
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|------------|------|--------|----------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（ソース分析から自動生成） |
+
+---
+
+**マイグレーション戦略ドキュメント終了**

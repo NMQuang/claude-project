@@ -1,0 +1,461 @@
+# マイグレーション設計ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **マイグレーションタイプ** | {{project.migration_type}} |
+| **ソース技術** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **ターゲット技術** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **ドキュメントタイプ** | マイグレーション設計 |
+| **作成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+
+---
+
+## エグゼクティブサマリー
+
+**ソース:** 現状分析とマイグレーション戦略から派生した詳細設計
+
+| メトリクス | 値 | ソース参照 |
+|------------|------|------------|
+| マイグレーション対象コンポーネント | {{metadata.source_analysis.total_files}} | 現状分析 |
+| 総LOC | {{metadata.source_analysis.total_loc}} | 現状分析 |
+| 複雑度レベル | {{metadata.migrationComplexity.difficulty}} | 複雑度分析 |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{metadata.source_analysis.database.tables}} | スキーマ分析 |{{/if}}
+
+---
+
+## 1. コンポーネントマッピング
+
+### 1.1 ソースからターゲットへのコンポーネントマッピング
+
+**ソース:** ソースコード分析から派生
+
+{{#if mappings.components}}
+| ソースコンポーネント | ソース位置 | ターゲットコンポーネント | ターゲット位置 | マッピングタイプ |
+|----------------------|------------|-------------------------|----------------|------------------|
+{{#each mappings.components}}
+| {{this.source_name}} | `{{this.source_path}}` | {{this.target_name}} | `{{this.target_path}}` | {{this.type}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** コンポーネントマッピングはソース分析の完了が必要です。
+{{/if}}
+
+### 1.2 マッピング詳細
+
+{{#if mappings.component_details}}
+{{#each mappings.component_details}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**ソース:** `{{this.source_path}}` ({{this.source_loc}} LOC)
+
+| 属性 | ソース | ターゲット |
+|------|--------|------------|
+| タイプ | {{this.source_type}} | {{this.target_type}} |
+| LOC | {{this.source_loc}} | {{this.estimated_target_loc}} |
+| 複雑度 | {{this.complexity}} | - |
+| 依存関係 | {{this.dependencies}} | {{this.target_dependencies}} |
+
+**適用マッピングルール:**
+{{#each this.rules}}
+- {{this}}
+{{/each}}
+
+**ソースコード参照:**
+```{{source.language}}
+{{{this.source_snippet}}}
+```
+**位置:** `{{this.source_path}}:{{this.start_line}}-{{this.end_line}}`
+
+{{#if this.target_template}}
+**ターゲットコードテンプレート:**
+```{{target.language}}
+{{{this.target_template}}}
+```
+{{/if}}
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 2. コード変換設計
+
+### 2.1 変換ルール
+
+**ソース:** ソースコードからのパターン抽出
+
+{{#if design.conversion_rules}}
+| ルールID | ソースパターン | ターゲットパターン | 発生回数 | ソース例 |
+|----------|----------------|-------------------|----------|----------|
+{{#each design.conversion_rules}}
+| {{this.id}} | `{{this.source_pattern}}` | `{{this.target_pattern}}` | {{this.count}} | {{this.examples}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 変換ルールはパターン分析が必要です。
+{{/if}}
+
+### 2.2 詳細変換仕様
+
+{{#if design.conversion_specs}}
+{{#each design.conversion_specs}}
+#### {{this.category}}
+
+**ソースパターン:**
+```{{source.language}}
+{{{this.source_example}}}
+```
+**位置:** `{{this.source_file}}:{{this.source_line}}`
+
+**ターゲットパターン:**
+```{{target.language}}
+{{{this.target_example}}}
+```
+
+**変換メモ:**
+{{#each this.notes}}
+- {{this}}
+{{/each}}
+
+**影響コンポーネント:**
+{{#each this.affected}}
+- `{{this}}`
+{{/each}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 2.3 データ構造変換
+
+**ソース:** ソースコードからのデータ構造抽出
+
+{{#if design.data_structure_conversion}}
+{{#each design.data_structure_conversion}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**ソース定義:** `{{this.source_file}}:{{this.source_line}}`
+
+| ソースフィールド | ソース型 | ターゲットフィールド | ターゲット型 | 変換 |
+|------------------|----------|----------------------|--------------|------|
+{{#each this.fields}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} | {{this.conversion}} |
+{{/each}}
+
+**ソースコード:**
+```{{source.language}}
+{{{this.source_code}}}
+```
+
+**ターゲットコード:**
+```{{target.language}}
+{{{this.target_code}}}
+```
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** データ構造変換は構造抽出が必要です。
+{{/if}}
+
+---
+
+## 3. インターフェース設計
+
+### 3.1 API/サービス設計
+
+**ソース:** ソースコードからのインターフェース抽出
+
+{{#if design.interfaces}}
+{{#each design.interfaces}}
+#### {{this.name}}
+
+**ソース:** `{{this.source_file}}:{{this.source_line}}`
+
+| 属性 | ソース | ターゲット |
+|------|--------|------------|
+| インターフェースタイプ | {{this.source_type}} | {{this.target_type}} |
+| プロトコル | {{this.source_protocol}} | {{this.target_protocol}} |
+
+**ソースインターフェース:**
+```{{source.language}}
+{{{this.source_code}}}
+```
+
+**ターゲットインターフェース:**
+```{{target.language}}
+{{{this.target_code}}}
+```
+
+**パラメータマッピング:**
+| ソースパラメータ | ソース型 | ターゲットパラメータ | ターゲット型 |
+|------------------|----------|----------------------|--------------|
+{{#each this.parameters}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** インターフェース設計はインターフェース抽出が必要です。
+{{/if}}
+
+---
+
+## 4. データベース設計
+
+{{#if source.database}}
+
+### 4.1 スキーマ変換設計
+
+**ソース:** {{source.database}}からのDDL抽出
+
+{{#if design.schema_conversion}}
+{{#each design.schema_conversion}}
+#### テーブル: {{this.source_table}} → {{this.target_table}}
+
+**ソースDDL:** `{{this.source_ddl_file}}`
+
+**ソース定義:**
+```sql
+{{{this.source_ddl}}}
+```
+
+**ターゲット定義:**
+```sql
+{{{this.target_ddl}}}
+```
+
+**カラムマッピング:**
+| ソースカラム | ソース型 | ターゲットカラム | ターゲット型 | 変換メモ |
+|--------------|----------|------------------|--------------|----------|
+{{#each this.columns}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} | {{this.notes}} |
+{{/each}}
+
+**制約変更:**
+{{#each this.constraints}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** スキーマ変換設計はDDL分析が必要です。
+{{/if}}
+
+### 4.2 ストアドプロシージャ変換設計
+
+**ソース:** データベースからのプロシージャ抽出
+
+{{#if design.procedure_conversion}}
+{{#each design.procedure_conversion}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**ソース:** `{{this.source_file}}`
+
+**ソースコード:**
+```sql
+{{{this.source_code}}}
+```
+
+**ターゲットコード:**
+```sql
+{{{this.target_code}}}
+```
+
+**変換メモ:**
+{{#each this.notes}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** プロシージャ変換はプロシージャ抽出が必要です。
+{{/if}}
+
+{{else}}
+> **該当なし:** このマイグレーションにはデータベースコンポーネントがありません。
+{{/if}}
+
+---
+
+## 5. データマイグレーション設計
+
+{{#if source.database}}
+
+### 5.1 データマイグレーションワークフロー
+
+**ソース:** テーブル依存関係分析
+
+{{#if design.data_migration.workflow}}
+```mermaid
+{{{design.data_migration.workflow}}}
+```
+{{else}}
+> **ソースに見つかりません:** データマイグレーションワークフローは依存関係分析が必要です。
+{{/if}}
+
+### 5.2 テーブルマイグレーション順序
+
+**ソース:** 外部キー依存関係分析
+
+{{#if design.data_migration.order}}
+| 順序 | テーブル | 行数 | 依存関係 | 戦略 |
+|------|----------|------|----------|------|
+{{#each design.data_migration.order}}
+| {{this.order}} | {{this.table}} | {{this.rows}} | {{this.dependencies}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** マイグレーション順序は依存関係分析が必要です。
+{{/if}}
+
+### 5.3 データ変換ルール
+
+**ソース:** データフォーマット分析
+
+{{#if design.data_migration.transformations}}
+{{#each design.data_migration.transformations}}
+#### {{this.table}}.{{this.column}}
+
+**ソース型:** {{this.source_type}}
+**ターゲット型:** {{this.target_type}}
+
+**変換ルール:**
+```
+{{this.rule}}
+```
+
+**例:**
+- 変換前: `{{this.example_before}}`
+- 変換後: `{{this.example_after}}`
+
+**ソース参照:** `{{this.source_file}}`
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 変換ルールはデータフォーマット分析が必要です。
+{{/if}}
+
+{{/if}}
+
+---
+
+## 6. 設定設計
+
+### 6.1 設定マッピング
+
+**ソース:** 設定ファイル分析
+
+{{#if design.config_mapping}}
+| ソース設定 | ソース位置 | ターゲット設定 | ターゲット位置 |
+|------------|------------|----------------|----------------|
+{{#each design.config_mapping}}
+| {{this.source_name}} | `{{this.source_path}}` | {{this.target_name}} | `{{this.target_path}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 設定マッピングは設定ファイル分析が必要です。
+{{/if}}
+
+---
+
+## 7. エラーハンドリング設計
+
+### 7.1 エラーコードマッピング
+
+**ソース:** ソースコードからのエラーハンドリング抽出
+
+{{#if design.error_mapping}}
+| ソースエラー | ソース位置 | ターゲットエラー | ハンドリング戦略 |
+|--------------|------------|------------------|------------------|
+{{#each design.error_mapping}}
+| {{this.source_error}} | `{{this.source_file}}:{{this.source_line}}` | {{this.target_error}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** エラーマッピングはエラーハンドリング抽出が必要です。
+{{/if}}
+
+---
+
+## 8. 実装チェックリスト
+
+### 8.1 実装前チェックリスト
+
+{{#if implementation.pre_checklist}}
+{{#each implementation.pre_checklist}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] すべてのソース成果物が分析・文書化済み
+- [ ] すべての変換ルールが定義・検証済み
+- [ ] ターゲットアーキテクチャが確定済み
+- [ ] 開発環境が構築済み
+{{/if}}
+
+### 8.2 実装シーケンス
+
+**ソース:** 依存関係分析
+
+{{#if implementation.sequence}}
+| ステップ | コンポーネント | 依存関係 | ソース参照 |
+|----------|----------------|----------|------------|
+{{#each implementation.sequence}}
+| {{this.step}} | {{this.component}} | {{this.dependencies}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 実装シーケンスは依存関係分析が必要です。
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: 完全マッピングマトリクス
+
+{{#if appendix.mapping_matrix}}
+{{appendix.mapping_matrix}}
+{{else}}
+> マッピングマトリクスは生成されませんでした。
+{{/if}}
+
+### 付録B: DDLスクリプト
+
+{{#if appendix.ddl_scripts}}
+```sql
+{{{appendix.ddl_scripts}}}
+```
+{{/if}}
+
+---
+
+## トレーサビリティノート
+
+このドキュメントのすべての設計仕様は、実際のソース成果物から派生しています。各設計要素には以下が含まれます:
+- **ソース参照:** ソース要素が見つかったファイルパスと行番号
+- **ソースコード:** ソースシステムからの実際のコードスニペット
+
+「ソースに見つかりません」とマークされた項目は、自動抽出できなかったため、手動仕様が必要です。
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|------------|------|--------|----------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（ソース分析から自動生成） |
+
+---
+
+**マイグレーション設計ドキュメント終了**

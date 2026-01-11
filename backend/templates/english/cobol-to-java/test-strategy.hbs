@@ -1,748 +1,652 @@
-# Test Strategy Document
+# Test Strategy Document (COBOL → Java)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | COBOL → Java |
 | **Document Type** | Test Strategy |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Test Scope from Source Analysis
 
-This document outlines the comprehensive testing strategy for the **{{project.name}}** migration project. It defines the testing approach, scope, test levels, test environments, and success criteria to ensure a successful migration from **{{source.language}}/{{source.database}}** to **{{target.language}}/{{target.database}}**.
+### 1.1 Scope Summary
 
-### Testing Objectives
+**Source:** COBOL program and artifact inventory
 
-{{#if objectives}}
-{{#each objectives}}
-- {{this}}
+| Component Type | Count | Test Coverage Required | Source |
+|----------------|-------|------------------------|--------|
+| COBOL Programs | {{metadata.source_analysis.total_files}} | 100% functional parity | Program scan |
+| Copybooks | {{metadata.copybook_count}} | Data structure validation | COPY extraction |
+| JCL Jobs | {{metadata.jcl_count}} | Batch processing validation | JCL scan |
+| DB2 Tables | {{metadata.db2_table_count}} | Data migration validation | EXEC SQL extraction |
+| CICS Transactions | {{metadata.cics_count}} | Online transaction testing | EXEC CICS extraction |
+
+### 1.2 Program-Level Test Scope
+
+**Source:** Individual program analysis
+
+{{#if testing.program_scope}}
+| Program | LOC | Complexity | Test Priority | Test Cases Est. | Source Path |
+|---------|-----|------------|---------------|-----------------|-------------|
+{{#each testing.program_scope}}
+| {{this.program}} | {{this.loc}} | {{this.complexity}} | {{this.priority}} | {{this.test_cases}} | `{{this.path}}` |
 {{/each}}
 {{else}}
-- Verify 100% functional parity with the current system
-- Ensure data integrity and accuracy after migration
-- Validate performance meets or exceeds current system
-- Identify and resolve defects before production deployment
-- Build confidence in the migrated system
+> **Not found in source:** Program-level test scope requires complexity analysis.
 {{/if}}
 
----
+### 1.3 Business Logic Test Scope
 
-## 1. Test Scope
+**Source:** Business rule extraction from COBOL
 
-### 1.1 In Scope
-
-{{#if scope.in_scope}}
-{{#each scope.in_scope}}
-- {{this}}
+{{#if testing.business_scope}}
+| Business Function | Source Program | Paragraphs | Conditions | Source Location |
+|-------------------|----------------|------------|------------|-----------------|
+{{#each testing.business_scope}}
+| {{this.function}} | {{this.program}} | {{this.paragraphs}} | {{this.conditions}} | `{{this.location}}` |
 {{/each}}
 {{else}}
-- All business functionalities from the source system
-- Database schema and data migration
-- Integration with external systems
-- Performance and scalability
-- Security and access control
-- User interface (if applicable)
-- Error handling and logging
-{{/if}}
-
-### 1.2 Out of Scope
-
-{{#if scope.out_scope}}
-{{#each scope.out_scope}}
-- {{this}}
-{{/each}}
-{{else}}
-- Features explicitly marked as out of scope in requirements
-- Legacy systems that will be decommissioned
-- Third-party system testing (assumed tested independently)
+> **Not found in source:** Business logic scope requires IF/EVALUATE extraction.
 {{/if}}
 
 ---
 
-## 2. Test Levels
+## 2. Unit Testing Strategy
 
-### 2.1 Unit Testing
+### 2.1 Test Targets from Source
 
-**Objective:** Verify individual components function correctly in isolation
+**Source:** COBOL paragraph and method extraction
 
-**Scope:**
-{{#if test_levels.unit.scope}}
-{{test_levels.unit.scope}}
+{{#if testing.unit.targets}}
+| Target Class | Source Program | Methods | Complexity | Priority | Source |
+|--------------|----------------|---------|------------|----------|--------|
+{{#each testing.unit.targets}}
+| {{this.class}} | {{this.program}} | {{this.methods}} | {{this.complexity}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
 {{else}}
-- All service methods
-- Utility functions
-- Data transformations
-- Business logic calculations
+| Target | Count | Source |
+|--------|-------|--------|
+| Service Classes | {{metadata.source_analysis.total_files}} | From COBOL programs |
+| DTO Classes | {{metadata.copybook_count}} | From copybooks |
+| Utility Classes | {{metadata.utility_count}} | From common routines |
+
+> Unit test targets derived from program structure.
 {{/if}}
 
-**Approach:**
-- **Framework:** {{#if test_levels.unit.framework}}{{test_levels.unit.framework}}{{else}}JUnit 5, Mockito{{/if}}
-- **Coverage Target:** {{#if test_levels.unit.coverage}}{{test_levels.unit.coverage}}{{else}}80%+{{/if}}
-- **Mocking:** Use Mockito to mock dependencies
-- **Responsibility:** Developers
+### 2.2 Method-Level Test Cases from Source
 
-**Sample Test Case:**
-```java
-@Test
-void testGetCustomerById_Success() {
-    // Given
-    Customer customer = new Customer(1L, "John Doe");
-    when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+**Source:** Paragraph/section analysis with branching logic
 
-    // When
-    Customer result = customerService.getCustomerById(1L);
+{{#if testing.unit.test_cases}}
+{{#each testing.unit.test_cases}}
+#### Class: {{this.class}}
 
-    // Then
-    assertNotNull(result);
-    assertEquals("John Doe", result.getName());
-}
+**Source Program:** `{{this.source_program}}`
+
+| Method | Source Paragraph | Branches | Test Cases | Input Data Source |
+|--------|------------------|----------|------------|-------------------|
+{{#each this.methods}}
+| `{{this.method}}` | {{this.paragraph}} | {{this.branches}} | {{this.test_cases}} | `{{this.data_source}}` |
+{{/each}}
+
+{{/each}}
+{{else}}
+> **Not found in source:** Method-level test cases require paragraph analysis.
+{{/if}}
+
+### 2.3 Boundary Conditions from PIC Clauses
+
+**Source:** DATA DIVISION PIC clause analysis
+
+{{#if testing.unit.boundaries}}
+| Field | PIC Clause | Min Value | Max Value | Boundary Tests | Source |
+|-------|------------|-----------|-----------|----------------|--------|
+{{#each testing.unit.boundaries}}
+| {{this.field}} | {{this.pic}} | {{this.min}} | {{this.max}} | {{this.tests}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Boundary conditions require PIC clause extraction.
+{{/if}}
+
+---
+
+## 3. Integration Testing Strategy
+
+### 3.1 Integration Points from Source
+
+**Source:** CALL statement and external interface extraction
+
+{{#if testing.integration.points}}
+| Integration Point | Type | Source Program | Target | Test Approach | Source Location |
+|-------------------|------|----------------|--------|---------------|-----------------|
+{{#each testing.integration.points}}
+| {{this.point}} | {{this.type}} | {{this.program}} | {{this.target}} | {{this.approach}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+| Integration Type | Count | Source |
+|------------------|-------|--------|
+| Inter-program CALL | {{metadata.call_count}} | CALL extraction |
+| DB2 Operations | {{metadata.sql_count}} | EXEC SQL extraction |
+| CICS Commands | {{metadata.cics_count}} | EXEC CICS extraction |
+| File I/O | {{metadata.file_io_count}} | FILE SECTION extraction |
+
+> Integration points require dependency analysis.
+{{/if}}
+
+### 3.2 Program Call Chain Testing
+
+**Source:** CALL dependency analysis
+
+{{#if testing.integration.call_chains}}
+{{#each testing.integration.call_chains}}
+#### Call Chain: {{this.name}}
+
+**Entry Program:** `{{this.entry_program}}`
+
+**Call Flow:**
 ```
-
----
-
-### 2.2 Integration Testing
-
-**Objective:** Verify components work correctly together
-
-**Scope:**
-{{#if test_levels.integration.scope}}
-{{test_levels.integration.scope}}
-{{else}}
-- API endpoints (Controller → Service → Repository)
-- Database interactions
-- External system integrations
-- Message queue interactions
-{{/if}}
-
-**Approach:**
-- **Framework:** {{#if test_levels.integration.framework}}{{test_levels.integration.framework}}{{else}}Spring Boot Test, TestContainers{{/if}}
-- **Database:** Use TestContainers for PostgreSQL
-- **Test Data:** SQL scripts or DbUnit
-- **Responsibility:** Developers + QA
-
-**Sample Test Case:**
-```java
-@SpringBootTest
-@AutoConfigureTestDatabase(replace = Replace.NONE)
-class CustomerIntegrationTest {
-
-    @Test
-    void testCreateCustomer_Integration() {
-        // API call → Service → DB
-        // Verify end-to-end flow
-    }
-}
+{{{this.call_flow}}}
 ```
-
----
-
-### 2.3 System Testing
-
-**Objective:** Validate complete system behavior from end-user perspective
-
-**Scope:**
-{{#if test_levels.system.scope}}
-{{test_levels.system.scope}}
-{{else}}
-- End-to-end business processes
-- User workflows
-- Cross-functional scenarios
-- Error handling and edge cases
-{{/if}}
-
-**Approach:**
-- **Environment:** Dedicated test environment (mirrors production)
-- **Test Data:** Representative production-like data
-- **Execution:** Manual and automated (Selenium/Playwright for UI)
-- **Responsibility:** QA Team
 
 **Test Scenarios:**
-{{#if test_levels.system.scenarios}}
-{{#each test_levels.system.scenarios}}
-- {{this}}
+| Scenario | Programs Involved | Input | Expected Output | Source Evidence |
+|----------|-------------------|-------|-----------------|-----------------|
+{{#each this.scenarios}}
+| {{this.scenario}} | {{this.programs}} | {{this.input}} | {{this.output}} | `{{this.source}}` |
+{{/each}}
+
+---
+
 {{/each}}
 {{else}}
-*[Define based on business use cases]*
+> **Not found in source:** Call chain testing requires CALL graph analysis.
+{{/if}}
+
+### 3.3 Database Integration Testing
+
+**Source:** EXEC SQL statement analysis
+
+{{#if testing.integration.database}}
+| SQL Operation | Table(s) | Program | Test Type | Validation | Source Location |
+|---------------|----------|---------|-----------|------------|-----------------|
+{{#each testing.integration.database}}
+| {{this.operation}} | {{this.tables}} | {{this.program}} | {{this.test_type}} | {{this.validation}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Database testing requires EXEC SQL extraction.
 {{/if}}
 
 ---
 
-### 2.4 Migration Testing
+## 4. Migration Testing Strategy
 
-**Objective:** Verify data migration accuracy and completeness
+### 4.1 Functional Parity Testing
 
-**Scope:**
-{{#if test_levels.migration.scope}}
-{{test_levels.migration.scope}}
-{{else}}
-- Schema migration (structure, indexes, constraints)
-- Data migration (completeness, accuracy)
-- Data transformation correctness
-- Referential integrity
-{{/if}}
+**Source:** COBOL program functionality inventory
 
-**Approach:**
+{{#if testing.migration.parity}}
+{{#each testing.migration.parity}}
+#### Program: {{this.program}}
 
-#### Schema Validation
-{{#if test_levels.migration.schema_validation}}
-{{test_levels.migration.schema_validation}}
-{{else}}
-- Compare source and target schemas
-- Verify all tables, columns, data types migrated
-- Validate indexes, primary keys, foreign keys
-- Check constraints and triggers
-{{/if}}
+**Source Path:** `{{this.path}}`
 
-#### Data Validation
-{{#if test_levels.migration.data_validation}}
-{{#each test_levels.migration.data_validation}}
-- **{{this.check}}:** {{this.description}}
+| Function | COBOL Implementation | Java Implementation | Parity Test | Source Location |
+|----------|---------------------|---------------------|-------------|-----------------|
+{{#each this.functions}}
+| {{this.function}} | {{this.cobol_impl}} | {{this.java_impl}} | {{this.test}} | `{{this.location}}` |
+{{/each}}
+
 {{/each}}
 {{else}}
-- **Row Count Validation:** Compare row counts per table
-  ```sql
-  -- Source (Oracle)
-  SELECT COUNT(*) FROM customers;
+> **Not found in source:** Functional parity testing requires function extraction.
+{{/if}}
 
-  -- Target (PostgreSQL)
-  SELECT COUNT(*) FROM customers;
-  ```
+### 4.2 Data Migration Testing
 
-- **Checksum Validation:** Verify data integrity
-  ```sql
-  SELECT MD5(string_agg(customer_id::text, ',' ORDER BY customer_id))
-  FROM customers;
-  ```
+**Source:** Database and file structure analysis
 
-- **Sample Data Validation:** Manual review of random samples (5-10% of data)
+{{#if testing.migration.data}}
+| Data Source | Records | Validation Method | Checksum | Source |
+|-------------|---------|-------------------|----------|--------|
+{{#each testing.migration.data}}
+| {{this.source}} | {{this.records}} | {{this.method}} | {{this.checksum}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+| Validation Type | Method | Source |
+|-----------------|--------|--------|
+| Row Count | SELECT COUNT(*) comparison | All tables |
+| Data Checksum | MD5/SHA hash of key columns | Critical tables |
+| Referential Integrity | FK validation queries | All relationships |
+| Sample Verification | Manual inspection | 5-10% sample |
 
-- **Business Rule Validation:** Execute business logic on both systems and compare results
+> Data migration testing scope requires table inventory.
+{{/if}}
 
-- **Edge Case Validation:** Test NULL values, special characters, date edge cases
+### 4.3 Copybook Data Structure Testing
+
+**Source:** Copybook field analysis
+
+{{#if testing.migration.copybooks}}
+| Copybook | Fields | Java DTO | Field Tests | Source Path |
+|----------|--------|----------|-------------|-------------|
+{{#each testing.migration.copybooks}}
+| {{this.copybook}} | {{this.fields}} | {{this.dto}} | {{this.tests}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Copybook testing requires structure analysis.
 {{/if}}
 
 ---
 
-### 2.5 Performance Testing
+## 5. Business Rule Testing
 
-**Objective:** Ensure system meets performance requirements
+### 5.1 Business Rules Extracted from Source
 
-**Scope:**
-{{#if test_levels.performance.scope}}
-{{test_levels.performance.scope}}
-{{else}}
-- Response time for key transactions
-- Throughput (transactions per second)
-- Concurrent user load
-- Database query performance
-- Resource utilization (CPU, memory, disk I/O)
-{{/if}}
+**Source:** IF/EVALUATE condition extraction
 
-**Test Types:**
+{{#if testing.business_rules}}
+{{#each testing.business_rules}}
+#### Rule: {{this.id}} - {{this.name}}
 
-#### Load Testing
-{{#if test_levels.performance.load_testing}}
-{{test_levels.performance.load_testing}}
-{{else}}
-- **Objective:** Verify system handles expected load
-- **Tool:** JMeter, Gatling, or K6
-- **Target:** Simulate normal production load
-- **Success Criteria:**
-  - Average response time < 2 seconds
-  - 95th percentile < 5 seconds
-  - No errors under normal load
-{{/if}}
+**Source Program:** `{{this.program}}`
 
-#### Stress Testing
-{{#if test_levels.performance.stress_testing}}
-{{test_levels.performance.stress_testing}}
-{{else}}
-- **Objective:** Identify breaking point
-- **Approach:** Gradually increase load until system fails
-- **Success Criteria:** Graceful degradation, no data corruption
-{{/if}}
+**Source Location:** `{{this.location}}`
 
-#### Endurance Testing
-{{#if test_levels.performance.endurance_testing}}
-{{test_levels.performance.endurance_testing}}
-{{else}}
-- **Objective:** Verify system stability over extended period
-- **Duration:** 8-24 hours under normal load
-- **Success Criteria:** No memory leaks, consistent performance
-{{/if}}
-
-**Performance Baseline:**
-{{#if test_levels.performance.baseline}}
-| Metric | Current System | Target System | Threshold |
-|--------|----------------|---------------|-----------|
-{{#each test_levels.performance.baseline}}
-| {{this.metric}} | {{this.current}} | {{this.target}} | {{this.threshold}} |
-{{/each}}
-{{else}}
-| Metric | Current System | Target System | Threshold |
-|--------|----------------|---------------|-----------|
-| Page Load Time | 1.5s | ≤ 1.5s | < 2s |
-| API Response Time | 200ms | ≤ 200ms | < 500ms |
-| Concurrent Users | 100 | ≥ 100 | 100+ |
-| Throughput | 50 TPS | ≥ 50 TPS | 50+ TPS |
-{{/if}}
-
----
-
-### 2.6 Security Testing
-
-**Objective:** Identify security vulnerabilities
-
-**Scope:**
-{{#if test_levels.security.scope}}
-{{test_levels.security.scope}}
-{{else}}
-- Authentication and authorization
-- SQL injection prevention
-- Cross-site scripting (XSS) prevention
-- Sensitive data exposure
-- API security
-{{/if}}
-
-**Approach:**
-{{#if test_levels.security.approach}}
-{{test_levels.security.approach}}
-{{else}}
-- **SAST (Static Analysis):** SonarQube, Checkmarx
-- **DAST (Dynamic Analysis):** OWASP ZAP, Burp Suite
-- **Dependency Scanning:** OWASP Dependency Check
-- **Penetration Testing:** Engage security team for critical systems
-{{/if}}
-
----
-
-### 2.7 User Acceptance Testing (UAT)
-
-**Objective:** Validate system meets business requirements
-
-**Scope:**
-{{#if test_levels.uat.scope}}
-{{test_levels.uat.scope}}
-{{else}}
-- All business-critical functionalities
-- User workflows and scenarios
-- Reports and data exports
-- UI/UX validation
-{{/if}}
-
-**Approach:**
-- **Participants:** Business users, domain experts
-- **Environment:** UAT environment with production-like data
-- **Duration:** {{#if test_levels.uat.duration}}{{test_levels.uat.duration}}{{else}}2-4 weeks{{/if}}
-- **Success Criteria:** {{#if test_levels.uat.success}}{{test_levels.uat.success}}{{else}}<5% defect rate, all critical defects resolved{{/if}}
-
-**UAT Test Scenarios:**
-{{#if test_levels.uat.scenarios}}
-{{#each test_levels.uat.scenarios}}
-- **{{this.id}}:** {{this.description}}
-  - **Steps:** {{this.steps}}
-  - **Expected Result:** {{this.expected}}
-{{/each}}
-{{else}}
-*[Define business scenarios with business users]*
-{{/if}}
-
----
-
-## 3. Test Environment
-
-### 3.1 Environment Strategy
-
-{{#if environments.strategy}}
-{{environments.strategy}}
-{{else}}
-| Environment | Purpose | Refresh Frequency | Access |
-|-------------|---------|-------------------|--------|
-| **DEV** | Development and unit testing | On-demand | Developers |
-| **TEST** | Integration and system testing | Weekly | Developers, QA |
-| **UAT** | User acceptance testing | Before UAT cycle | Business users, QA |
-| **STAGING** | Pre-production validation | Before release | QA, Release team |
-| **PROD** | Production | N/A | End users |
-{{/if}}
-
-### 3.2 Environment Configuration
-
-{{#if environments.config}}
-{{#each environments.config}}
-#### {{this.name}} Environment
-
-**Infrastructure:**
-{{#each this.infrastructure}}
-- {{this}}
-{{/each}}
-
-**Database:**
-- **Type:** {{this.db_type}}
-- **Size:** {{this.db_size}}
-- **Data:** {{this.db_data}}
-
-**Configuration:**
-```yaml
-{{this.config}}
+**COBOL Condition:**
+```cobol
+{{{this.condition}}}
 ```
 
----
-
+**Test Cases:**
+| Test ID | Input | Condition Path | Expected Output | Priority |
+|---------|-------|----------------|-----------------|----------|
+{{#each this.test_cases}}
+| {{this.id}} | {{this.input}} | {{this.path}} | {{this.expected}} | {{this.priority}} |
 {{/each}}
-{{else}}
-*[Define configuration for each environment]*
-{{/if}}
-
-### 3.3 Test Data Management
-
-{{#if test_data.strategy}}
-{{test_data.strategy}}
-{{else}}
-**Strategy:**
-- **DEV/TEST:** Synthetic data generated via scripts
-- **UAT:** Subset of production data (anonymized)
-- **STAGING:** Full production data copy (anonymized)
-
-**Data Refresh:**
-- TEST environment: Weekly
-- UAT environment: Before each UAT cycle
-- STAGING: Before each release
-
-**Data Privacy:**
-- Anonymize PII (names, emails, phone numbers)
-- Mask sensitive financial data
-- Use data masking tools or SQL scripts
-{{/if}}
-
----
-
-## 4. Test Automation Strategy
-
-### 4.1 Automation Scope
-
-{{#if automation.scope}}
-{{#each automation.scope}}
-- {{this}}
-{{/each}}
-{{else}}
-- Unit tests: 100% automated
-- Integration tests: 90% automated
-- API tests: 80% automated
-- UI regression tests: 50% automated (critical paths)
-- Performance tests: 100% automated
-{{/if}}
-
-### 4.2 Automation Framework
-
-{{#if automation.framework}}
-{{automation.framework}}
-{{else}}
-| Test Type | Framework/Tool | Language |
-|-----------|----------------|----------|
-| Unit | JUnit 5, Mockito | Java |
-| Integration | Spring Boot Test | Java |
-| API | REST Assured | Java |
-| UI | Selenium / Playwright | Java / TypeScript |
-| Performance | JMeter / Gatling | Groovy / Scala |
-| DB Migration | Custom SQL scripts | SQL |
-{{/if}}
-
-### 4.3 CI/CD Integration
-
-{{#if automation.cicd}}
-{{automation.cicd}}
-{{else}}
-```mermaid
-graph LR
-    A[Code Commit] --> B[Build]
-    B --> C[Unit Tests]
-    C --> D[Integration Tests]
-    D --> E[Code Quality Check]
-    E --> F{Pass?}
-    F -->|Yes| G[Deploy to TEST]
-    F -->|No| H[Notify Developer]
-    G --> I[Automated Regression]
-    I --> J{Pass?}
-    J -->|Yes| K[Ready for UAT]
-    J -->|No| H
-```
-
-**Pipeline Configuration:**
-- Trigger: On every commit to main branch
-- Unit + Integration tests must pass before deployment
-- Automated regression runs nightly on TEST environment
-- Performance tests run weekly on STAGING environment
-{{/if}}
-
----
-
-## 5. Defect Management
-
-### 5.1 Defect Lifecycle
-
-{{#if defect.lifecycle}}
-{{defect.lifecycle}}
-{{else}}
-```
-New → Assigned → In Progress → Fixed → Testing → Verified → Closed
-                                    ↓
-                                Reopened (if test fails)
-```
-{{/if}}
-
-### 5.2 Defect Severity & Priority
-
-{{#if defect.severity}}
-{{#each defect.severity}}
-- **{{this.level}}:** {{this.description}}
-  - **Response Time:** {{this.response_time}}
-{{/each}}
-{{else}}
-| Severity | Definition | Response Time | Example |
-|----------|------------|---------------|---------|
-| **Critical** | System crash, data loss, security breach | 4 hours | Database connection failure |
-| **High** | Major functionality broken, no workaround | 1 business day | Payment processing fails |
-| **Medium** | Functionality impaired, workaround exists | 3 business days | Report formatting issue |
-| **Low** | Minor issue, cosmetic | Next release | UI alignment issue |
-{{/if}}
-
-### 5.3 Defect Tracking
-
-{{#if defect.tracking}}
-{{defect.tracking}}
-{{else}}
-**Tool:** Jira, Azure DevOps, or Bugzilla
-
-**Required Fields:**
-- Title, Description, Steps to Reproduce
-- Severity, Priority
-- Environment, Browser/Version (if UI)
-- Assignee, Reporter
-- Attachments (screenshots, logs)
-
-**Metrics to Track:**
-- Total defects found
-- Defects by severity
-- Defect resolution time
-- Defect aging
-- Defect rejection rate
-{{/if}}
-
----
-
-## 6. Entry & Exit Criteria
-
-### 6.1 Test Entry Criteria
-
-{{#if entry_criteria}}
-{{#each entry_criteria}}
-- [ ] {{this}}
-{{/each}}
-{{else}}
-- [ ] Test plan approved
-- [ ] Test environment ready and accessible
-- [ ] Test data prepared
-- [ ] Application deployed to test environment
-- [ ] Unit tests passing with >80% coverage
-- [ ] Test cases reviewed and approved
-{{/if}}
-
-### 6.2 Test Exit Criteria
-
-{{#if exit_criteria}}
-{{#each exit_criteria}}
-- [ ] {{this}}
-{{/each}}
-{{else}}
-- [ ] All planned test cases executed
-- [ ] 95%+ test case pass rate
-- [ ] No open Critical or High severity defects
-- [ ] All Medium defects reviewed and accepted/fixed
-- [ ] Performance benchmarks met
-- [ ] UAT sign-off obtained
-- [ ] Test summary report completed
-{{/if}}
-
----
-
-## 7. Test Deliverables
-
-{{#if deliverables}}
-{{#each deliverables}}
-### {{this.name}}
-
-**Description:** {{this.description}}
-
-**Responsible:** {{this.responsible}}
-
-**Delivery Date:** {{this.date}}
 
 ---
 
 {{/each}}
 {{else}}
-| Deliverable | Description | Responsible | Timeline |
-|-------------|-------------|-------------|----------|
-| Test Plan | This document | QA Lead | Before testing starts |
-| Test Cases | Detailed test scenarios | QA Team | 1 week before execution |
-| Test Data | Sample datasets | QA + BA | Before testing starts |
-| Test Execution Report | Daily/weekly test progress | QA Team | Daily/weekly |
-| Defect Report | Defect metrics and trends | QA Lead | Weekly |
-| Performance Test Report | Load/stress test results | Performance Engineer | After performance testing |
-| UAT Sign-off | Business approval | Business Users | After UAT completion |
-| Test Summary Report | Final test results | QA Lead | End of testing phase |
+> **Not found in source:** Business rule testing requires condition extraction.
+{{/if}}
+
+### 5.2 Calculation Logic Testing
+
+**Source:** COMPUTE and arithmetic statement extraction
+
+{{#if testing.calculations}}
+| Calculation | Formula | Source Program | Test Values | Source Location |
+|-------------|---------|----------------|-------------|-----------------|
+{{#each testing.calculations}}
+| {{this.name}} | `{{this.formula}}` | {{this.program}} | {{this.test_values}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Calculation testing requires COMPUTE extraction.
 {{/if}}
 
 ---
 
-## 8. Roles & Responsibilities
+## 6. Batch Processing Testing
 
-{{#if roles}}
-| Role | Responsibility | Team Members |
-|------|----------------|--------------|
-{{#each roles}}
-| {{this.role}} | {{this.responsibility}} | {{this.members}} |
+### 6.1 JCL Job Testing
+
+**Source:** JCL job and step analysis
+
+{{#if testing.batch.jobs}}
+{{#each testing.batch.jobs}}
+#### Job: {{this.job_name}}
+
+**Source Path:** `{{this.path}}`
+
+**Step Testing:**
+| Step | Program | Input Files | Output Files | Test Scenario | Source |
+|------|---------|-------------|--------------|---------------|--------|
+{{#each this.steps}}
+| {{this.step}} | {{this.program}} | {{this.input}} | {{this.output}} | {{this.scenario}} | `{{this.source}}` |
+{{/each}}
+
+**Job-Level Tests:**
+| Test Type | Description | Expected Result |
+|-----------|-------------|-----------------|
+{{#each this.job_tests}}
+| {{this.type}} | {{this.description}} | {{this.expected}} |
+{{/each}}
+
+---
+
 {{/each}}
 {{else}}
-| Role | Responsibility | Team Members |
-|------|----------------|--------------|
-| **QA Lead** | Test strategy, planning, reporting | TBD |
-| **QA Engineer** | Test case design, execution, automation | TBD |
-| **Performance Engineer** | Performance testing, analysis | TBD |
-| **Developer** | Unit/integration tests, defect fixing | Dev team |
-| **Business Analyst** | UAT test case review, UAT coordination | BA team |
-| **Business User** | UAT execution, sign-off | Business stakeholders |
+> **Not found in source:** Batch testing requires JCL analysis.
+{{/if}}
+
+### 6.2 File Processing Testing
+
+**Source:** FILE SECTION and I/O statement extraction
+
+{{#if testing.batch.files}}
+| File DD | File Type | Record Layout | Test Cases | Source Program |
+|---------|-----------|---------------|------------|----------------|
+{{#each testing.batch.files}}
+| {{this.dd_name}} | {{this.type}} | {{this.layout}} | {{this.tests}} | `{{this.program}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** File processing tests require FILE SECTION analysis.
 {{/if}}
 
 ---
 
-## 9. Test Schedule
+## 7. CICS Transaction Testing
 
-{{#if schedule}}
-```mermaid
-gantt
-    title Test Schedule
-    dateFormat YYYY-MM-DD
+### 7.1 Transaction Test Cases
 
-    {{#each schedule}}
-    {{this.phase}} :{{this.start}}, {{this.duration}}
-    {{/each}}
-```
-{{else}}
-```mermaid
-gantt
-    title Test Schedule
-    dateFormat YYYY-MM-DD
+**Source:** EXEC CICS command extraction
 
-    Test Planning      :2024-01-01, 10d
-    Test Case Design   :2024-01-08, 15d
-    Unit Testing       :2024-01-15, 30d
-    Integration Testing:2024-02-01, 20d
-    System Testing     :2024-02-15, 30d
-    Migration Testing  :2024-02-15, 30d
-    Performance Testing:2024-03-01, 15d
-    UAT                :2024-03-15, 30d
-    Regression Testing :2024-04-01, 15d
-```
-{{/if}}
+{{#if testing.cics.transactions}}
+{{#each testing.cics.transactions}}
+#### Transaction: {{this.trans_id}}
 
-**Key Milestones:**
-{{#if milestones}}
-{{#each milestones}}
-- **{{this.name}}:** {{this.date}}
+**Source Program:** `{{this.program}}`
+
+**Source Path:** `{{this.path}}`
+
+**CICS Commands:**
+| Command | Resource | Test Scenario | Expected | Source Location |
+|---------|----------|---------------|----------|-----------------|
+{{#each this.commands}}
+| {{this.command}} | {{this.resource}} | {{this.scenario}} | {{this.expected}} | `{{this.location}}` |
+{{/each}}
+
+**User Flow Tests:**
+| Flow | Steps | Input | Expected Output |
+|------|-------|-------|-----------------|
+{{#each this.flows}}
+| {{this.flow}} | {{this.steps}} | {{this.input}} | {{this.expected}} |
+{{/each}}
+
+---
+
 {{/each}}
 {{else}}
-- Test Plan Approval: [Date]
-- Test Environment Ready: [Date]
-- System Testing Complete: [Date]
-- UAT Sign-off: [Date]
-- Go-Live Readiness: [Date]
+> **Not found in source:** CICS testing requires EXEC CICS extraction.
+{{/if}}
+
+### 7.2 BMS Screen Testing
+
+**Source:** BMS mapset extraction
+
+{{#if testing.cics.screens}}
+| Screen | Fields | Input Tests | Output Tests | Source Path |
+|--------|--------|-------------|--------------|-------------|
+{{#each testing.cics.screens}}
+| {{this.screen}} | {{this.fields}} | {{this.input_tests}} | {{this.output_tests}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Screen testing requires BMS extraction.
 {{/if}}
 
 ---
 
-## 10. Risk & Mitigation
+## 8. Performance Testing Strategy
 
-{{#if risks}}
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-{{#each risks}}
-| {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} |
+### 8.1 Performance Baseline from Source
+
+**Source:** Program complexity and data volume analysis
+
+{{#if testing.performance.baseline}}
+| Program | LOC | Complexity | Baseline (Source) | Target | Source |
+|---------|-----|------------|-------------------|--------|--------|
+{{#each testing.performance.baseline}}
+| {{this.program}} | {{this.loc}} | {{this.complexity}} | {{this.baseline}} | {{this.target}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Test environment instability | Medium | High | Dedicated DevOps support, backup environment |
-| Insufficient test data | Medium | Medium | Early test data preparation, synthetic data generation |
-| Resource unavailability | Low | High | Cross-training, external QA resources |
-| Delayed defect fixes | Medium | High | Daily defect triage, dedicated fix sprint |
-| UAT delays | Medium | High | Early business engagement, clear UAT criteria |
+| Metric | Source Value | Target | Measurement |
+|--------|--------------|--------|-------------|
+| Batch Job Duration | [From JCL SMF] | ≤ Source | Job elapsed time |
+| Transaction Response | [From CICS stats] | ≤ Source | Average response |
+| Throughput | [From production] | ≥ Source | TPS |
+
+> Performance baseline requires production metrics.
+{{/if}}
+
+### 8.2 High Complexity Programs for Performance Testing
+
+**Source:** Complexity analysis
+
+{{#if testing.performance.high_complexity}}
+| Program | Complexity | LOC | Performance Risk | Test Priority | Source |
+|---------|------------|-----|------------------|---------------|--------|
+{{#each testing.performance.high_complexity}}
+| {{this.program}} | {{this.complexity}} | {{this.loc}} | {{this.risk}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> Programs with complexity > 15 require performance testing.
+{{/if}}
+
+### 8.3 Data Volume Testing
+
+**Source:** Table row counts and file sizes
+
+{{#if testing.performance.data_volume}}
+| Data Source | Current Volume | Test Volume | Test Scenario | Source |
+|-------------|----------------|-------------|---------------|--------|
+{{#each testing.performance.data_volume}}
+| {{this.source}} | {{this.current}} | {{this.test}} | {{this.scenario}} | `{{this.evidence}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Data volume testing requires production statistics.
 {{/if}}
 
 ---
 
-## 11. Tools & Infrastructure
+## 9. Regression Testing Strategy
 
-{{#if tools}}
-| Category | Tool | Purpose |
-|----------|------|---------|
-{{#each tools}}
-| {{this.category}} | {{this.tool}} | {{this.purpose}} |
+### 9.1 Regression Test Suite from Source
+
+**Source:** Program dependency and change impact analysis
+
+{{#if testing.regression.suite}}
+| Test Category | Programs | Test Cases | Automation | Source |
+|---------------|----------|------------|------------|--------|
+{{#each testing.regression.suite}}
+| {{this.category}} | {{this.programs}} | {{this.test_cases}} | {{this.automation}} | {{this.source}} |
 {{/each}}
 {{else}}
-| Category | Tool | Purpose |
-|----------|------|---------|
-| Test Management | Jira / TestRail | Test case management, execution tracking |
-| Defect Tracking | Jira / Bugzilla | Defect lifecycle management |
-| Automation | Selenium / Playwright | UI test automation |
-| API Testing | REST Assured / Postman | API test automation |
-| Performance | JMeter / Gatling | Load and performance testing |
-| CI/CD | Jenkins / GitLab CI | Continuous integration |
-| Code Coverage | JaCoCo / SonarQube | Code coverage analysis |
-| Database | PostgreSQL | Test database |
+| Category | Count | Priority | Source |
+|----------|-------|----------|--------|
+| Core Business Logic | {{metadata.source_analysis.total_files}} | Critical | All programs |
+| Database Operations | {{metadata.sql_count}} | High | EXEC SQL |
+| File Processing | {{metadata.file_io_count}} | High | File I/O |
+| Inter-program Calls | {{metadata.call_count}} | Medium | CALL statements |
+
+> Regression suite derived from program inventory.
+{{/if}}
+
+### 9.2 Change Impact Analysis
+
+**Source:** CALL and COPY dependency graph
+
+{{#if testing.regression.impact}}
+| Changed Component | Dependent Programs | Regression Scope | Source Evidence |
+|-------------------|-------------------|------------------|-----------------|
+{{#each testing.regression.impact}}
+| {{this.component}} | {{this.dependents}} | {{this.scope}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Change impact requires dependency analysis.
+{{/if}}
+
+---
+
+## 10. Test Data Strategy
+
+### 10.1 Test Data Requirements from Source
+
+**Source:** DATA DIVISION and database structure analysis
+
+{{#if testing.data.requirements}}
+| Data Entity | Fields | Constraints | Test Data Needs | Source |
+|-------------|--------|-------------|-----------------|--------|
+{{#each testing.data.requirements}}
+| {{this.entity}} | {{this.fields}} | {{this.constraints}} | {{this.needs}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Test data requirements need structure analysis.
+{{/if}}
+
+### 10.2 Test Data Generation from PIC Clauses
+
+**Source:** PIC clause analysis for data types and ranges
+
+{{#if testing.data.generation}}
+| Field | PIC | Data Type | Valid Range | Sample Values | Source |
+|-------|-----|-----------|-------------|---------------|--------|
+{{#each testing.data.generation}}
+| {{this.field}} | {{this.pic}} | {{this.type}} | {{this.range}} | {{this.samples}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Test data generation requires PIC analysis.
+{{/if}}
+
+### 10.3 Edge Cases from Source
+
+**Source:** Condition and validation logic extraction
+
+{{#if testing.data.edge_cases}}
+| Edge Case | Source Condition | Test Value | Expected Result | Source Location |
+|-----------|------------------|------------|-----------------|-----------------|
+{{#each testing.data.edge_cases}}
+| {{this.case}} | {{this.condition}} | {{this.value}} | {{this.expected}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Edge cases require validation logic extraction.
+{{/if}}
+
+---
+
+## 11. Test Environment Requirements
+
+### 11.1 Environment Configuration from Source
+
+**Source:** JCL, CICS, and database configuration
+
+{{#if testing.environment.config}}
+| Component | Source Configuration | Test Environment | Source |
+|-----------|---------------------|------------------|--------|
+{{#each testing.environment.config}}
+| {{this.component}} | {{this.source_config}} | {{this.test_config}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Component | Requirement | Source |
+|-----------|-------------|--------|
+| Database | {{target.database}} with migrated schema | EXEC SQL |
+| Batch | Spring Batch for {{metadata.jcl_count}} jobs | JCL |
+| Online | {{target.framework}} for {{metadata.cics_count}} transactions | CICS |
+| Files | Test file datasets | FILE SECTION |
+
+> Environment requirements derived from source inventory.
+{{/if}}
+
+### 11.2 Test Data Volume Requirements
+
+**Source:** Production data volume analysis
+
+{{#if testing.environment.data_volume}}
+| Table/File | Production Volume | Test Volume | Rationale | Source |
+|------------|-------------------|-------------|-----------|--------|
+{{#each testing.environment.data_volume}}
+| {{this.name}} | {{this.prod_volume}} | {{this.test_volume}} | {{this.rationale}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Data volume requires production statistics.
+{{/if}}
+
+---
+
+## 12. Test Success Criteria
+
+### 12.1 Success Criteria from Source Metrics
+
+**Source:** Program inventory and complexity metrics
+
+| Criteria | Target | Measurement | Source Baseline |
+|----------|--------|-------------|-----------------|
+| Functional Parity | 100% | All {{metadata.source_analysis.total_files}} programs | Program inventory |
+| Unit Test Coverage | 80%+ | Code coverage tool | Complexity analysis |
+| Integration Tests | 100% | All {{metadata.call_count}} call chains | CALL extraction |
+| Data Migration | 100% | Row counts, checksums | Database inventory |
+| Performance | ≤ Baseline | Response time, throughput | Production metrics |
+
+### 12.2 Defect Metrics from Source
+
+**Source:** Complexity-based risk assessment
+
+{{#if testing.success.defect_targets}}
+| Category | Target | Based On | Source |
+|----------|--------|----------|--------|
+{{#each testing.success.defect_targets}}
+| {{this.category}} | {{this.target}} | {{this.basis}} | {{this.source}} |
+{{/each}}
+{{else}}
+| Severity | Target | Rationale |
+|----------|--------|-----------|
+| Critical | 0 open | System functionality |
+| High | 0 open | Business logic |
+| Medium | <5 open | Minor issues |
+| Low | Tracked | Cosmetic |
 {{/if}}
 
 ---
 
 ## Appendices
 
-### Appendix A: Sample Test Cases
+### Appendix A: Test Case Matrix by Program
 
-{{#if appendix.sample_tests}}
-{{#each appendix.sample_tests}}
-#### Test Case: {{this.id}} - {{this.title}}
-
-**Preconditions:** {{this.preconditions}}
-
-**Steps:**
-{{#each this.steps}}
-{{@index}}. {{this}}
+{{#if appendix.test_matrix}}
+| Program | Unit Tests | Integration Tests | Regression Tests | Total | Source |
+|---------|------------|-------------------|------------------|-------|--------|
+{{#each appendix.test_matrix}}
+| {{this.program}} | {{this.unit}} | {{this.integration}} | {{this.regression}} | {{this.total}} | `{{this.path}}` |
 {{/each}}
+{{/if}}
 
-**Expected Result:** {{this.expected}}
+### Appendix B: Business Rule Test Cases
+
+{{#if appendix.business_rules}}
+| Rule ID | Rule Description | Test Cases | Priority | Source |
+|---------|------------------|------------|----------|--------|
+{{#each appendix.business_rules}}
+| {{this.id}} | {{this.description}} | {{this.cases}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
+{{/if}}
+
+### Appendix C: Data Migration Validation Queries
+
+{{#if appendix.validation_queries}}
+{{#each appendix.validation_queries}}
+#### {{this.name}}
+
+```sql
+{{{this.query}}}
+```
+
+**Expected:** {{this.expected}}
 
 ---
 
 {{/each}}
 {{/if}}
 
-### Appendix B: Test Data Samples
+---
 
-{{#if appendix.test_data}}
-*[Sample test data sets]*
-{{/if}}
+## Traceability Note
 
-### Appendix C: Performance Test Scripts
-
-{{#if appendix.perf_scripts}}
-*[JMeter/Gatling test scripts]*
-{{/if}}
+All test strategies and test cases in this document are derived from COBOL source code analysis. Each test item includes source evidence (file name, line number). Items marked "Not found in source" require manual test design or additional analysis.
 
 ---
 
@@ -750,7 +654,7 @@ gantt
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
 
 ---
 

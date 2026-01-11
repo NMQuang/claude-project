@@ -1,0 +1,667 @@
+# Deployment & Rollback Plan
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Source Technology** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **Target Technology** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **Document Type** | Deployment & Rollback Plan |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+
+---
+
+## Executive Summary
+
+**Source:** Deployment scope derived from migration analysis.
+
+| Metric | Value | Source Reference |
+|--------|-------|------------------|
+| Components to Deploy | {{metadata.source_analysis.total_files}} | Migration Design |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} | Schema Analysis |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Schema Analysis |{{/if}}
+| Complexity Level | {{metadata.migrationComplexity.difficulty}} | Complexity Analysis |
+
+---
+
+## 1. Deployment Scope
+
+### 1.1 Components to Deploy
+
+**Source:** Migration Design document
+
+{{#if deployment.components}}
+| Component | Type | Source Reference | Deployment Order |
+|-----------|------|------------------|------------------|
+{{#each deployment.components}}
+| {{this.name}} | {{this.type}} | `{{this.source}}` | {{this.order}} |
+{{/each}}
+{{else}}
+| Component Type | Count | Source |
+|----------------|-------|--------|
+| Migrated Code | {{metadata.source_analysis.total_files}} files | Migration output |
+{{#if metadata.source_analysis.database.tables}}| Database Objects | {{metadata.source_analysis.database.tables}} tables | DDL scripts |{{/if}}
+| Configuration | Per Migration Design | Config files |
+{{/if}}
+
+### 1.2 Deployment Dependencies
+
+**Source:** Dependency analysis
+
+{{#if deployment.dependencies}}
+| Component | Depends On | Dependency Type | Source Reference |
+|-----------|------------|-----------------|------------------|
+{{#each deployment.dependencies}}
+| {{this.component}} | {{this.depends_on}} | {{this.type}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Deployment dependencies require dependency analysis.
+{{/if}}
+
+---
+
+## 2. Pre-Deployment Checklist
+
+### 2.1 Code & Build Verification
+
+{{#if pre_deployment.code}}
+| Check | Verification Method | Status | Source Reference |
+|-------|---------------------|--------|------------------|
+{{#each pre_deployment.code}}
+| {{this.check}} | {{this.method}} | [ ] | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Check | Verification Method | Status |
+|-------|---------------------|--------|
+| Code migration complete | All files in Migration Design present | [ ] |
+| Build successful | Build command succeeds | [ ] |
+| Unit tests pass | Test suite execution | [ ] |
+| Integration tests pass | Test suite execution | [ ] |
+{{/if}}
+
+### 2.2 Database Verification
+
+{{#if source.database}}
+
+{{#if pre_deployment.database}}
+| Check | Verification Method | Status | Source Reference |
+|-------|---------------------|--------|------------------|
+{{#each pre_deployment.database}}
+| {{this.check}} | {{this.method}} | [ ] | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Check | Verification Method | Status |
+|-------|---------------------|--------|
+| DDL scripts validated | Script execution in test environment | [ ] |
+| Data migration scripts validated | Script execution in test environment | [ ] |
+| Stored procedures validated | Compilation and basic tests | [ ] |
+{{/if}}
+
+{{/if}}
+
+### 2.3 Environment Verification
+
+{{#if pre_deployment.environment}}
+| Check | Verification Method | Status | Source Reference |
+|-------|---------------------|--------|------------------|
+{{#each pre_deployment.environment}}
+| {{this.check}} | {{this.method}} | [ ] | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Check | Verification Method | Status |
+|-------|---------------------|--------|
+| Target environment ready | Environment health check | [ ] |
+| Network connectivity | Connection tests | [ ] |
+| Required permissions | Access verification | [ ] |
+{{/if}}
+
+### 2.4 Backup Verification
+
+{{#if pre_deployment.backup}}
+| Backup Item | Location | Verification | Status |
+|-------------|----------|--------------|--------|
+{{#each pre_deployment.backup}}
+| {{this.item}} | {{this.location}} | {{this.verification}} | [ ] |
+{{/each}}
+{{else}}
+| Backup Item | Verification | Status |
+|-------------|--------------|--------|
+| Source system state | Backup verified restorable | [ ] |
+{{#if source.database}}| Source database | Full backup completed | [ ] |{{/if}}
+| Current target system | Snapshot/backup taken | [ ] |
+{{/if}}
+
+---
+
+## 3. Deployment Procedure
+
+### 3.1 Deployment Order
+
+**Source:** Dependency analysis from Migration Design
+
+{{#if deployment.order}}
+| Step | Component | Prerequisites | Validation | Source Reference |
+|------|-----------|---------------|------------|------------------|
+{{#each deployment.order}}
+| {{this.step}} | {{this.component}} | {{this.prerequisites}} | {{this.validation}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Step | Action | Prerequisites |
+|------|--------|---------------|
+{{#if source.database}}| 1 | Deploy database schema | Backup complete |{{/if}}
+{{#if source.database}}| 2 | Migrate data | Schema deployed |{{/if}}
+{{#if source.database}}| 3 | Deploy stored procedures/functions | Data migrated |{{/if}}
+| {{#if source.database}}4{{else}}1{{/if}} | Deploy application code | {{#if source.database}}DB ready{{else}}Backup complete{{/if}} |
+| {{#if source.database}}5{{else}}2{{/if}} | Deploy configuration | Code deployed |
+| {{#if source.database}}6{{else}}3{{/if}} | Smoke test | All components deployed |
+{{/if}}
+
+### 3.2 Detailed Deployment Steps
+
+{{#if deployment.detailed_steps}}
+{{#each deployment.detailed_steps}}
+#### Step {{this.step}}: {{this.name}}
+
+**Component:** {{this.component}}
+
+**Source Reference:** `{{this.source}}`
+
+**Prerequisites:**
+{{#each this.prerequisites}}
+- {{this}}
+{{/each}}
+
+**Actions:**
+{{#each this.actions}}
+{{@index}}. {{this}}
+{{/each}}
+
+**Validation:**
+{{#each this.validation}}
+- {{this}}
+{{/each}}
+
+**Rollback Point:** {{this.rollback_point}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Detailed deployment steps require manual specification.
+{{/if}}
+
+### 3.3 Database Deployment Steps
+
+{{#if source.database}}
+
+{{#if deployment.database_steps}}
+{{#each deployment.database_steps}}
+#### DB Step {{this.step}}: {{this.name}}
+
+**Object Type:** {{this.type}}
+
+**Source DDL:** `{{this.source_file}}`
+
+**Script:**
+```sql
+{{{this.script}}}
+```
+
+**Validation Query:**
+```sql
+{{{this.validation}}}
+```
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Database deployment steps require DDL extraction.
+{{/if}}
+
+{{/if}}
+
+---
+
+## 4. Validation Procedures
+
+### 4.1 Post-Deployment Validation
+
+**Source:** Validation criteria from Test Strategy
+
+{{#if validation.post_deployment}}
+| Validation | Method | Expected Result | Source Reference |
+|------------|--------|-----------------|------------------|
+{{#each validation.post_deployment}}
+| {{this.check}} | {{this.method}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Validation | Method | Expected Result |
+|------------|--------|-----------------|
+| Application starts | Health check endpoint | 200 OK |
+| Basic functionality | Smoke test suite | All pass |
+{{#if source.database}}| Database connectivity | Connection test | Connected |{{/if}}
+{{#if source.database}}| Data integrity | Row count validation | Match source |{{/if}}
+{{/if}}
+
+### 4.2 Functional Validation
+
+{{#if validation.functional}}
+{{#each validation.functional}}
+#### {{this.name}}
+
+**Source Component:** `{{this.source}}`
+
+**Test Steps:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+**Expected Result:** {{this.expected}}
+
+**Status:** [ ] Pass  [ ] Fail
+
+---
+
+{{/each}}
+{{/if}}
+
+### 4.3 Data Validation
+
+{{#if source.database}}
+
+{{#if validation.data}}
+| Table/Object | Validation Type | Query/Method | Expected | Source |
+|--------------|-----------------|--------------|----------|--------|
+{{#each validation.data}}
+| {{this.object}} | {{this.type}} | {{this.query}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Validation | Query Template | Expected |
+|------------|----------------|----------|
+| Row Count | `SELECT COUNT(*) FROM [table]` | Match source |
+| Checksum | `SELECT SUM(hash_value) FROM [table]` | Match source |
+| Sample Data | Manual inspection | Data correct |
+{{/if}}
+
+{{/if}}
+
+### 4.4 Performance Validation
+
+{{#if validation.performance}}
+| Metric | Baseline (Source) | Target Threshold | Measurement Method | Source Reference |
+|--------|-------------------|------------------|--------------------| -----------------|
+{{#each validation.performance}}
+| {{this.metric}} | {{this.baseline}} | {{this.threshold}} | {{this.method}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Performance baselines require source system metrics.
+{{/if}}
+
+---
+
+## 5. Rollback Plan
+
+### 5.1 Rollback Decision Criteria
+
+{{#if rollback.criteria}}
+| Criterion | Threshold | Detection Method | Source Reference |
+|-----------|-----------|------------------|------------------|
+{{#each rollback.criteria}}
+| {{this.criterion}} | {{this.threshold}} | {{this.detection}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Criterion | Threshold | Detection |
+|-----------|-----------|-----------|
+| Critical functionality failure | Any critical function fails | Validation tests |
+| Data integrity issue | Any data corruption | Data validation |
+| Performance degradation | >50% slower than source | Performance tests |
+| Error rate | >5% of transactions | Monitoring |
+{{/if}}
+
+### 5.2 Rollback Decision Authority
+
+{{#if rollback.authority}}
+| Role | Authority | Condition |
+|------|-----------|-----------|
+{{#each rollback.authority}}
+| {{this.role}} | {{this.authority}} | {{this.condition}} |
+{{/each}}
+{{else}}
+| Role | Authority |
+|------|-----------|
+| Deployment Lead | Can initiate rollback |
+| Project Manager | Must be notified |
+| Business Owner | Must approve extended downtime |
+{{/if}}
+
+### 5.3 Rollback Procedure
+
+{{#if rollback.procedure}}
+{{#each rollback.procedure}}
+#### Rollback Step {{this.step}}: {{this.name}}
+
+**Trigger:** {{this.trigger}}
+
+**Actions:**
+{{#each this.actions}}
+{{@index}}. {{this}}
+{{/each}}
+
+**Validation:**
+{{#each this.validation}}
+- {{this}}
+{{/each}}
+
+**Source Reference:** `{{this.source}}`
+
+---
+
+{{/each}}
+{{else}}
+
+#### Step 1: Stop New System
+
+**Actions:**
+1. Stop application/service
+2. Disable routing to new system
+
+#### Step 2: Restore Database (if applicable)
+
+{{#if source.database}}
+**Actions:**
+1. Restore database from backup
+2. Verify restore completion
+3. Validate data integrity
+{{/if}}
+
+#### Step 3: Restore Application
+
+**Actions:**
+1. Deploy previous version
+2. Restore previous configuration
+3. Start application
+
+#### Step 4: Validation
+
+**Actions:**
+1. Verify system health
+2. Execute smoke tests
+3. Confirm with stakeholders
+
+{{/if}}
+
+### 5.4 Rollback Verification
+
+{{#if rollback.verification}}
+| Check | Method | Expected Result | Status |
+|-------|--------|-----------------|--------|
+{{#each rollback.verification}}
+| {{this.check}} | {{this.method}} | {{this.expected}} | [ ] |
+{{/each}}
+{{else}}
+| Check | Expected Result | Status |
+|-------|-----------------|--------|
+| Source system restored | All functions working | [ ] |
+{{#if source.database}}| Database restored | Data matches pre-deployment | [ ] |{{/if}}
+| No data loss | All data accessible | [ ] |
+| User access | Users can access system | [ ] |
+{{/if}}
+
+---
+
+## 6. Communication Plan
+
+### 6.1 Stakeholder Notification
+
+{{#if communication.stakeholders}}
+| Stakeholder | Notification Trigger | Method | Template |
+|-------------|---------------------|--------|----------|
+{{#each communication.stakeholders}}
+| {{this.stakeholder}} | {{this.trigger}} | {{this.method}} | {{this.template}} |
+{{/each}}
+{{else}}
+| Stakeholder | Notification Trigger | Method |
+|-------------|---------------------|--------|
+| IT Operations | Deployment start/end | Email + Call |
+| Business Users | System availability change | Email |
+| Management | Deployment complete/rollback | Email |
+{{/if}}
+
+### 6.2 Status Updates
+
+{{#if communication.status_updates}}
+| Checkpoint | Recipients | Method | Frequency |
+|------------|------------|--------|-----------|
+{{#each communication.status_updates}}
+| {{this.checkpoint}} | {{this.recipients}} | {{this.method}} | {{this.frequency}} |
+{{/each}}
+{{else}}
+| Checkpoint | Recipients | Frequency |
+|------------|------------|-----------|
+| Deployment started | All stakeholders | Once |
+| Each phase complete | Technical team | Per phase |
+| Validation complete | All stakeholders | Once |
+| Go/No-Go decision | All stakeholders | Once |
+{{/if}}
+
+---
+
+## 7. Hypercare Plan
+
+### 7.1 Hypercare Period
+
+{{#if hypercare.period}}
+| Aspect | Value | Source Reference |
+|--------|-------|------------------|
+| Duration | {{hypercare.period.duration}} | Based on complexity |
+| Coverage | {{hypercare.period.coverage}} | - |
+| Support Level | {{hypercare.period.support_level}} | - |
+{{else}}
+| Aspect | Value |
+|--------|-------|
+| Duration | 2-4 weeks (based on complexity: {{metadata.migrationComplexity.difficulty}}) |
+| Coverage | Business hours + on-call |
+| Support Level | L1/L2/L3 escalation |
+{{/if}}
+
+### 7.2 Monitoring Metrics
+
+**Source:** Based on migrated components
+
+{{#if hypercare.monitoring}}
+| Metric | Threshold | Alert | Source Reference |
+|--------|-----------|-------|------------------|
+{{#each hypercare.monitoring}}
+| {{this.metric}} | {{this.threshold}} | {{this.alert}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Metric | Threshold | Alert |
+|--------|-----------|-------|
+| Error Rate | >1% | Critical |
+| Response Time | >baseline +20% | Warning |
+| Failed Transactions | >0 | Critical |
+| Resource Utilization | >80% | Warning |
+{{/if}}
+
+### 7.3 Issue Escalation
+
+{{#if hypercare.escalation}}
+| Severity | Response Time | Escalation Path | Source Reference |
+|----------|---------------|-----------------|------------------|
+{{#each hypercare.escalation}}
+| {{this.severity}} | {{this.response}} | {{this.path}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Severity | Response Time | Escalation Path |
+|----------|---------------|-----------------|
+| Critical | 15 minutes | On-call → Lead → Manager |
+| High | 1 hour | On-call → Lead |
+| Medium | 4 hours | Support team |
+| Low | Next business day | Support queue |
+{{/if}}
+
+---
+
+## 8. Post-Deployment Tasks
+
+### 8.1 Immediate Tasks (24 hours)
+
+{{#if post_deployment.immediate}}
+| Task | Owner | Status |
+|------|-------|--------|
+{{#each post_deployment.immediate}}
+| {{this.task}} | {{this.owner}} | [ ] |
+{{/each}}
+{{else}}
+| Task | Status |
+|------|--------|
+| Confirm all validations passed | [ ] |
+| Update system documentation | [ ] |
+| Send deployment success notification | [ ] |
+| Archive deployment artifacts | [ ] |
+{{/if}}
+
+### 8.2 Short-term Tasks (1 week)
+
+{{#if post_deployment.short_term}}
+| Task | Owner | Status |
+|------|-------|--------|
+{{#each post_deployment.short_term}}
+| {{this.task}} | {{this.owner}} | [ ] |
+{{/each}}
+{{else}}
+| Task | Status |
+|------|--------|
+| Review monitoring metrics | [ ] |
+| Address any reported issues | [ ] |
+| Conduct deployment retrospective | [ ] |
+| Update runbooks | [ ] |
+{{/if}}
+
+### 8.3 Long-term Tasks (1 month)
+
+{{#if post_deployment.long_term}}
+| Task | Owner | Status |
+|------|-------|--------|
+{{#each post_deployment.long_term}}
+| {{this.task}} | {{this.owner}} | [ ] |
+{{/each}}
+{{else}}
+| Task | Status |
+|------|--------|
+| Decommission source system | [ ] |
+| Archive source system backups | [ ] |
+| Update disaster recovery procedures | [ ] |
+| Knowledge transfer completion | [ ] |
+{{/if}}
+
+---
+
+## 9. Contingency Procedures
+
+### 9.1 Common Issues and Resolutions
+
+**Source:** Based on migration complexity and risk analysis
+
+{{#if contingency.issues}}
+{{#each contingency.issues}}
+#### Issue: {{this.issue}}
+
+**Symptoms:** {{this.symptoms}}
+
+**Resolution:**
+{{#each this.resolution}}
+{{@index}}. {{this}}
+{{/each}}
+
+**Source Reference:** `{{this.source}}`
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Contingency procedures require risk analysis.
+{{/if}}
+
+### 9.2 Emergency Contacts
+
+{{#if contingency.contacts}}
+| Role | Name | Contact | Availability |
+|------|------|---------|--------------|
+{{#each contingency.contacts}}
+| {{this.role}} | {{this.name}} | {{this.contact}} | {{this.availability}} |
+{{/each}}
+{{else}}
+| Role | Contact | Availability |
+|------|---------|--------------|
+| Deployment Lead | [TBD] | During deployment |
+| Database Expert | [TBD] | On-call |
+| Application Expert | [TBD] | On-call |
+| Infrastructure | [TBD] | On-call |
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Deployment Artifacts Checklist
+
+{{#if appendix.artifacts}}
+| Artifact | Location | Verified |
+|----------|----------|----------|
+{{#each appendix.artifacts}}
+| {{this.name}} | `{{this.location}}` | [ ] |
+{{/each}}
+{{else}}
+| Artifact | Verified |
+|----------|----------|
+| Application package | [ ] |
+| Configuration files | [ ] |
+{{#if source.database}}| DDL scripts | [ ] |{{/if}}
+{{#if source.database}}| Data migration scripts | [ ] |{{/if}}
+| Validation scripts | [ ] |
+| Rollback scripts | [ ] |
+{{/if}}
+
+### Appendix B: Validation Scripts
+
+{{#if appendix.validation_scripts}}
+```sql
+{{{appendix.validation_scripts}}}
+```
+{{/if}}
+
+### Appendix C: Rollback Scripts
+
+{{#if appendix.rollback_scripts}}
+```sql
+{{{appendix.rollback_scripts}}}
+```
+{{/if}}
+
+---
+
+## Traceability Note
+
+All deployment procedures in this document are derived from:
+- **Migration Design:** Component mappings and conversion details
+- **Source Analysis:** Complexity and dependency information
+- **Test Strategy:** Validation requirements
+
+Items marked "Not found in source" require manual specification based on infrastructure and operational requirements.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated from migration analysis) |
+
+---
+
+**End of Deployment & Rollback Plan**

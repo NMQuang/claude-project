@@ -1,0 +1,606 @@
+# Test Strategy Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Source Technology** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **Target Technology** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **Document Type** | Test Strategy |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+
+---
+
+## Executive Summary
+
+**Source:** Test scope derived from source analysis.
+
+| Metric | Value | Source Reference |
+|--------|-------|------------------|
+| Components to Test | {{metadata.source_analysis.total_files}} | As-Is Analysis |
+| Total LOC | {{metadata.source_analysis.total_loc}} | As-Is Analysis |
+| High Complexity Components | {{metadata.high_complexity_count}} | Complexity Analysis |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} | Schema Analysis |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Schema Analysis |{{/if}}
+
+---
+
+## 1. Test Scope
+
+### 1.1 Components In Test Scope
+
+**Source:** Extracted from source analysis
+
+{{#if test_scope.components}}
+| Component | Type | LOC | Complexity | Priority | Source Location |
+|-----------|------|-----|------------|----------|-----------------|
+{{#each test_scope.components}}
+| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Component Type | Count | Source |
+|----------------|-------|--------|
+| Source Files | {{metadata.source_analysis.total_files}} | Directory scan |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} | Schema extraction |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Schema extraction |{{/if}}
+{{/if}}
+
+### 1.2 Test Scope Rationale
+
+**Source:** Based on complexity and risk analysis
+
+{{#if test_scope.rationale}}
+| Area | Rationale | Source Evidence |
+|------|-----------|-----------------|
+{{#each test_scope.rationale}}
+| {{this.area}} | {{this.rationale}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Test scope rationale requires risk analysis.
+{{/if}}
+
+---
+
+## 2. Test Levels
+
+### 2.1 Unit Testing
+
+**Source:** Component analysis from source code
+
+{{#if testing.unit}}
+
+#### Scope
+
+| Component | Test Cases Required | Complexity | Source Reference |
+|-----------|---------------------|------------|------------------|
+{{#each testing.unit.scope}}
+| {{this.component}} | {{this.test_count}} | {{this.complexity}} | `{{this.source}}` |
+{{/each}}
+
+#### Unit Test Requirements
+
+| Source Function/Method | Expected Test | Source Location |
+|------------------------|---------------|-----------------|
+{{#each testing.unit.requirements}}
+| {{this.function}} | {{this.test_description}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+| Metric | Value | Source |
+|--------|-------|--------|
+| Components to Unit Test | {{metadata.source_analysis.total_files}} | File analysis |
+| Estimated Test Cases | Based on component count | Calculation |
+
+> **Not found in source:** Detailed unit test scope requires function extraction.
+{{/if}}
+
+### 2.2 Integration Testing
+
+**Source:** Dependency and interface analysis
+
+{{#if testing.integration}}
+
+#### Integration Points
+
+| Interface | Source Components | Target Components | Source Reference |
+|-----------|-------------------|-------------------|------------------|
+{{#each testing.integration.interfaces}}
+| {{this.name}} | {{this.source_components}} | {{this.target_components}} | `{{this.source}}` |
+{{/each}}
+
+#### Integration Test Requirements
+
+{{#each testing.integration.requirements}}
+- **{{this.interface}}:** {{this.test_description}} (Source: `{{this.source}}`)
+{{/each}}
+
+{{else}}
+> **Not found in source:** Integration test scope requires interface extraction.
+{{/if}}
+
+### 2.3 System Testing
+
+**Source:** Business process analysis
+
+{{#if testing.system}}
+
+#### System Test Scenarios
+
+| Scenario | Description | Components Involved | Source Reference |
+|----------|-------------|---------------------|------------------|
+{{#each testing.system.scenarios}}
+| {{this.name}} | {{this.description}} | {{this.components}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+> **Not found in source:** System test scenarios require business process extraction.
+{{/if}}
+
+### 2.4 Migration Validation Testing
+
+**Source:** As-Is analysis and Migration Design
+
+#### 2.4.1 Functional Parity Validation
+
+{{#if testing.migration.functional}}
+| Source Function | Source Output | Expected Target Output | Source Reference |
+|-----------------|---------------|------------------------|------------------|
+{{#each testing.migration.functional}}
+| {{this.function}} | {{this.source_output}} | {{this.target_output}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Functional parity tests require source output extraction.
+{{/if}}
+
+#### 2.4.2 Data Validation
+
+{{#if source.database}}
+
+**Source:** Database schema analysis
+
+{{#if testing.migration.data_validation}}
+| Validation Type | Table/Object | Expected Result | Validation Query |
+|-----------------|--------------|-----------------|------------------|
+{{#each testing.migration.data_validation}}
+| {{this.type}} | {{this.object}} | {{this.expected}} | `{{this.query}}` |
+{{/each}}
+{{else}}
+| Validation Type | Description | Source |
+|-----------------|-------------|--------|
+| Row Count | Compare row counts between source and target | All tables |
+| Checksum | Compare data checksums | Critical tables |
+| Sample Data | Manual verification of sample records | Random sample |
+| Referential Integrity | Verify all foreign keys | All FK constraints |
+{{/if}}
+
+{{/if}}
+
+#### 2.4.3 Code Conversion Validation
+
+**Source:** Conversion rules from Migration Design
+
+{{#if testing.migration.code_validation}}
+| Conversion Rule | Test Description | Source Pattern | Expected Target Pattern |
+|-----------------|------------------|----------------|-------------------------|
+{{#each testing.migration.code_validation}}
+| {{this.rule}} | {{this.description}} | `{{this.source_pattern}}` | `{{this.target_pattern}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Code conversion tests require conversion rule extraction.
+{{/if}}
+
+### 2.5 Performance Testing
+
+**Source:** Source system metrics (if available)
+
+{{#if testing.performance}}
+
+#### Performance Baselines
+
+| Metric | Source System Value | Target Threshold | Source Reference |
+|--------|---------------------|------------------|------------------|
+{{#each testing.performance.baselines}}
+| {{this.metric}} | {{this.source_value}} | {{this.target_threshold}} | `{{this.source}}` |
+{{/each}}
+
+#### Performance Test Scenarios
+
+{{#each testing.performance.scenarios}}
+- **{{this.name}}:** {{this.description}} (Baseline: {{this.baseline}})
+{{/each}}
+
+{{else}}
+| Metric | Target | Source |
+|--------|--------|--------|
+| Response Time | ≤ Source system | Source system metrics |
+| Throughput | ≥ Source system | Source system metrics |
+| Concurrent Users | ≥ Source system | Source system capacity |
+
+> **Not found in source:** Performance baselines require source system metric extraction.
+{{/if}}
+
+### 2.6 Security Testing
+
+{{#if testing.security}}
+
+#### Security Test Requirements
+
+| Test Area | Requirement | Source Reference |
+|-----------|-------------|------------------|
+{{#each testing.security.requirements}}
+| {{this.area}} | {{this.requirement}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+> **Not found in source:** Security test requirements require security analysis.
+{{/if}}
+
+---
+
+## 3. Test Cases
+
+### 3.1 Test Case Summary by Component
+
+**Source:** Component analysis
+
+{{#if test_cases.summary}}
+| Component | Unit Tests | Integration Tests | System Tests | Source Reference |
+|-----------|------------|-------------------|--------------|------------------|
+{{#each test_cases.summary}}
+| {{this.component}} | {{this.unit}} | {{this.integration}} | {{this.system}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Test case summary requires component analysis completion.
+{{/if}}
+
+### 3.2 High Priority Test Cases
+
+**Source:** Complexity and risk analysis
+
+{{#if test_cases.high_priority}}
+{{#each test_cases.high_priority}}
+#### TC-{{this.id}}: {{this.name}}
+
+**Source Component:** `{{this.source_component}}`
+
+**Test Type:** {{this.type}}
+
+**Priority:** {{this.priority}}
+
+**Preconditions:**
+{{#each this.preconditions}}
+- {{this}}
+{{/each}}
+
+**Test Steps:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+**Expected Result:** {{this.expected}}
+
+**Source Reference:** `{{this.source}}`
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** High priority test cases require risk analysis.
+{{/if}}
+
+### 3.3 Migration-Specific Test Cases
+
+{{#if test_cases.migration}}
+{{#each test_cases.migration}}
+#### MTC-{{this.id}}: {{this.name}}
+
+**Migration Area:** {{this.area}}
+
+**Source:** `{{this.source_reference}}`
+
+**Description:** {{this.description}}
+
+**Validation Method:** {{this.validation_method}}
+
+**Expected Outcome:** {{this.expected}}
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 4. Test Data
+
+### 4.1 Test Data Requirements
+
+**Source:** Data structure and volume analysis
+
+{{#if test_data.requirements}}
+| Data Category | Source | Volume | Anonymization Required | Source Reference |
+|---------------|--------|--------|------------------------|------------------|
+{{#each test_data.requirements}}
+| {{this.category}} | {{this.source}} | {{this.volume}} | {{this.anonymize}} | `{{this.source_ref}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Test data requirements require data analysis.
+{{/if}}
+
+### 4.2 Test Data Sources
+
+{{#if test_data.sources}}
+| Source Type | Description | Usage | Source Reference |
+|-------------|-------------|-------|------------------|
+{{#each test_data.sources}}
+| {{this.type}} | {{this.description}} | {{this.usage}} | `{{this.source}}` |
+{{/each}}
+{{/if}}
+
+### 4.3 Data Preparation
+
+{{#if test_data.preparation}}
+{{#each test_data.preparation}}
+#### {{this.name}}
+
+**Source:** `{{this.source_reference}}`
+
+**Preparation Steps:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 5. Test Environment
+
+### 5.1 Environment Requirements
+
+**Source:** Source system configuration analysis
+
+{{#if environments.requirements}}
+| Component | Requirement | Based On | Source Reference |
+|-----------|-------------|----------|------------------|
+{{#each environments.requirements}}
+| {{this.component}} | {{this.requirement}} | {{this.basis}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Component | Requirement | Source |
+|-----------|-------------|--------|
+| {{target.language}} Runtime | Compatible version | Target specification |
+{{#if target.database}}| {{target.database}} | Compatible version | Target specification |{{/if}}
+| Test Tools | As defined in strategy | - |
+{{/if}}
+
+### 5.2 Environment Configuration
+
+{{#if environments.configuration}}
+{{#each environments.configuration}}
+#### {{this.name}} Environment
+
+| Setting | Value | Source Reference |
+|---------|-------|------------------|
+{{#each this.settings}}
+| {{this.name}} | {{this.value}} | `{{this.source}}` |
+{{/each}}
+
+{{/each}}
+{{/if}}
+
+---
+
+## 6. Entry and Exit Criteria
+
+### 6.1 Entry Criteria
+
+{{#if criteria.entry}}
+| Criterion | Verification Method | Source Reference |
+|-----------|---------------------|------------------|
+{{#each criteria.entry}}
+| {{this.criterion}} | {{this.verification}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Criterion | Verification |
+|-----------|--------------|
+| Code migration complete | Build succeeds |
+| Test environment ready | Environment health check |
+| Test data prepared | Data load verification |
+| Test cases reviewed | Review sign-off |
+{{/if}}
+
+### 6.2 Exit Criteria
+
+{{#if criteria.exit}}
+| Criterion | Target | Measurement | Source Reference |
+|-----------|--------|-------------|------------------|
+{{#each criteria.exit}}
+| {{this.criterion}} | {{this.target}} | {{this.measurement}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Criterion | Target | Measurement |
+|-----------|--------|-------------|
+| Test Execution | 100% planned tests executed | Test management report |
+| Pass Rate | ≥95% | Test management report |
+| Critical Defects | 0 open | Defect tracking |
+| Functional Parity | 100% | Migration validation tests |
+{{/if}}
+
+---
+
+## 7. Defect Management
+
+### 7.1 Defect Classification
+
+{{#if defects.classification}}
+| Severity | Definition | Response Time | Example |
+|----------|------------|---------------|---------|
+{{#each defects.classification}}
+| {{this.severity}} | {{this.definition}} | {{this.response}} | {{this.example}} |
+{{/each}}
+{{else}}
+| Severity | Definition | Response Time |
+|----------|------------|---------------|
+| Critical | System crash, data corruption | 4 hours |
+| High | Major function broken, no workaround | 1 business day |
+| Medium | Function impaired, workaround exists | 3 business days |
+| Low | Minor issue, cosmetic | Next release |
+{{/if}}
+
+### 7.2 Defect Workflow
+
+{{#if defects.workflow}}
+```
+{{defects.workflow}}
+```
+{{else}}
+```
+New → Assigned → In Progress → Fixed → Verification → Closed
+                                   ↓
+                               Reopened (if verification fails)
+```
+{{/if}}
+
+---
+
+## 8. Risk Assessment
+
+### 8.1 Testing Risks
+
+**Source:** Complexity and dependency analysis
+
+{{#if risks.testing}}
+| Risk | Probability | Impact | Mitigation | Source Evidence |
+|------|-------------|--------|------------|-----------------|
+{{#each risks.testing}}
+| {{this.risk}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Testing risks require analysis completion.
+{{/if}}
+
+### 8.2 Coverage Risks
+
+{{#if risks.coverage}}
+| Area | Risk | Coverage Strategy | Source Reference |
+|------|------|-------------------|------------------|
+{{#each risks.coverage}}
+| {{this.area}} | {{this.risk}} | {{this.strategy}} | `{{this.source}}` |
+{{/each}}
+{{/if}}
+
+---
+
+## 9. Test Deliverables
+
+### 9.1 Deliverables Checklist
+
+{{#if deliverables}}
+| Deliverable | Description | Owner | Status |
+|-------------|-------------|-------|--------|
+{{#each deliverables}}
+| {{this.name}} | {{this.description}} | {{this.owner}} | {{this.status}} |
+{{/each}}
+{{else}}
+| Deliverable | Description |
+|-------------|-------------|
+| Test Plan | Detailed test plan with test cases |
+| Test Cases | Test case specifications |
+| Test Data | Prepared test datasets |
+| Test Scripts | Automated test scripts |
+| Test Report | Test execution results |
+| Defect Report | Defect metrics and resolution |
+{{/if}}
+
+---
+
+## 10. Traceability Matrix
+
+### 10.1 Source to Test Traceability
+
+**Source:** Mapping from source components to test cases
+
+{{#if traceability.source_to_test}}
+| Source Component | Source Location | Test Cases | Coverage |
+|------------------|-----------------|------------|----------|
+{{#each traceability.source_to_test}}
+| {{this.component}} | `{{this.source}}` | {{this.test_cases}} | {{this.coverage}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Traceability requires test case mapping.
+{{/if}}
+
+### 10.2 Conversion Rule to Test Traceability
+
+{{#if traceability.rule_to_test}}
+| Conversion Rule | Affected Components | Validation Tests |
+|-----------------|---------------------|------------------|
+{{#each traceability.rule_to_test}}
+| {{this.rule}} | {{this.components}} | {{this.tests}} |
+{{/each}}
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Test Case Template
+
+```
+Test Case ID: [TC-XXX]
+Test Name: [Name]
+Source Component: [path:line]
+Test Type: [Unit/Integration/System/Migration]
+Priority: [High/Medium/Low]
+
+Preconditions:
+1. [Condition]
+
+Test Steps:
+1. [Step]
+
+Expected Result:
+[Expected outcome]
+
+Actual Result:
+[To be filled during execution]
+
+Status: [Pass/Fail/Blocked]
+```
+
+### Appendix B: Source Component Summary
+
+| Component | LOC | Complexity | Test Priority |
+|-----------|-----|------------|---------------|
+{{#each appendix.component_summary}}
+| {{this.component}} | {{this.loc}} | {{this.complexity}} | {{this.priority}} |
+{{/each}}
+
+---
+
+## Traceability Note
+
+All test requirements in this document are derived from source analysis:
+- **Source Reference:** File path and line number where the source element was found
+- **Source Evidence:** Analysis results that justify the test requirement
+
+Items marked "Not found in source" indicate that the test requirement could not be automatically derived and requires manual specification based on business requirements.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated from source analysis) |
+
+---
+
+**End of Test Strategy Document**

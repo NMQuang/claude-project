@@ -1,859 +1,685 @@
-# Deployment & Rollback Plan
+# Deployment & Rollback Plan (COBOL → Java)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | COBOL → Java |
 | **Document Type** | Deployment & Rollback Plan |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Deployment Scope from Source Analysis
 
-This document provides a comprehensive plan for deploying the migrated **{{project.name}}** system to production and the procedures for rolling back in case of critical issues. It covers pre-deployment preparations, deployment steps, validation procedures, and rollback strategies.
+### 1.1 Components to Deploy
 
-### Deployment Approach
+**Source:** COBOL program and artifact inventory
 
-{{#if deployment.approach}}
-{{deployment.approach}}
-{{else}}
-**Selected Strategy:** Phased deployment with blue-green deployment pattern
+| Component Type | Count | Java Equivalent | Deployment Target | Source |
+|----------------|-------|-----------------|-------------------|--------|
+| COBOL Programs | {{metadata.source_analysis.total_files}} | Java Services/Classes | Application Server | Program scan |
+| Copybooks | {{metadata.copybook_count}} | DTO/Entity Classes | Application Server | COPY extraction |
+| JCL Jobs | {{metadata.jcl_count}} | Spring Batch Jobs | Batch Server | JCL scan |
+| DB2 Tables | {{metadata.db2_table_count}} | Database Schema | {{target.database}} | EXEC SQL extraction |
+| CICS Transactions | {{metadata.cics_count}} | REST APIs/Controllers | Application Server | EXEC CICS extraction |
 
-**Rationale:** Minimizes risk, allows quick rollback, zero-downtime deployment
-{{/if}}
+### 1.2 Deployment Artifacts from Source
 
----
+**Source:** Migration design output
 
-## 1. Deployment Overview
-
-### 1.1 Deployment Scope
-
-{{#if scope.components}}
-| Component | Description | Version |
-|-----------|-------------|---------|
-{{#each scope.components}}
-| {{this.name}} | {{this.description}} | {{this.version}} |
+{{#if deployment.artifacts}}
+| Artifact | Source Origin | Description | Target Location | Source |
+|----------|---------------|-------------|-----------------|--------|
+{{#each deployment.artifacts}}
+| {{this.artifact}} | {{this.origin}} | {{this.description}} | {{this.location}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-| Component | Description | Version |
-|-----------|-------------|---------|
-| Application | {{target.language}} application | {{app_version}} |
-| Database | {{target.database}} database | {{db_version}} |
-| Configuration | Environment configs | {{config_version}} |
-{{/if}}
+| Artifact | Source Origin | Description |
+|----------|---------------|-------------|
+| Application JAR | COBOL Programs | Migrated Java services |
+| Database DDL | EXEC SQL/DCLGEN | Schema migration scripts |
+| Batch Jobs | JCL Jobs | Spring Batch configurations |
+| Configuration | JCL PARM/SYSIN | application.yml, batch configs |
 
-### 1.2 Deployment Timeline
-
-{{#if timeline.schedule}}
-| Activity | Date/Time | Duration | Responsible |
-|----------|-----------|----------|-------------|
-{{#each timeline.schedule}}
-| {{this.activity}} | {{this.datetime}} | {{this.duration}} | {{this.responsible}} |
-{{/each}}
-{{else}}
-*[To be defined based on production schedule]*
-
-**Proposed Deployment Window:**
-- **Date:** [Weekend/Holiday preferred]
-- **Time:** 2:00 AM - 6:00 AM (low traffic period)
-- **Duration:** 4 hours (including validation)
-{{/if}}
-
-### 1.3 Deployment Team
-
-{{#if team}}
-| Role | Name | Contact | Responsibility |
-|------|------|---------|----------------|
-{{#each team}}
-| {{this.role}} | {{this.name}} | {{this.contact}} | {{this.responsibility}} |
-{{/each}}
-{{else}}
-| Role | Name | Contact | Responsibility |
-|------|------|---------|----------------|
-| Deployment Lead | TBD | TBD | Overall coordination |
-| Application Lead | TBD | TBD | Application deployment |
-| Database Lead | TBD | TBD | Database migration |
-| DevOps Engineer | TBD | TBD | Infrastructure, scripts |
-| QA Lead | TBD | TBD | Validation testing |
-| Business SME | TBD | TBD | Business validation |
+> Artifact list derived from source inventory.
 {{/if}}
 
 ---
 
 ## 2. Pre-Deployment Checklist
 
-### 2.1 Environment Preparation
+### 2.1 Source Migration Verification
 
-{{#if pre_deployment.environment}}
-{{#each pre_deployment.environment}}
-- [ ] {{this}}
+**Source:** Migration completion status
+
+{{#if deployment.pre_checks.migration}}
+| Check | Component | Status | Source Evidence |
+|-------|-----------|--------|-----------------|
+{{#each deployment.pre_checks.migration}}
+| {{this.check}} | {{this.component}} | {{this.status}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- [ ] Production environment verified and accessible
-- [ ] Server resources verified (CPU, memory, disk space)
-- [ ] Network connectivity tested
-- [ ] Load balancer configured
-- [ ] SSL certificates installed and valid
-- [ ] DNS entries updated (if required)
-- [ ] Firewall rules configured
-- [ ] Monitoring and alerting configured
+| Check | Count | Status | Source |
+|-------|-------|--------|--------|
+| Programs Migrated | {{metadata.source_analysis.total_files}} | [ ] Verified | Program inventory |
+| Copybooks Converted | {{metadata.copybook_count}} | [ ] Verified | COPY extraction |
+| JCL Jobs Converted | {{metadata.jcl_count}} | [ ] Verified | JCL scan |
+| SQL Migrated | {{metadata.sql_count}} | [ ] Verified | EXEC SQL extraction |
+| CICS Transactions | {{metadata.cics_count}} | [ ] Verified | EXEC CICS extraction |
 {{/if}}
 
-### 2.2 Code & Database Preparation
+### 2.2 Testing Sign-Off from Source
 
-{{#if pre_deployment.code}}
-{{#each pre_deployment.code}}
-- [ ] {{this}}
+**Source:** Test strategy completion
+
+{{#if deployment.pre_checks.testing}}
+| Test Type | Programs | Pass Rate | Sign-Off | Source |
+|-----------|----------|-----------|----------|--------|
+{{#each deployment.pre_checks.testing}}
+| {{this.type}} | {{this.programs}} | {{this.pass_rate}} | {{this.signoff}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- [ ] Code freeze enforced
-- [ ] All code merged to release branch
-- [ ] Release branch tagged (e.g., v1.0.0)
-- [ ] Application artifact built (JAR/WAR)
-- [ ] Database migration scripts tested in staging
-- [ ] Configuration files prepared for production
-- [ ] All UAT defects resolved
-- [ ] UAT sign-off obtained
+| Test Type | Target | Status | Source |
+|-----------|--------|--------|--------|
+| Unit Tests | All {{metadata.source_analysis.total_files}} programs | [ ] Passed | Program scan |
+| Integration Tests | All call chains | [ ] Passed | CALL extraction |
+| Migration Tests | Data validation | [ ] Passed | Database inventory |
+| UAT | Business functions | [ ] Signed off | Business rules |
 {{/if}}
 
-### 2.3 Backup & Recovery
+### 2.3 Environment Readiness
 
-{{#if pre_deployment.backup}}
-{{#each pre_deployment.backup}}
-- [ ] {{this}}
+**Source:** Target architecture requirements
+
+{{#if deployment.pre_checks.environment}}
+| Component | Requirement | Status | Source |
+|-----------|-------------|--------|--------|
+{{#each deployment.pre_checks.environment}}
+| {{this.component}} | {{this.requirement}} | {{this.status}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- [ ] Full database backup completed
-- [ ] Backup verified and restorable
-- [ ] Application configuration backed up
-- [ ] Current application version archived
-- [ ] Backup stored in secure location
-- [ ] Recovery time tested (RTO validated)
-{{/if}}
-
-### 2.4 Communication & Approval
-
-{{#if pre_deployment.communication}}
-{{#each pre_deployment.communication}}
-- [ ] {{this}}
-{{/each}}
-{{else}}
-- [ ] Deployment plan reviewed and approved
-- [ ] Stakeholders notified of deployment window
-- [ ] Change Advisory Board (CAB) approval obtained
-- [ ] Downtime notification sent to users
-- [ ] Support team briefed on changes
-- [ ] Escalation contacts confirmed
+| Component | Requirement | Status |
+|-----------|-------------|--------|
+| Application Server | Java {{target.java_version}} runtime | [ ] Ready |
+| Database | {{target.database}} instance | [ ] Ready |
+| Batch Server | Spring Batch infrastructure | [ ] Ready |
+| File Storage | Migrated file locations | [ ] Ready |
+| Network | Connectivity configured | [ ] Ready |
 {{/if}}
 
 ---
 
-## 3. Deployment Procedure
+## 3. Database Deployment
 
-### 3.1 Deployment Strategy
+### 3.1 Schema Migration from Source
 
-{{#if deployment.strategy}}
-{{deployment.strategy}}
-{{else}}
-**Blue-Green Deployment:**
+**Source:** EXEC SQL and DCLGEN extraction
 
-```
-┌─────────────────────────────────────────────┐
-│         Load Balancer                       │
-└──────────────┬──────────────────────────────┘
-               │
-       ┌───────┴────────┐
-       │                │
-   ┌───▼───┐        ┌───▼───┐
-   │ BLUE  │        │ GREEN │
-   │(Old)  │        │(New)  │
-   └───┬───┘        └───┬───┘
-       │                │
-   ┌───▼────────────────▼───┐
-   │      Database          │
-   └────────────────────────┘
+{{#if deployment.database.schema}}
+{{#each deployment.database.schema}}
+#### Table: {{this.table}}
 
-1. Deploy new version to GREEN environment
-2. Test GREEN environment
-3. Switch traffic from BLUE to GREEN
-4. Monitor for issues
-5. Keep BLUE running for quick rollback
-```
-{{/if}}
+**Source:** `{{this.source_path}}`
 
-### 3.2 Detailed Deployment Steps
-
-#### Step 1: Pre-Deployment Verification
-```bash
-{{#if deployment.steps.pre_verification}}
-{{{deployment.steps.pre_verification}}}
-{{else}}
-# Verify current system status
-curl -f https://api.example.com/health || echo "Current system DOWN"
-
-# Check database connectivity
-psql -h prod-db -U app_user -c "SELECT 1"
-
-# Verify backup completed
-ls -lh /backups/db_backup_$(date +%Y%m%d).sql
-{{/if}}
+**DDL Script:**
+```sql
+{{{this.ddl}}}
 ```
 
-#### Step 2: Enable Maintenance Mode (If Applicable)
-```bash
-{{#if deployment.steps.maintenance_mode}}
-{{{deployment.steps.maintenance_mode}}}
-{{else}}
-# Display maintenance page to users
-# Route traffic to maintenance page via load balancer
-{{/if}}
-```
+**Migration Order:** {{this.order}}
 
-#### Step 3: Database Migration
-```bash
-{{#if deployment.steps.db_migration}}
-{{{deployment.steps.db_migration}}}
-{{else}}
-# Run database migration scripts
-cd /opt/migration
+**Dependencies:** {{this.dependencies}}
 
-# Execute schema migration
-psql -h prod-db -U app_user -d app_db -f schema_migration.sql
+---
 
-# Execute data migration
-./data_migration.sh
-
-# Verify migration
-psql -h prod-db -U app_user -d app_db -f verify_migration.sql
-{{/if}}
-```
-
-**Migration Scripts:**
-{{#if deployment.migration_scripts}}
-{{#each deployment.migration_scripts}}
-- `{{this.file}}`: {{this.description}}
-{{/each}}
-{{/if}}
-
-#### Step 4: Application Deployment
-```bash
-{{#if deployment.steps.app_deployment}}
-{{{deployment.steps.app_deployment}}}
-{{else}}
-# Deploy application to GREEN environment
-scp target/app-1.0.0.jar prod-green:/opt/app/
-
-# Deploy configuration
-scp config/application-prod.yml prod-green:/opt/app/config/
-
-# Start application on GREEN
-ssh prod-green "systemctl start app-green"
-
-# Wait for application to start
-sleep 30
-
-# Health check
-curl -f http://prod-green:8080/actuator/health
-{{/if}}
-```
-
-#### Step 5: Smoke Testing
-```bash
-{{#if deployment.steps.smoke_test}}
-{{{deployment.steps.smoke_test}}}
-{{else}}
-# Run automated smoke tests on GREEN environment
-./smoke_tests.sh http://prod-green:8080
-
-# Manual verification:
-# - Login functionality
-# - Critical business operations
-# - Database connectivity
-{{/if}}
-```
-
-**Smoke Test Checklist:**
-{{#if deployment.smoke_tests}}
-{{#each deployment.smoke_tests}}
-- [ ] {{this}}
 {{/each}}
 {{else}}
-- [ ] Application started successfully
-- [ ] Health endpoint returns 200 OK
-- [ ] Database connection successful
-- [ ] User login works
-- [ ] Critical API endpoints respond
-- [ ] No errors in application logs
-{{/if}}
-
-#### Step 6: Traffic Switchover
-```bash
-{{#if deployment.steps.switchover}}
-{{{deployment.steps.switchover}}}
-{{else}}
-# Update load balancer to route traffic to GREEN
-# Option 1: Gradual (canary deployment)
-# - Route 10% traffic to GREEN, monitor
-# - Route 50% traffic to GREEN, monitor
-# - Route 100% traffic to GREEN
-
-# Option 2: Immediate switchover
-./switch_traffic.sh --from blue --to green
-
-# Verify traffic routing
-curl -H "Host: api.example.com" http://load-balancer/health
-{{/if}}
-```
-
-#### Step 7: Post-Deployment Monitoring
-```bash
-{{#if deployment.steps.monitoring}}
-{{{deployment.steps.monitoring}}}
-{{else}}
-# Monitor application logs
-tail -f /var/log/app/application.log
-
-# Monitor database connections
-psql -h prod-db -c "SELECT count(*) FROM pg_stat_activity WHERE datname='app_db'"
-
-# Monitor system resources
-top
-df -h
-
-# Check error rates in monitoring dashboard
-# - Application errors
-# - API response times
-# - Database query performance
-{{/if}}
-```
-
-**Monitoring Checklist (First 30 minutes):**
-{{#if deployment.monitoring}}
-{{#each deployment.monitoring}}
-- [ ] {{this}}
+| Table | Columns | Source DCLGEN | Migration Script | Order |
+|-------|---------|---------------|------------------|-------|
+{{#if metadata.db2_tables}}
+{{#each metadata.db2_tables}}
+| {{this.name}} | {{this.columns}} | `{{this.source}}` | `{{this.script}}` | {{this.order}} |
 {{/each}}
 {{else}}
-- [ ] No application errors in logs
-- [ ] API response times within acceptable range
-- [ ] Database queries performing normally
-- [ ] CPU/Memory utilization normal
-- [ ] No user-reported issues
-- [ ] Business transactions completing successfully
+> **Not found in source:** Database schema requires EXEC SQL analysis.
+{{/if}}
 {{/if}}
 
-#### Step 8: Disable Maintenance Mode
-```bash
-{{#if deployment.steps.disable_maintenance}}
-{{{deployment.steps.disable_maintenance}}}
+### 3.2 Data Migration from Source
+
+**Source:** Database content analysis
+
+{{#if deployment.database.data}}
+| Table | Rows | Migration Method | Validation | Source |
+|-------|------|------------------|------------|--------|
+{{#each deployment.database.data}}
+| {{this.table}} | {{this.rows}} | {{this.method}} | {{this.validation}} | `{{this.source}}` |
+{{/each}}
 {{else}}
-# Remove maintenance page
-# Restore normal routing
+> **Not found in source:** Data migration plan requires production data analysis.
 {{/if}}
+
+### 3.3 Database Migration Scripts
+
+**Source:** Generated from COBOL analysis
+
+{{#if deployment.database.scripts}}
+**Migration Script Sequence:**
+
+```bash
+{{#each deployment.database.scripts}}
+# Step {{@index}}: {{this.description}}
+# Source: {{this.source}}
+{{this.command}}
+
+{{/each}}
+```
+{{else}}
+```bash
+# 1. Create schema
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f schema/create_tables.sql
+
+# 2. Create indexes (from DB2 analysis)
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f schema/create_indexes.sql
+
+# 3. Migrate data
+./migrate_data.sh --source-db $SOURCE --target-db $TARGET
+
+# 4. Validate migration
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f validation/row_counts.sql
+```
+
+> Database scripts derived from EXEC SQL extraction.
+{{/if}}
+
+---
+
+## 4. Application Deployment
+
+### 4.1 Deployment Order from Dependencies
+
+**Source:** CALL and COPY dependency analysis
+
+{{#if deployment.application.order}}
+| Phase | Components | Dependencies | Rationale | Source |
+|-------|------------|--------------|-----------|--------|
+{{#each deployment.application.order}}
+| {{this.phase}} | {{this.components}} | {{this.dependencies}} | {{this.rationale}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Phase | Components | Source |
+|-------|------------|--------|
+| 1 | Common utilities, DTOs | Copybooks (no dependencies) |
+| 2 | Data access layer | EXEC SQL programs |
+| 3 | Business services | Core COBOL programs |
+| 4 | Batch jobs | JCL-called programs |
+| 5 | Online services | CICS programs |
+
+> Deployment order derived from dependency analysis.
+{{/if}}
+
+### 4.2 Application Deployment Steps
+
+**Source:** Target architecture design
+
+{{#if deployment.application.steps}}
+{{#each deployment.application.steps}}
+#### Step {{@index}}: {{this.name}}
+
+**Source Components:** {{this.components}}
+
+**Source Evidence:** `{{this.source}}`
+
+```bash
+{{{this.commands}}}
+```
+
+**Verification:**
+```bash
+{{{this.verification}}}
 ```
 
 ---
 
-## 4. Post-Deployment Validation
+{{/each}}
+{{else}}
+```bash
+# Step 1: Deploy application artifact
+# Source: Migrated from {{metadata.source_analysis.total_files}} COBOL programs
+scp target/{{project.artifact_id}}-{{project.version}}.jar $APP_SERVER:/opt/app/
 
-### 4.1 Functional Validation
+# Step 2: Deploy configuration
+# Source: Extracted from JCL PARM and SYSIN
+scp config/application-prod.yml $APP_SERVER:/opt/app/config/
 
-{{#if validation.functional}}
-{{#each validation.functional}}
-#### {{this.name}}
+# Step 3: Start application
+ssh $APP_SERVER "systemctl start {{project.service_name}}"
 
-**Steps:**
+# Step 4: Verify deployment
+curl -f http://$APP_SERVER:8080/actuator/health
+```
+
+> Deployment steps derived from migration design.
+{{/if}}
+
+### 4.3 Batch Job Deployment
+
+**Source:** JCL job analysis
+
+{{#if deployment.batch.jobs}}
+{{#each deployment.batch.jobs}}
+#### Job: {{this.name}}
+
+**Source JCL:** `{{this.source_jcl}}`
+
+**Spring Batch Job:** `{{this.spring_job}}`
+
+**Deployment:**
+```bash
+{{{this.deployment}}}
+```
+
+**Schedule:** {{this.schedule}}
+
+---
+
+{{/each}}
+{{else}}
+| Batch Job | Source JCL | Spring Batch Job | Schedule | Source |
+|-----------|------------|------------------|----------|--------|
+{{#if metadata.jcl_jobs}}
+{{#each metadata.jcl_jobs}}
+| {{this.name}} | `{{this.path}}` | {{this.spring_job}} | {{this.schedule}} | JCL scan |
+{{/each}}
+{{else}}
+> **Not found in source:** Batch job deployment requires JCL analysis.
+{{/if}}
+{{/if}}
+
+---
+
+## 5. Validation Procedures
+
+### 5.1 Component Validation from Source
+
+**Source:** Migration inventory
+
+{{#if deployment.validation.components}}
+| Component | Source Program | Validation | Expected | Source |
+|-----------|----------------|------------|----------|--------|
+{{#each deployment.validation.components}}
+| {{this.component}} | {{this.program}} | {{this.validation}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Validation | Count | Method | Source |
+|------------|-------|--------|--------|
+| Services Deployed | {{metadata.source_analysis.total_files}} | Health check | Program scan |
+| DTOs Created | {{metadata.copybook_count}} | Class loading | Copybook extraction |
+| Batch Jobs Registered | {{metadata.jcl_count}} | Job listing | JCL scan |
+| Database Tables | {{metadata.db2_table_count}} | Schema query | EXEC SQL |
+{{/if}}
+
+### 5.2 Functional Validation
+
+**Source:** Business function inventory
+
+{{#if deployment.validation.functional}}
+{{#each deployment.validation.functional}}
+#### Function: {{this.name}}
+
+**Source Program:** `{{this.program}}`
+
+**Validation Steps:**
 {{#each this.steps}}
 {{@index}}. {{this}}
 {{/each}}
 
 **Expected Result:** {{this.expected}}
 
-**Actual Result:** _______________________
-
-**Status:** [ ] Pass  [ ] Fail
-
 ---
 
 {{/each}}
 {{else}}
-| Test Scenario | Expected Result | Actual Result | Status |
-|---------------|-----------------|---------------|--------|
-| User login | Successful authentication | | [ ] Pass [ ] Fail |
-| Create record | Record created in database | | [ ] Pass [ ] Fail |
-| Update record | Record updated successfully | | [ ] Pass [ ] Fail |
-| Generate report | Report generated correctly | | [ ] Pass [ ] Fail |
+> **Not found in source:** Functional validation requires business function extraction.
 {{/if}}
 
-### 4.2 Performance Validation
+### 5.3 Data Validation Queries
 
-{{#if validation.performance}}
-{{#each validation.performance}}
-- **{{this.metric}}:** Target: {{this.target}}, Actual: _______, Status: [ ] Pass [ ] Fail
-{{/each}}
-{{else}}
-| Metric | Baseline | Target | Actual | Status |
-|--------|----------|--------|--------|--------|
-| Page load time | 1.5s | ≤ 1.5s | _____ | [ ] Pass [ ] Fail |
-| API response time | 200ms | ≤ 200ms | _____ | [ ] Pass [ ] Fail |
-| Database query time | 50ms | ≤ 50ms | _____ | [ ] Pass [ ] Fail |
-| Concurrent users | 100 | ≥ 100 | _____ | [ ] Pass [ ] Fail |
-{{/if}}
+**Source:** Database migration analysis
 
-### 4.3 Data Validation
+{{#if deployment.validation.data}}
+{{#each deployment.validation.data}}
+#### {{this.name}}
 
-{{#if validation.data}}
-{{#each validation.data}}
-- **{{this.check}}:** {{this.query}}
-  - Expected: {{this.expected}}
-  - Actual: _____________
-  - Status: [ ] Pass [ ] Fail
+**Source Table:** `{{this.source_table}}`
+
+```sql
+{{{this.query}}}
+```
+
+**Expected:** {{this.expected}}
+
+---
+
 {{/each}}
 {{else}}
 ```sql
--- Row count validation
-SELECT 'customers' as table_name, COUNT(*) as row_count FROM customers
-UNION ALL
-SELECT 'orders', COUNT(*) FROM orders;
--- Compare with pre-migration counts
+-- Row count validation (from source inventory)
+SELECT table_name,
+       (SELECT COUNT(*) FROM source_table) as source_count,
+       (SELECT COUNT(*) FROM target_table) as target_count
+FROM migration_tables;
 
--- Data integrity check
-SELECT COUNT(*) FROM orders o
-LEFT JOIN customers c ON o.customer_id = c.customer_id
-WHERE c.customer_id IS NULL;
--- Should return 0 (no orphaned orders)
-
--- Sample data verification
-SELECT * FROM customers LIMIT 10;
--- Manually verify data looks correct
+-- Checksum validation
+SELECT MD5(string_agg(key_column::text, ',' ORDER BY key_column))
+FROM migrated_table;
 ```
+
+> Data validation queries derived from database inventory.
 {{/if}}
 
 ---
 
-## 5. Rollback Plan
+## 6. Rollback Plan
 
-### 5.1 Rollback Decision Criteria
+### 6.1 Rollback Triggers
 
-{{#if rollback.criteria}}
-{{#each rollback.criteria}}
-- {{this}}
+**Source:** Risk assessment from migration analysis
+
+{{#if deployment.rollback.triggers}}
+| Trigger | Threshold | Detection | Source Evidence |
+|---------|-----------|-----------|-----------------|
+{{#each deployment.rollback.triggers}}
+| {{this.trigger}} | {{this.threshold}} | {{this.detection}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-**Trigger rollback if ANY of the following occur:**
-- Critical functionality is broken (e.g., payment processing fails)
-- Data corruption detected
-- Performance degradation >50% from baseline
-- Security vulnerability discovered
-- >20% of users unable to access system
-- Database migration fails
-- Unable to resolve issue within rollback window (1 hour)
+| Trigger | Threshold | Detection |
+|---------|-----------|-----------|
+| Critical function failure | Any of {{metadata.source_analysis.total_files}} services | Health check |
+| Data integrity error | Any discrepancy | Validation queries |
+| Performance degradation | >50% baseline | Monitoring |
+| Batch job failure | Critical jobs | Job status |
 {{/if}}
 
-### 5.2 Rollback Authority
+### 6.2 Rollback Decision Matrix
 
-{{#if rollback.authority}}
-{{rollback.authority}}
+**Source:** Component criticality analysis
+
+{{#if deployment.rollback.matrix}}
+| Component | Impact | Rollback Type | Time | Source |
+|-----------|--------|---------------|------|--------|
+{{#each deployment.rollback.matrix}}
+| {{this.component}} | {{this.impact}} | {{this.type}} | {{this.time}} | `{{this.source}}` |
+{{/each}}
 {{else}}
-**Authorized to initiate rollback:**
-- Deployment Lead
-- Application Lead
-- Project Manager
-
-**Approval required:** None (pre-approved in deployment plan)
-
-**Notification:** Inform all stakeholders immediately upon rollback decision
+| Component | Rollback Approach | Estimated Time |
+|-----------|-------------------|----------------|
+| Application | Blue-green switch | 5 minutes |
+| Database Schema | DDL rollback scripts | 15-30 minutes |
+| Database Data | Restore from backup | 30-60 minutes |
+| Batch Jobs | Disable new, enable old | 10 minutes |
 {{/if}}
 
-### 5.3 Rollback Procedure
+### 6.3 Application Rollback Procedure
 
-#### Option 1: Blue-Green Rollback (Fastest)
+**Source:** Deployment architecture
 
-{{#if rollback.blue_green}}
-{{{rollback.blue_green}}}
-{{else}}
-**Duration:** 5-10 minutes
-
+{{#if deployment.rollback.application}}
 ```bash
-# Step 1: Switch traffic back to BLUE (old version)
+{{{deployment.rollback.application}}}
+```
+{{else}}
+```bash
+# Step 1: Switch traffic to old version (Blue-Green)
 ./switch_traffic.sh --from green --to blue
 
-# Step 2: Verify old system is working
-curl -f https://api.example.com/health
+# Step 2: Verify old system
+curl -f http://$OLD_SERVER:8080/actuator/health
 
-# Step 3: Stop GREEN environment
-ssh prod-green "systemctl stop app-green"
+# Step 3: Stop new application
+ssh $NEW_SERVER "systemctl stop {{project.service_name}}"
 
 # Step 4: Monitor for stability
 tail -f /var/log/app/application.log
 ```
 
-**Post-Rollback:**
-- Database remains migrated (rollback application only)
-- If database rollback needed, proceed to Option 2
+> Application rollback based on deployment architecture.
 {{/if}}
 
-#### Option 2: Full Rollback (Database + Application)
+### 6.4 Database Rollback Procedure
 
-{{#if rollback.full}}
-{{{rollback.full}}}
-{{else}}
-**Duration:** 30-60 minutes
+**Source:** Database migration design
 
-**WARNING:** This will lose any data created after deployment
-
+{{#if deployment.rollback.database}}
 ```bash
-# Step 1: Enable maintenance mode
-./enable_maintenance.sh
-
-# Step 2: Stop new application
-systemctl stop app-green
-
-# Step 3: Restore database from backup
-pg_restore -h prod-db -U app_user -d app_db /backups/db_backup_20240101.sql
-
-# Step 4: Verify database restore
-psql -h prod-db -U app_user -d app_db -c "SELECT COUNT(*) FROM customers"
-
-# Step 5: Switch traffic to BLUE (old application)
-./switch_traffic.sh --from green --to blue
-
-# Step 6: Disable maintenance mode
-./disable_maintenance.sh
-
-# Step 7: Verify system functionality
-./smoke_tests.sh https://api.example.com
+{{{deployment.rollback.database}}}
 ```
+{{else}}
+```bash
+# Option 1: Schema-only rollback (if no data changes)
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f rollback/drop_new_objects.sql
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f rollback/restore_old_objects.sql
+
+# Option 2: Full database restore (if data changes)
+# WARNING: Data loss for transactions after backup
+pg_restore -h $DB_HOST -U $DB_USER -d $DB_NAME /backups/pre_migration_backup.dump
+
+# Validation after rollback
+psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f validation/verify_rollback.sql
+```
+
+> Database rollback derived from schema migration design.
 {{/if}}
 
-### 5.4 Rollback Validation
+### 6.5 Batch Job Rollback
 
-{{#if rollback.validation}}
-{{#each rollback.validation}}
-- [ ] {{this}}
+**Source:** JCL job inventory
+
+{{#if deployment.rollback.batch}}
+{{#each deployment.rollback.batch}}
+#### Job: {{this.name}}
+
+**Source JCL:** `{{this.source}}`
+
+**Rollback:**
+```bash
+{{{this.rollback}}}
+```
+
+---
+
 {{/each}}
 {{else}}
-- [ ] Old application version running
-- [ ] Database restored (if applicable)
-- [ ] User login working
-- [ ] Critical business functions operational
-- [ ] No errors in application logs
-- [ ] Performance metrics normal
-- [ ] Users can access system
+```bash
+# Disable new batch jobs
+./batch-admin.sh --disable-all --tag=new-migration
+
+# Re-enable old JCL jobs (if parallel running)
+# Note: Requires mainframe access or emulation
+
+# Verify batch schedule
+./batch-admin.sh --list-scheduled
+```
+
+> Batch rollback based on JCL job inventory.
 {{/if}}
 
 ---
 
-## 6. Hypercare & Monitoring
+## 7. Monitoring and Hypercare
 
-### 6.1 Hypercare Period
+### 7.1 Monitoring Targets from Source
 
-{{#if hypercare.duration}}
-**Duration:** {{hypercare.duration}}
-{{else}}
-**Duration:** 4 weeks post-deployment
-{{/if}}
+**Source:** Component inventory and complexity analysis
 
-**Hypercare Team:**
-{{#if hypercare.team}}
-{{#each hypercare.team}}
-- **{{this.role}}:** {{this.name}} ({{this.availability}})
+{{#if deployment.monitoring.targets}}
+| Target | Source Component | Metric | Threshold | Source |
+|--------|------------------|--------|-----------|--------|
+{{#each deployment.monitoring.targets}}
+| {{this.target}} | {{this.component}} | {{this.metric}} | {{this.threshold}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- **L1 Support:** 24/7 on-call rotation
-- **L2 Support:** Application team (business hours + on-call)
-- **L3 Support:** Senior developers (on-call for critical issues)
+| Target | Count | Metric | Threshold |
+|--------|-------|--------|-----------|
+| Services | {{metadata.source_analysis.total_files}} | Health, Response Time | <2s |
+| Database | {{metadata.db2_table_count}} tables | Query Time, Connections | <100ms |
+| Batch Jobs | {{metadata.jcl_count}} | Duration, Status | ≤Baseline |
+| Error Rate | All | Errors/minute | <1% |
 {{/if}}
 
-### 6.2 Monitoring Strategy
+### 7.2 Critical Programs for Monitoring
 
-{{#if monitoring.strategy}}
-{{monitoring.strategy}}
-{{else}}
-**Immediate (First 24 hours):**
-- Continuous monitoring of application logs
-- Dashboard monitoring (refresh every 5 minutes)
-- User feedback monitoring
+**Source:** Complexity analysis
 
-**Week 1:**
-- Daily health checks
-- Daily review of error logs
-- Daily performance report
-- Daily stakeholder update
-
-**Weeks 2-4:**
-- Bi-weekly health checks
-- Weekly performance report
-- Weekly stakeholder update
-{{/if}}
-
-### 6.3 Key Metrics to Monitor
-
-{{#if monitoring.metrics}}
-| Metric | Threshold | Alert | Action |
-|--------|-----------|-------|--------|
-{{#each monitoring.metrics}}
-| {{this.name}} | {{this.threshold}} | {{this.alert}} | {{this.action}} |
+{{#if deployment.monitoring.critical}}
+| Program | Complexity | Risk Level | Monitoring Priority | Source |
+|---------|------------|------------|---------------------|--------|
+{{#each deployment.monitoring.critical}}
+| {{this.program}} | {{this.complexity}} | {{this.risk}} | {{this.priority}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-| Metric | Threshold | Alert | Action |
-|--------|-----------|-------|--------|
-| Error Rate | >1% | Critical | Immediate investigation |
-| API Response Time | >2s | Warning | Performance analysis |
-| Database Connections | >80% pool | Warning | Scale up or investigate |
-| CPU Utilization | >80% | Warning | Scale up or investigate |
-| Memory Usage | >90% | Critical | Immediate investigation |
-| Disk Space | <10% free | Critical | Clear space or scale |
-{{/if}}
+> High complexity programs (>15) require enhanced monitoring.
 
-### 6.4 Incident Response
-
-{{#if incident.response}}
-{{incident.response}}
+{{#if metadata.complexity.high_programs}}
+| Program | Complexity | Source |
+|---------|------------|--------|
+{{#each metadata.complexity.high_programs}}
+| {{this.name}} | {{this.score}} | `{{this.path}}` |
+{{/each}}
 {{else}}
-**Process:**
-1. **Detection:** Monitoring alert or user report
-2. **Triage:** Assess severity and impact (5 minutes)
-3. **Escalation:** Notify appropriate team members
-4. **Investigation:** Identify root cause
-5. **Resolution:** Apply fix or rollback if critical
-6. **Documentation:** Document incident and resolution
-7. **Post-Mortem:** Review and identify improvements (within 48 hours for critical incidents)
-
-**Severity Levels:**
-- **P1 (Critical):** System down, data loss, security breach
-  - Response: Immediate (24/7)
-  - Resolution Target: 1 hour
-- **P2 (High):** Major feature broken, performance degraded >50%
-  - Response: 1 hour (business hours), 4 hours (after hours)
-  - Resolution Target: 4 hours
-- **P3 (Medium):** Minor feature broken, workaround exists
-  - Response: 4 hours (business hours)
-  - Resolution Target: 1 business day
-- **P4 (Low):** Cosmetic issue, minor inconvenience
-  - Response: Next business day
-  - Resolution Target: Next release
+> **Not found in source:** High complexity programs require analysis.
 {{/if}}
+{{/if}}
+
+### 7.3 Hypercare Schedule
+
+**Source:** Migration scope and risk
+
+| Period | Focus | Escalation | Source |
+|--------|-------|------------|--------|
+| 0-24 hours | All {{metadata.source_analysis.total_files}} services | Immediate | Migration scope |
+| Day 2-7 | Critical business functions | 1 hour | Business priority |
+| Week 2-4 | Batch processing, edge cases | 4 hours | JCL analysis |
 
 ---
 
-## 7. Communication Plan
+## 8. Communication Plan
 
-### 7.1 Stakeholder Communication
+### 8.1 Stakeholder Notification
 
-{{#if communication.stakeholders}}
-{{#each communication.stakeholders}}
-**{{this.group}}:**
-- **Method:** {{this.method}}
-- **Frequency:** {{this.frequency}}
-- **Content:** {{this.content}}
+**Source:** Migration impact analysis
+
+{{#if deployment.communication.stakeholders}}
+| Stakeholder | Impact | Notification | Source |
+|-------------|--------|--------------|--------|
+{{#each deployment.communication.stakeholders}}
+| {{this.stakeholder}} | {{this.impact}} | {{this.notification}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-**Executive Management:**
-- **Method:** Email summary
-- **Frequency:** Major milestones only
-- **Content:** Go/No-go decision, deployment complete, rollback (if any)
-
-**Business Users:**
-- **Method:** Email + in-app notification
-- **Frequency:** Before deployment, after completion
-- **Content:** Downtime window, new features, known issues
-
-**Support Team:**
-- **Method:** Slack + email
-- **Frequency:** Before, during, and after deployment
-- **Content:** Changes, known issues, troubleshooting guide
-
-**Development Team:**
-- **Method:** Slack
-- **Frequency:** Real-time during deployment
-- **Content:** Step completion, issues encountered
+| Stakeholder | Impact | Notification |
+|-------------|--------|--------------|
+| End Users | {{metadata.cics_count}} online transactions | Pre/Post deployment |
+| Batch Operations | {{metadata.jcl_count}} job changes | Schedule change notice |
+| Database Team | {{metadata.db2_table_count}} table migration | Pre-deployment |
+| Support Team | All migrated services | Training, runbook |
 {{/if}}
 
-### 7.2 Communication Templates
+### 8.2 Notification Templates
 
-#### Pre-Deployment Notification
-{{#if communication.templates.pre_deployment}}
-{{{communication.templates.pre_deployment}}}
-{{else}}
+**Pre-Deployment:**
 ```
-Subject: [PROJECT] System Maintenance - [DATE]
+Subject: [{{project.name}}] Migration Deployment - {{deployment.date}}
 
-Dear Users,
+Migration Scope:
+- {{metadata.source_analysis.total_files}} COBOL programs → Java services
+- {{metadata.jcl_count}} batch jobs → Spring Batch
+- {{metadata.cics_count}} online transactions → REST APIs
 
-We will be performing system maintenance for the migration to our new platform.
-
-Maintenance Window: [DATE] [TIME] - [TIME]
+Deployment Window: [TIME]
 Expected Downtime: [DURATION]
+```
+
+**Post-Deployment Success:**
+```
+Subject: [{{project.name}}] Migration Completed Successfully
+
+All {{metadata.source_analysis.total_files}} services deployed and validated.
+System is operational.
+
+Please report any issues to [SUPPORT].
+```
+
+**Rollback Notification:**
+```
+Subject: [URGENT] [{{project.name}}] Deployment Rolled Back
+
+Reason: [REASON]
 Impact: [DESCRIPTION]
+Status: Previous version restored
 
-During this time, the system will be unavailable. We apologize for any inconvenience.
-
-For questions, please contact [SUPPORT EMAIL].
-
-Thank you for your patience.
+Next Steps: [PLAN]
 ```
-{{/if}}
-
-#### Deployment Success Notification
-{{#if communication.templates.success}}
-{{{communication.templates.success}}}
-{{else}}
-```
-Subject: [PROJECT] Migration Completed Successfully
-
-The system migration has been completed successfully.
-
-- New version deployed
-- All validation tests passed
-- System is now available
-
-Please report any issues to [SUPPORT EMAIL].
-
-Thank you for your cooperation.
-```
-{{/if}}
-
-#### Rollback Notification
-{{#if communication.templates.rollback}}
-{{{communication.templates.rollback}}}
-{{else}}
-```
-Subject: [URGENT] [PROJECT] Deployment Rolled Back
-
-Due to technical issues, we have rolled back the deployment to the previous version.
-
-Current Status: Previous version restored and operational
-Impact: [DESCRIPTION OF ANY DATA LOSS OR IMPACT]
-Next Steps: [PLAN FOR RE-DEPLOYMENT]
-
-We apologize for the inconvenience. We will provide updates as they become available.
-
-For urgent issues, please contact [ON-CALL NUMBER].
-```
-{{/if}}
-
----
-
-## 8. Contingency Planning
-
-### 8.1 Common Issues & Resolutions
-
-{{#if contingency.issues}}
-{{#each contingency.issues}}
-**Issue:** {{this.issue}}
-
-**Symptoms:** {{this.symptoms}}
-
-**Resolution:**
-{{this.resolution}}
-
----
-
-{{/each}}
-{{else}}
-**Issue:** Database connection pool exhausted
-
-**Symptoms:** "Connection timeout" errors, slow response times
-
-**Resolution:**
-```bash
-# Increase connection pool size
-# Edit application.yml:
-spring.datasource.hikari.maximum-pool-size=50
-
-# Restart application
-systemctl restart app
-```
-
-**Issue:** High CPU usage
-
-**Symptoms:** Slow response times, timeouts
-
-**Resolution:**
-- Check for long-running queries: `SELECT * FROM pg_stat_activity WHERE state = 'active' AND query_start < now() - interval '1 minute'`
-- Kill long-running queries if needed
-- Scale horizontally (add more instances)
-
-**Issue:** Disk space full
-
-**Symptoms:** "No space left on device" errors
-
-**Resolution:**
-```bash
-# Clear old logs
-find /var/log/app -name "*.log" -mtime +7 -delete
-
-# Clear temp files
-rm -rf /tmp/*
-
-# Expand disk if needed
-```
-{{/if}}
 
 ---
 
 ## 9. Post-Deployment Tasks
 
-### 9.1 Immediate Tasks (Within 24 hours)
+### 9.1 Immediate Tasks (0-24 hours)
 
-{{#if post_deployment.immediate}}
-{{#each post_deployment.immediate}}
-- [ ] {{this}}
-{{/each}}
-{{else}}
+**Source:** Deployment validation requirements
+
+- [ ] Verify all {{metadata.source_analysis.total_files}} services healthy
+- [ ] Validate {{metadata.db2_table_count}} database tables
+- [ ] Confirm {{metadata.jcl_count}} batch jobs scheduled
+- [ ] Execute smoke tests for critical functions
+- [ ] Monitor error rates and performance
 - [ ] Send deployment success notification
-- [ ] Update status page
-- [ ] Archive old application version (BLUE environment)
-- [ ] Document any issues encountered during deployment
-- [ ] Update runbook with any new procedures
-- [ ] Schedule post-deployment review meeting
-{{/if}}
 
-### 9.2 Short-term Tasks (Within 1 week)
+### 9.2 Short-term Tasks (Week 1)
 
-{{#if post_deployment.short_term}}
-{{#each post_deployment.short_term}}
-- [ ] {{this}}
-{{/each}}
-{{else}}
-- [ ] Conduct post-deployment review meeting
-- [ ] Update documentation with lessons learned
-- [ ] Analyze performance metrics and optimize if needed
-- [ ] Review and close deployment-related tickets
-- [ ] Plan for decommissioning old system (if applicable)
-{{/if}}
+**Source:** Migration scope
 
-### 9.3 Long-term Tasks (Within 1 month)
+- [ ] Complete data migration validation
+- [ ] Run full regression test suite
+- [ ] Verify all {{metadata.cics_count}} transaction equivalents
+- [ ] Document any issues and workarounds
+- [ ] Conduct daily stand-up with support team
 
-{{#if post_deployment.long_term}}
-{{#each post_deployment.long_term}}
-- [ ] {{this}}
-{{/each}}
-{{else}}
-- [ ] Decommission old system and infrastructure
-- [ ] Archive old system data
-- [ ] Update disaster recovery plans
-- [ ] Conduct knowledge transfer sessions
-- [ ] Publish case study or lessons learned document
-{{/if}}
+### 9.3 Long-term Tasks (Month 1)
+
+**Source:** Decommissioning plan
+
+- [ ] Decommission COBOL programs ({{metadata.source_analysis.total_files}})
+- [ ] Archive JCL jobs ({{metadata.jcl_count}})
+- [ ] Update operational documentation
+- [ ] Complete knowledge transfer
+- [ ] Conduct lessons learned session
 
 ---
 
-## 10. Appendices
+## Appendices
 
-### Appendix A: Configuration Files
+### Appendix A: Deployment Artifact Manifest
 
-{{#if appendix.config_files}}
-{{#each appendix.config_files}}
+{{#if appendix.artifacts}}
+| Artifact | Version | Source | Checksum |
+|----------|---------|--------|----------|
+{{#each appendix.artifacts}}
+| {{this.artifact}} | {{this.version}} | `{{this.source}}` | {{this.checksum}} |
+{{/each}}
+{{/if}}
+
+### Appendix B: Rollback Scripts
+
+{{#if appendix.rollback_scripts}}
+{{#each appendix.rollback_scripts}}
 #### {{this.name}}
 
-```{{this.language}}
-{{{this.content}}}
+```bash
+{{{this.script}}}
 ```
 
 ---
@@ -861,27 +687,36 @@ rm -rf /tmp/*
 {{/each}}
 {{/if}}
 
-### Appendix B: Deployment Scripts
+### Appendix C: Validation Queries
 
-{{#if appendix.scripts}}
-*[All deployment scripts stored in /scripts directory]*
-{{/if}}
+{{#if appendix.validation_queries}}
+{{#each appendix.validation_queries}}
+#### {{this.name}}
 
-### Appendix C: Contact List
+```sql
+{{{this.query}}}
+```
 
-{{#if appendix.contacts}}
-| Name | Role | Phone | Email |
-|------|------|-------|-------|
-{{#each appendix.contacts}}
-| {{this.name}} | {{this.role}} | {{this.phone}} | {{this.email}} |
+---
+
 {{/each}}
 {{/if}}
 
-### Appendix D: Runbook
+### Appendix D: Contact List
 
-{{#if appendix.runbook}}
-*[See separate runbook document for operational procedures]*
+{{#if appendix.contacts}}
+| Role | Name | Contact | Responsibility |
+|------|------|---------|----------------|
+{{#each appendix.contacts}}
+| {{this.role}} | {{this.name}} | {{this.contact}} | {{this.responsibility}} |
+{{/each}}
 {{/if}}
+
+---
+
+## Traceability Note
+
+All deployment and rollback procedures in this document are derived from COBOL source analysis. Component counts, dependencies, and migration artifacts are traced to original source files. Items marked "Not found in source" require manual planning or additional analysis.
 
 ---
 
@@ -889,7 +724,7 @@ rm -rf /tmp/*
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
 
 ---
 

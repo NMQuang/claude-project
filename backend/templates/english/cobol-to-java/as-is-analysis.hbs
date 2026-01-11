@@ -1,378 +1,489 @@
-# As-Is Analysis Document
+# As-Is Analysis Document (COBOL → Java)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | COBOL → Java |
 | **Document Type** | As-Is Analysis |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Source Artifacts Inventory
 
-This document provides a comprehensive analysis of the current system (As-Is) for the **{{project.name}}** migration project. The analysis covers the source code structure, database schema, system architecture, dependencies, and identified risks.
+### 1.1 COBOL Program Inventory
 
-### Key Findings
-
-- **Total Source Files:** {{metadata.source_analysis.total_files}}
-- **Total Lines of Code:** {{metadata.source_analysis.total_loc}}
-- **Source Language:** {{source.language}}
-- **Source Database:** {{source.database}}
-- **Complexity Assessment:** {{metadata.complexity_summary}}
-
----
-
-## 1. System Overview
-
-### 1.1 Purpose and Scope
-
-{{#if system_overview.purpose}}
-{{system_overview.purpose}}
-{{else}}
-*[Describe the purpose of the current system, business functions it supports, and scope of this analysis]*
-{{/if}}
-
-### 1.2 System Architecture
-
-{{#if system_overview.architecture}}
-{{system_overview.architecture}}
-{{else}}
-*[Describe the high-level architecture: client-server, batch processing, mainframe, etc.]*
-{{/if}}
-
-```mermaid
-{{#if diagrams.architecture}}
-{{{diagrams.architecture}}}
-{{else}}
-graph LR
-    A[User Interface] --> B[Application Layer]
-    B --> C[Database Layer]
-{{/if}}
-```
-
-### 1.3 Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| Programming Language | {{source.language}} |
-| Database | {{source.database}} |
-| Application Server | {{source.app_server}} |
-| Operating System | {{source.os}} |
-{{#each source.additional_tech}}
-| {{this.component}} | {{this.technology}} |
-{{/each}}
-
----
-
-## 2. Source Code Analysis
-
-### 2.1 Code Structure
-
-#### File Inventory
+**Source:** Directory scan of `{{source.base_path}}`
 
 {{#if metadata.source_analysis.programs}}
-| File Name | Type | LOC | Complexity | Priority |
-|-----------|------|-----|------------|----------|
+| Program Name | Type | LOC | Complexity Score | Copybooks Used | Source Path |
+|--------------|------|-----|------------------|----------------|-------------|
 {{#each metadata.source_analysis.programs}}
-| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | {{this.priority}} |
+| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | {{this.copybooks}} | `{{this.path}}` |
+{{/each}}
+
+**Totals:**
+- Programs: {{metadata.source_analysis.total_files}}
+- Total LOC: {{metadata.source_analysis.total_loc}}
+{{else}}
+> **Not found in source:** No COBOL programs detected in `{{source.base_path}}`
+{{/if}}
+
+### 1.2 Copybook Inventory
+
+**Source:** COPY statement extraction from COBOL programs
+
+{{#if metadata.copybooks}}
+| Copybook Name | Used By Programs | Field Count | Source Path |
+|---------------|------------------|-------------|-------------|
+{{#each metadata.copybooks}}
+| {{this.name}} | {{this.used_by}} | {{this.field_count}} | `{{this.path}}` |
 {{/each}}
 {{else}}
-*[No source files analyzed yet]*
+> **Not found in source:** No copybooks detected.
 {{/if}}
 
-**Total Files:** {{metadata.source_analysis.total_files}}
-**Total LOC:** {{metadata.source_analysis.total_loc}}
+### 1.3 JCL/Job Inventory
 
-#### File Type Distribution
+**Source:** JCL file scan
 
-{{#if metadata.file_type_distribution}}
-| File Type | Count | Percentage |
-|-----------|-------|------------|
-{{#each metadata.file_type_distribution}}
-| {{this.type}} | {{this.count}} | {{this.percentage}}% |
+{{#if metadata.jcl_jobs}}
+| Job Name | Steps | Programs Called | Schedule | Source Path |
+|----------|-------|-----------------|----------|-------------|
+{{#each metadata.jcl_jobs}}
+| {{this.name}} | {{this.step_count}} | {{this.programs}} | {{this.schedule}} | `{{this.path}}` |
 {{/each}}
+{{else}}
+> **Not found in source:** No JCL files detected.
 {{/if}}
 
-### 2.2 Program Dependencies
+---
+
+## 2. COBOL Program Structure Analysis
+
+### 2.1 Division Breakdown
+
+**Source:** COBOL division parsing
+
+{{#if metadata.program_structure}}
+{{#each metadata.program_structure}}
+#### Program: {{this.name}}
+
+**Source:** `{{this.path}}`
+
+| Division | Lines | Key Sections |
+|----------|-------|--------------|
+| IDENTIFICATION | {{this.id_division_lines}} | PROGRAM-ID: {{this.program_id}} |
+| ENVIRONMENT | {{this.env_division_lines}} | {{this.env_sections}} |
+| DATA | {{this.data_division_lines}} | {{this.data_sections}} |
+| PROCEDURE | {{this.proc_division_lines}} | {{this.procedure_sections}} |
+
+{{/each}}
+{{else}}
+> **Not found in source:** Program structure not analyzed.
+{{/if}}
+
+### 2.2 Paragraph/Section Inventory
+
+**Source:** PROCEDURE DIVISION parsing
+
+{{#if metadata.paragraphs}}
+| Program | Paragraph/Section | Lines | PERFORM Count | Source Location |
+|---------|-------------------|-------|---------------|-----------------|
+{{#each metadata.paragraphs}}
+| {{this.program}} | {{this.name}} | {{this.lines}} | {{this.perform_count}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Paragraph analysis not performed.
+{{/if}}
+
+### 2.3 PERFORM Call Graph
+
+**Source:** PERFORM statement extraction
+
+{{#if metadata.perform_graph}}
+```mermaid
+{{{metadata.perform_graph}}}
+```
+{{else}}
+> **Not found in source:** PERFORM graph not generated.
+{{/if}}
+
+---
+
+## 3. Data Division Analysis
+
+### 3.1 Working-Storage Section
+
+**Source:** WORKING-STORAGE SECTION parsing
+
+{{#if metadata.working_storage}}
+{{#each metadata.working_storage}}
+#### Program: {{this.program}}
+
+**Source:** `{{this.file}}:{{this.start_line}}-{{this.end_line}}`
+
+| Level | Data Name | PIC Clause | Occurs | Redefines | Usage |
+|-------|-----------|------------|--------|-----------|-------|
+{{#each this.items}}
+| {{this.level}} | {{this.name}} | {{this.pic}} | {{this.occurs}} | {{this.redefines}} | {{this.usage}} |
+{{/each}}
+
+{{/each}}
+{{else}}
+> **Not found in source:** WORKING-STORAGE not analyzed.
+{{/if}}
+
+### 3.2 File Section (FD)
+
+**Source:** FILE SECTION parsing
+
+{{#if metadata.file_section}}
+{{#each metadata.file_section}}
+#### File: {{this.fd_name}}
+
+**Source:** `{{this.file}}:{{this.line}}`
+
+| Attribute | Value |
+|-----------|-------|
+| SELECT | {{this.select_clause}} |
+| ASSIGN TO | {{this.assign_to}} |
+| ORGANIZATION | {{this.organization}} |
+| ACCESS MODE | {{this.access_mode}} |
+| RECORD KEY | {{this.record_key}} |
+| Record Length | {{this.record_length}} |
+
+**Record Layout:**
+| Level | Field Name | PIC | Bytes | Description |
+|-------|------------|-----|-------|-------------|
+{{#each this.record_layout}}
+| {{this.level}} | {{this.name}} | {{this.pic}} | {{this.bytes}} | {{this.description}} |
+{{/each}}
+
+{{/each}}
+{{else}}
+> **Not found in source:** FILE SECTION not detected.
+{{/if}}
+
+### 3.3 Copybook Data Structures
+
+**Source:** Copybook parsing
+
+{{#if metadata.copybook_structures}}
+{{#each metadata.copybook_structures}}
+#### Copybook: {{this.name}}
+
+**Source:** `{{this.path}}`
+
+```cobol
+{{{this.content}}}
+```
+
+**Field Summary:**
+| Level | Field Name | PIC Clause | Bytes | Java Type Suggestion |
+|-------|------------|------------|-------|----------------------|
+{{#each this.fields}}
+| {{this.level}} | {{this.name}} | {{this.pic}} | {{this.bytes}} | {{this.java_type}} |
+{{/each}}
+
+{{/each}}
+{{else}}
+> **Not found in source:** Copybook structures not parsed.
+{{/if}}
+
+---
+
+## 4. Database/File Access Analysis
+
+### 4.1 VSAM File Access
+
+**Source:** SELECT/ASSIGN and file I/O statement extraction
+
+{{#if metadata.vsam_files}}
+| File DD Name | File Type | Access Mode | Key Field | Operations | Source Location |
+|--------------|-----------|-------------|-----------|------------|-----------------|
+{{#each metadata.vsam_files}}
+| {{this.dd_name}} | {{this.type}} | {{this.access}} | {{this.key}} | {{this.operations}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No VSAM file access detected.
+{{/if}}
+
+### 4.2 DB2/SQL Statements
+
+**Source:** EXEC SQL extraction
+
+{{#if metadata.sql_statements}}
+{{#each metadata.sql_statements}}
+#### SQL in: {{this.program}}
+
+**Source:** `{{this.file}}:{{this.line}}`
+
+```sql
+{{{this.sql}}}
+```
+
+| Attribute | Value |
+|-----------|-------|
+| Type | {{this.type}} |
+| Tables | {{this.tables}} |
+| Cursor | {{this.cursor_name}} |
+| Host Variables | {{this.host_vars}} |
+
+{{/each}}
+{{else}}
+> **Not found in source:** No EXEC SQL statements detected.
+{{/if}}
+
+### 4.3 CICS Commands
+
+**Source:** EXEC CICS extraction
+
+{{#if metadata.cics_commands}}
+| Program | Command | Resource | Source Location |
+|---------|---------|----------|-----------------|
+{{#each metadata.cics_commands}}
+| {{this.program}} | {{this.command}} | {{this.resource}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No EXEC CICS commands detected.
+{{/if}}
+
+---
+
+## 5. Program Dependencies
+
+### 5.1 CALL Statements
+
+**Source:** CALL statement extraction
+
+{{#if metadata.call_statements}}
+| Calling Program | Called Program/Module | Parameters | Source Location |
+|-----------------|----------------------|------------|-----------------|
+{{#each metadata.call_statements}}
+| {{this.caller}} | {{this.callee}} | {{this.params}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No CALL statements detected.
+{{/if}}
+
+### 5.2 Program Dependency Graph
+
+**Source:** CALL and COPY analysis
 
 {{#if metadata.dependency_graph}}
 ```mermaid
 {{{metadata.dependency_graph}}}
 ```
 {{else}}
-*[Dependency analysis pending]*
+> **Not found in source:** Dependency graph not generated.
 {{/if}}
 
-#### Key Dependencies
+### 5.3 External Interface Calls
 
-{{#if metadata.dependencies}}
-{{#each metadata.dependencies}}
-- **{{this.source}}** depends on: {{this.targets}}
+**Source:** External system call extraction
+
+{{#if metadata.external_calls}}
+| Program | Interface Type | Target System | Parameters | Source Location |
+|---------|----------------|---------------|------------|-----------------|
+{{#each metadata.external_calls}}
+| {{this.program}} | {{this.type}} | {{this.target}} | {{this.params}} | `{{this.file}}:{{this.line}}` |
 {{/each}}
 {{else}}
-*[No critical dependencies identified yet]*
-{{/if}}
-
-### 2.3 Business Logic Analysis
-
-#### Core Business Processes
-
-{{#if business_logic}}
-{{#each business_logic}}
-##### {{this.name}}
-
-**Description:** {{this.description}}
-
-**Implemented In:** {{this.files}}
-
-**Complexity:** {{this.complexity_level}}
-
-{{/each}}
-{{else}}
-*[Business logic analysis to be completed manually]*
-{{/if}}
-
-### 2.4 Data Structures
-
-{{#if metadata.data_structures}}
-| Structure Name | Type | Fields | Used By |
-|----------------|------|--------|---------|
-{{#each metadata.data_structures}}
-| {{this.name}} | {{this.type}} | {{this.field_count}} | {{this.used_by}} |
-{{/each}}
+> **Not found in source:** No external interface calls detected.
 {{/if}}
 
 ---
 
-## 3. Database Analysis
+## 6. Complexity Analysis
 
-### 3.1 Schema Overview
+### 6.1 Cyclomatic Complexity by Program
 
-| Metric | Count |
-|--------|-------|
-| Total Tables | {{metadata.source_analysis.database.tables}} |
-| Total Views | {{metadata.source_analysis.database.views}} |
-| Total Indexes | {{metadata.source_analysis.database.indexes}} |
-| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} |
-| Triggers | {{metadata.source_analysis.database.triggers}} |
-| Functions | {{metadata.source_analysis.database.functions}} |
-
-### 3.2 Table Inventory
-
-{{#if metadata.database.tables}}
-| Table Name | Rows (Est.) | Columns | Primary Key | Indexes | Foreign Keys |
-|------------|-------------|---------|-------------|---------|--------------|
-{{#each metadata.database.tables}}
-| {{this.name}} | {{this.row_count}} | {{this.column_count}} | {{this.pk}} | {{this.index_count}} | {{this.fk_count}} |
-{{/each}}
-{{/if}}
-
-### 3.3 Data Volume Analysis
-
-{{#if metadata.database.data_volume}}
-| Category | Size |
-|----------|------|
-| Total Database Size | {{metadata.database.data_volume.total_size}} |
-| Largest Table | {{metadata.database.data_volume.largest_table}} ({{metadata.database.data_volume.largest_size}}) |
-| Average Row Size | {{metadata.database.data_volume.avg_row_size}} |
-{{/if}}
-
-### 3.4 Database Objects
-
-#### Stored Procedures
-
-{{#if metadata.database.stored_procedures}}
-| Name | LOC | Complexity | Purpose |
-|------|-----|------------|---------|
-{{#each metadata.database.stored_procedures}}
-| {{this.name}} | {{this.loc}} | {{this.complexity}} | {{this.purpose}} |
-{{/each}}
-{{/if}}
-
-#### Views
-
-{{#if metadata.database.views}}
-| Name | Base Tables | Purpose |
-|------|-------------|---------|
-{{#each metadata.database.views}}
-| {{this.name}} | {{this.base_tables}} | {{this.purpose}} |
-{{/each}}
-{{/if}}
-
----
-
-## 4. Complexity & Quality Assessment
-
-### 4.1 Code Complexity Metrics
+**Source:** Control flow analysis
 
 {{#if metadata.complexity}}
-| Metric | Value | Threshold | Status |
-|--------|-------|-----------|--------|
-| Average Cyclomatic Complexity | {{metadata.complexity.avg_cyclomatic}} | {{complexity_thresholds.cyclomatic}} | {{metadata.complexity.cyclomatic_status}} |
-| Max Cyclomatic Complexity | {{metadata.complexity.max_cyclomatic}} | - | {{metadata.complexity.max_status}} |
-| Average Method Length | {{metadata.complexity.avg_method_length}} | {{complexity_thresholds.method_length}} | {{metadata.complexity.method_status}} |
+| Program | Paragraphs | IF Statements | EVALUATE | PERFORM | GO TO | Complexity Score |
+|---------|------------|---------------|----------|---------|-------|------------------|
+{{#each metadata.complexity.by_program}}
+| {{this.name}} | {{this.paragraphs}} | {{this.if_count}} | {{this.evaluate_count}} | {{this.perform_count}} | {{this.goto_count}} | {{this.score}} |
+{{/each}}
+
+**Summary:**
+- Average Complexity: {{metadata.complexity.avg_cyclomatic}}
+- Max Complexity: {{metadata.complexity.max_cyclomatic}} ({{metadata.complexity.max_program}})
+- High Complexity Programs (>15): {{metadata.complexity.high_count}}
+{{else}}
+> **Not found in source:** Complexity analysis not performed.
 {{/if}}
 
-### 4.2 High Complexity Modules
+### 6.2 High Complexity Paragraphs
 
-{{#if metadata.high_complexity_modules}}
-| Module | Complexity Score | Risk Level | Recommendation |
-|--------|------------------|------------|----------------|
-{{#each metadata.high_complexity_modules}}
-| {{this.name}} | {{this.score}} | {{this.risk}} | {{this.recommendation}} |
+**Source:** Paragraph-level complexity analysis
+
+{{#if metadata.high_complexity_paragraphs}}
+| Program | Paragraph | Lines | Nested IFs | Complexity | Source Location |
+|---------|-----------|-------|------------|------------|-----------------|
+{{#each metadata.high_complexity_paragraphs}}
+| {{this.program}} | {{this.paragraph}} | {{this.lines}} | {{this.nested_ifs}} | {{this.complexity}} | `{{this.file}}:{{this.line}}` |
 {{/each}}
 {{else}}
-*[No high-complexity modules identified]*
-{{/if}}
-
-### 4.3 Code Quality Issues
-
-{{#if metadata.quality_issues}}
-{{#each metadata.quality_issues}}
-- **{{this.severity}}:** {{this.description}} (Found in: {{this.location}})
-{{/each}}
-{{else}}
-*[Code quality analysis to be performed]*
+> **Not found in source:** No high complexity paragraphs identified.
 {{/if}}
 
 ---
 
-## 5. Integration & External Dependencies
+## 7. Code Patterns Detected
 
-### 5.1 External Systems
+### 7.1 Common COBOL Patterns
 
-{{#if integrations}}
-| System Name | Integration Type | Protocol | Frequency |
-|-------------|------------------|----------|-----------|
-{{#each integrations}}
-| {{this.name}} | {{this.type}} | {{this.protocol}} | {{this.frequency}} |
+**Source:** Pattern matching analysis
+
+{{#if metadata.patterns}}
+| Pattern | Occurrences | Programs | Example Location |
+|---------|-------------|----------|------------------|
+{{#each metadata.patterns}}
+| {{this.pattern}} | {{this.count}} | {{this.programs}} | `{{this.example_location}}` |
 {{/each}}
 {{else}}
-*[External system integrations to be documented]*
+> **Not found in source:** Pattern analysis not performed.
 {{/if}}
 
-### 5.2 File I/O Operations
+### 7.2 Problematic Constructs
 
-{{#if metadata.file_operations}}
-| Operation Type | File Format | Purpose |
-|----------------|-------------|---------|
-{{#each metadata.file_operations}}
-| {{this.type}} | {{this.format}} | {{this.purpose}} |
+**Source:** Code smell detection
+
+{{#if metadata.code_issues}}
+| Issue Type | Severity | Count | Locations |
+|------------|----------|-------|-----------|
+{{#each metadata.code_issues}}
+| {{this.type}} | {{this.severity}} | {{this.count}} | {{this.locations}} |
 {{/each}}
+{{else}}
+> **Not found in source:** No problematic constructs detected.
 {{/if}}
 
 ---
 
-## 6. Risk Assessment
+## 8. Business Logic Extraction
 
-### 6.1 Identified Risks
+### 8.1 Identified Business Rules
+
+**Source:** Condition extraction from COBOL code
+
+{{#if metadata.business_rules}}
+{{#each metadata.business_rules}}
+#### Rule: {{this.id}}
+
+**Source:** `{{this.file}}:{{this.line}}`
+
+**Condition:**
+```cobol
+{{{this.condition}}}
+```
+
+**Action:**
+```cobol
+{{{this.action}}}
+```
+
+| Attribute | Value |
+|-----------|-------|
+| Variables Involved | {{this.variables}} |
+| Paragraph | {{this.paragraph}} |
+
+{{/each}}
+{{else}}
+> **Not found in source:** Business rules require manual extraction.
+{{/if}}
+
+### 8.2 Calculation Logic
+
+**Source:** COMPUTE/arithmetic statement extraction
+
+{{#if metadata.calculations}}
+| Program | Paragraph | Calculation | Variables | Source Location |
+|---------|-----------|-------------|-----------|-----------------|
+{{#each metadata.calculations}}
+| {{this.program}} | {{this.paragraph}} | `{{this.expression}}` | {{this.variables}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No COMPUTE statements detected.
+{{/if}}
+
+---
+
+## 9. Migration Risk Assessment
+
+### 9.1 Risks from Source Analysis
+
+**Source:** Automated risk detection
 
 {{#if metadata.risks}}
-| Risk ID | Category | Description | Severity | Impact | Mitigation |
-|---------|----------|-------------|----------|--------|------------|
+| Risk ID | Category | Description | Severity | Source Evidence |
+|---------|----------|-------------|----------|-----------------|
 {{#each metadata.risks}}
-| R-{{this.id}} | {{this.category}} | {{this.description}} | {{this.severity}} | {{this.impact}} | {{this.mitigation}} |
+| {{this.id}} | {{this.category}} | {{this.description}} | {{this.severity}} | `{{this.evidence}}` |
 {{/each}}
 {{else}}
-*[Risk assessment to be completed]*
+> **Not found in source:** Risk assessment requires manual review.
 {{/if}}
 
-### 6.2 Technical Debt
+### 9.2 Unsupported Constructs
 
-{{#if technical_debt}}
-{{#each technical_debt}}
-- **{{this.area}}:** {{this.description}} (Effort: {{this.effort}})
+**Source:** Construct compatibility check
+
+{{#if metadata.unsupported}}
+| Construct | Count | Programs | Migration Impact |
+|-----------|-------|----------|------------------|
+{{#each metadata.unsupported}}
+| {{this.construct}} | {{this.count}} | {{this.programs}} | {{this.impact}} |
 {{/each}}
-{{/if}}
-
-### 6.3 Migration Challenges
-
-{{#if migration_challenges}}
-{{#each migration_challenges}}
-##### {{this.title}}
-
-**Challenge:** {{this.description}}
-
-**Impact:** {{this.impact}}
-
-**Proposed Approach:** {{this.approach}}
-
-{{/each}}
-{{/if}}
-
----
-
-## 7. Environment & Infrastructure
-
-### 7.1 Current Environment
-
-| Component | Details |
-|-----------|---------|
-| Development | {{environment.development}} |
-| Testing | {{environment.testing}} |
-| Staging | {{environment.staging}} |
-| Production | {{environment.production}} |
-
-### 7.2 Hardware Specifications
-
-{{#if infrastructure.hardware}}
-| Server Type | Specifications |
-|-------------|----------------|
-{{#each infrastructure.hardware}}
-| {{this.type}} | {{this.specs}} |
-{{/each}}
-{{/if}}
-
----
-
-## 8. Recommendations
-
-### 8.1 Migration Approach
-
-{{#if recommendations.migration_approach}}
-{{recommendations.migration_approach}}
 {{else}}
-*[To be defined in Migration Strategy document]*
-{{/if}}
-
-### 8.2 Priority Areas
-
-{{#if recommendations.priorities}}
-1. {{#each recommendations.priorities}}
-   {{@index}}. **{{this.area}}:** {{this.description}}
-{{/each}}
+> **Not found in source:** No unsupported constructs detected.
 {{/if}}
 
 ---
 
 ## Appendices
 
-### Appendix A: Complete File List
+### Appendix A: Complete Program List
 
-{{#if appendix.file_list}}
+{{#if appendix.program_list}}
 ```
-{{#each appendix.file_list}}
-{{this.path}} ({{this.size}})
+{{#each appendix.program_list}}
+{{this.name}} | {{this.loc}} LOC | {{this.path}}
 {{/each}}
 ```
 {{/if}}
 
-### Appendix B: Data Dictionary
+### Appendix B: Copybook Cross-Reference
 
-{{#if appendix.data_dictionary}}
-*[See separate data dictionary document]*
+{{#if appendix.copybook_xref}}
+| Copybook | Used In Programs |
+|----------|------------------|
+{{#each appendix.copybook_xref}}
+| {{this.copybook}} | {{this.programs}} |
+{{/each}}
 {{/if}}
 
-### Appendix C: Interface Specifications
+### Appendix C: Source Code Metrics
 
-{{#if appendix.interfaces}}
-*[See interface documentation]*
-{{/if}}
+| Metric | Value |
+|--------|-------|
+| Total Programs | {{metadata.source_analysis.total_files}} |
+| Total LOC | {{metadata.source_analysis.total_loc}} |
+| Total Copybooks | {{metadata.copybook_count}} |
+| Total Paragraphs | {{metadata.paragraph_count}} |
+| Average Complexity | {{metadata.complexity.avg_cyclomatic}} |
+
+---
+
+## Traceability Note
+
+All data in this document is extracted directly from source COBOL programs, copybooks, and JCL files. Each item includes a source reference in the format `filename:line_number`. Items marked "Not found in source" indicate that the analysis tools could not automatically extract this information.
 
 ---
 
@@ -380,7 +491,7 @@ graph LR
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
 
 ---
 

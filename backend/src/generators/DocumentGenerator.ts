@@ -38,13 +38,17 @@ export class DocumentGenerator {
     // Try paths in order of priority:
     // 1. Language + Migration Type specific
     // 2. English + Migration Type specific
-    // 3. Language only (legacy fallback for backward compatibility)
-    // 4. English only (fallback)
+    // 3. Language + Common templates (technology-agnostic)
+    // 4. English + Common templates (technology-agnostic)
+    // 5. Language only (legacy fallback for backward compatibility)
+    // 6. English only (legacy fallback)
     const tryPaths = [
       path.join(languageFolder, migrationSubfolder, `${documentType}.hbs`),
       path.join('english', migrationSubfolder, `${documentType}.hbs`),
-      path.join(languageFolder, `${documentType}.hbs`),  // Legacy fallback
-      path.join('english', `${documentType}.hbs`)         // Legacy fallback
+      path.join(languageFolder, 'common', `${documentType}.hbs`),  // Common templates
+      path.join('english', 'common', `${documentType}.hbs`),        // English common fallback
+      path.join(languageFolder, `${documentType}.hbs`),             // Legacy fallback
+      path.join('english', `${documentType}.hbs`)                   // Legacy fallback
     ];
 
     let templatePath: string | null = null;
@@ -71,7 +75,7 @@ export class DocumentGenerator {
    */
   private getMigrationSubfolder(migrationType?: string): string {
     if (!migrationType) {
-      return 'cobol-to-java'; // Default for backward compatibility
+      return 'common'; // Default to common templates for technology-agnostic approach
     }
 
     // Normalize migration type names to folder names
@@ -80,10 +84,12 @@ export class DocumentGenerator {
       'PostgreSQL-to-Oracle': 'pg-to-oracle',
       'PL1-to-Java': 'pl1-to-java',
       'Oracle-to-PostgreSQL': 'oracle-to-pg',
-      'MySQL-to-Oracle': 'mysql-to-oracle'
+      'MySQL-to-Oracle': 'mysql-to-oracle',
+      'Common': 'common',
+      'common': 'common'
     };
 
-    return typeMap[migrationType] || 'cobol-to-java'; // Default fallback
+    return typeMap[migrationType] || 'common'; // Default to common templates
   }
 
   /**
