@@ -1,0 +1,523 @@
+# As-Is Analysis Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Source Technology** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **Target Technology** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **Document Type** | As-Is Analysis |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+
+---
+
+## Executive Summary
+
+**Source:** Extracted from analysis of {{metadata.source_analysis.total_files}} source files.
+
+| Metric | Value | Source Reference |
+|--------|-------|------------------|
+| Total Source Files | {{metadata.source_analysis.total_files}} | Scan of {{source.base_path}} |
+| Total Lines of Code | {{metadata.source_analysis.total_loc}} | LOC analysis |
+| Source Language | {{source.language}} | File extension analysis |
+{{#if source.database}}| Source Database | {{source.database}} | Connection/DDL analysis |{{/if}}
+| Complexity Score | {{metadata.complexity_summary}} | Cyclomatic complexity analysis |
+
+---
+
+## 1. Source Artifacts Inventory
+
+### 1.1 File Inventory
+
+**Source:** Directory scan of `{{source.base_path}}`
+
+{{#if metadata.source_analysis.programs}}
+| File Name | Type | LOC | Complexity | Source Path |
+|-----------|------|-----|------------|-------------|
+{{#each metadata.source_analysis.programs}}
+| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No program files detected in scan.
+{{/if}}
+
+**Summary:**
+- Total Files: {{metadata.source_analysis.total_files}}
+- Total LOC: {{metadata.source_analysis.total_loc}}
+
+### 1.2 File Type Distribution
+
+**Source:** File extension analysis
+
+{{#if metadata.file_type_distribution}}
+| File Type | Count | Percentage | Example Files |
+|-----------|-------|------------|---------------|
+{{#each metadata.file_type_distribution}}
+| {{this.type}} | {{this.count}} | {{this.percentage}}% | {{this.examples}} |
+{{/each}}
+{{else}}
+> **Not found in source:** File type distribution not analyzed.
+{{/if}}
+
+---
+
+## 2. Source Code Structure
+
+### 2.1 Module/Component Structure
+
+**Source:** Static code analysis
+
+{{#if metadata.modules}}
+| Module Name | Files | LOC | Purpose | Source Path |
+|-------------|-------|-----|---------|-------------|
+{{#each metadata.modules}}
+| {{this.name}} | {{this.file_count}} | {{this.loc}} | {{this.purpose}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Module structure not detected.
+{{/if}}
+
+### 2.2 Entry Points
+
+**Source:** Call graph analysis
+
+{{#if metadata.entry_points}}
+| Entry Point | Type | Called From | Source Location |
+|-------------|------|-------------|-----------------|
+{{#each metadata.entry_points}}
+| {{this.name}} | {{this.type}} | {{this.caller}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Entry points not identified.
+{{/if}}
+
+### 2.3 Dependencies Between Components
+
+**Source:** Import/Include analysis
+
+{{#if metadata.dependency_graph}}
+```mermaid
+{{{metadata.dependency_graph}}}
+```
+{{else}}
+> **Not found in source:** Dependency graph not generated.
+{{/if}}
+
+{{#if metadata.dependencies}}
+| Source Component | Depends On | Dependency Type | Source Location |
+|------------------|------------|-----------------|-----------------|
+{{#each metadata.dependencies}}
+| {{this.source}} | {{this.target}} | {{this.type}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{/if}}
+
+---
+
+## 3. Data Structures
+
+### 3.1 Data Definitions
+
+**Source:** Data structure extraction from source code
+
+{{#if metadata.data_structures}}
+| Structure Name | Type | Field Count | Source Location | Used By |
+|----------------|------|-------------|-----------------|---------|
+{{#each metadata.data_structures}}
+| {{this.name}} | {{this.type}} | {{this.field_count}} | `{{this.file}}:{{this.line}}` | {{this.used_by}} |
+{{/each}}
+{{else}}
+> **Not found in source:** No data structures extracted.
+{{/if}}
+
+### 3.2 Data Structure Details
+
+{{#if metadata.data_structure_details}}
+{{#each metadata.data_structure_details}}
+#### {{this.name}}
+
+**Source:** `{{this.file}}:{{this.line}}`
+
+| Field Name | Data Type | Length | Nullable | Description |
+|------------|-----------|--------|----------|-------------|
+{{#each this.fields}}
+| {{this.name}} | {{this.type}} | {{this.length}} | {{this.nullable}} | {{this.description}} |
+{{/each}}
+
+{{/each}}
+{{/if}}
+
+---
+
+## 4. Database Analysis
+
+{{#if source.database}}
+
+### 4.1 Database Objects Summary
+
+**Source:** DDL/Schema extraction from {{source.database}}
+
+| Object Type | Count | Source |
+|-------------|-------|--------|
+| Tables | {{metadata.source_analysis.database.tables}} | Schema scan |
+| Views | {{metadata.source_analysis.database.views}} | Schema scan |
+| Indexes | {{metadata.source_analysis.database.indexes}} | Schema scan |
+| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Schema scan |
+| Functions | {{metadata.source_analysis.database.functions}} | Schema scan |
+| Triggers | {{metadata.source_analysis.database.triggers}} | Schema scan |
+{{#if metadata.source_analysis.database.sequences}}| Sequences | {{metadata.source_analysis.database.sequences}} | Schema scan |{{/if}}
+{{#if metadata.source_analysis.database.partitionedTables}}| Partitioned Tables | {{metadata.source_analysis.database.partitionedTables}} | Schema scan |{{/if}}
+
+### 4.2 Table Inventory
+
+**Source:** Database schema extraction
+
+{{#if metadata.database.tables}}
+| Table Name | Row Count (Est.) | Columns | Primary Key | Indexes | Source DDL |
+|------------|------------------|---------|-------------|---------|------------|
+{{#each metadata.database.tables}}
+| {{this.name}} | {{this.row_count}} | {{this.column_count}} | {{this.pk}} | {{this.index_count}} | `{{this.ddl_file}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Table inventory not available.
+{{/if}}
+
+### 4.3 Column Details
+
+{{#if metadata.database.column_details}}
+{{#each metadata.database.column_details}}
+#### Table: {{this.table_name}}
+
+**Source:** `{{this.ddl_file}}`
+
+| Column Name | Data Type | Nullable | Default | Constraints |
+|-------------|-----------|----------|---------|-------------|
+{{#each this.columns}}
+| {{this.name}} | {{this.type}} | {{this.nullable}} | {{this.default}} | {{this.constraints}} |
+{{/each}}
+
+{{/each}}
+{{/if}}
+
+### 4.4 Stored Procedures/Functions
+
+**Source:** Procedure/Function extraction
+
+{{#if metadata.database.stored_procedures_details}}
+| Name | Type | Parameters | LOC | Complexity | Source Location |
+|------|------|------------|-----|------------|-----------------|
+{{#each metadata.database.stored_procedures_details}}
+| {{this.name}} | {{this.type}} | {{this.param_count}} | {{this.loc}} | {{this.complexity}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No stored procedures/functions found.
+{{/if}}
+
+### 4.5 Database-Specific Features
+
+**Source:** Feature detection analysis
+
+{{#if metadata.database_specific_features}}
+| Feature | Usage Count | Impact | Source Locations |
+|---------|-------------|--------|------------------|
+{{#each metadata.database_specific_features}}
+| {{this.feature}} | {{this.count}} | {{this.impact}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **Not found in source:** No database-specific features detected.
+{{/if}}
+
+{{else}}
+> **Not applicable:** No database component in this migration.
+{{/if}}
+
+---
+
+## 5. External Interfaces
+
+### 5.1 File I/O Operations
+
+**Source:** File operation extraction from source code
+
+{{#if metadata.file_operations}}
+| Operation | File Type | Mode | Source Location |
+|-----------|-----------|------|-----------------|
+{{#each metadata.file_operations}}
+| {{this.operation}} | {{this.file_type}} | {{this.mode}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No file I/O operations detected.
+{{/if}}
+
+### 5.2 External System Integrations
+
+**Source:** Integration point analysis
+
+{{#if metadata.integrations}}
+| System/Service | Protocol | Direction | Source Location |
+|----------------|----------|-----------|-----------------|
+{{#each metadata.integrations}}
+| {{this.system}} | {{this.protocol}} | {{this.direction}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No external integrations detected.
+{{/if}}
+
+### 5.3 API/Service Calls
+
+**Source:** API call extraction
+
+{{#if metadata.api_calls}}
+| Endpoint/Service | Method | Parameters | Source Location |
+|------------------|--------|------------|-----------------|
+{{#each metadata.api_calls}}
+| {{this.endpoint}} | {{this.method}} | {{this.params}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No API/service calls detected.
+{{/if}}
+
+---
+
+## 6. Business Logic Extraction
+
+### 6.1 Business Rules
+
+**Source:** Rule extraction from source code
+
+{{#if metadata.business_rules}}
+| Rule ID | Description | Implementation | Source Location |
+|---------|-------------|----------------|-----------------|
+{{#each metadata.business_rules}}
+| {{this.id}} | {{this.description}} | {{this.implementation}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Business rules require manual extraction.
+{{/if}}
+
+### 6.2 Calculation/Algorithm Extraction
+
+**Source:** Algorithm detection from source code
+
+{{#if metadata.algorithms}}
+| Algorithm | Purpose | Inputs | Outputs | Source Location |
+|-----------|---------|--------|---------|-----------------|
+{{#each metadata.algorithms}}
+| {{this.name}} | {{this.purpose}} | {{this.inputs}} | {{this.outputs}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Algorithms require manual extraction.
+{{/if}}
+
+### 6.3 Code Snippets (Critical Logic)
+
+{{#if metadata.critical_code_snippets}}
+{{#each metadata.critical_code_snippets}}
+#### {{this.name}}
+
+**Source:** `{{this.file}}:{{this.start_line}}-{{this.end_line}}`
+
+**Purpose:** {{this.purpose}}
+
+```{{this.language}}
+{{{this.code}}}
+```
+
+{{/each}}
+{{else}}
+> **Not found in source:** No critical code snippets extracted.
+{{/if}}
+
+---
+
+## 7. Complexity Assessment
+
+### 7.1 Complexity Metrics
+
+**Source:** Static code analysis
+
+{{#if metadata.complexity}}
+| Metric | Value | Threshold | Status | Source |
+|--------|-------|-----------|--------|--------|
+| Average Cyclomatic Complexity | {{metadata.complexity.avg_cyclomatic}} | {{complexity_thresholds.cyclomatic}} | {{metadata.complexity.cyclomatic_status}} | Analysis tool |
+| Max Cyclomatic Complexity | {{metadata.complexity.max_cyclomatic}} | - | {{metadata.complexity.max_status}} | Analysis tool |
+| Average Method/Paragraph Length | {{metadata.complexity.avg_method_length}} | {{complexity_thresholds.method_length}} | {{metadata.complexity.method_status}} | Analysis tool |
+| Nesting Depth (Max) | {{metadata.complexity.max_nesting}} | {{complexity_thresholds.nesting}} | {{metadata.complexity.nesting_status}} | Analysis tool |
+{{else}}
+> **Not found in source:** Complexity metrics not calculated.
+{{/if}}
+
+### 7.2 High Complexity Components
+
+**Source:** Complexity analysis ranking
+
+{{#if metadata.high_complexity_modules}}
+| Component | Complexity Score | LOC | Risk Level | Source Location |
+|-----------|------------------|-----|------------|-----------------|
+{{#each metadata.high_complexity_modules}}
+| {{this.name}} | {{this.score}} | {{this.loc}} | {{this.risk}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No high-complexity modules identified.
+{{/if}}
+
+### 7.3 Migration Complexity by Dimension
+
+{{#if metadata.migrationComplexity}}
+| Dimension | Score | Assessment | Key Factors |
+|-----------|-------|------------|-------------|
+{{#if metadata.migrationComplexity.schemaDataTypeComplexity}}| Schema & Data Type | {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.schemaDataType}} |{{/if}}
+{{#if metadata.migrationComplexity.sqlQueryRewriteComplexity}}| SQL & Query Rewrite | {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.sqlQueryRewrite}} |{{/if}}
+{{#if metadata.migrationComplexity.procedureFunctionTriggerComplexity}}| Procedures/Functions/Triggers | {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.procedureFunctionTrigger}} |{{/if}}
+{{#if metadata.migrationComplexity.codeComplexity}}| Code Complexity | {{metadata.migrationComplexity.codeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.codeComplexity}} |{{/if}}
+{{#if metadata.migrationComplexity.dataVolumeMigrationComplexity}}| Data Volume | {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.dataVolumeMigration}} |{{/if}}
+{{#if metadata.migrationComplexity.applicationORMDependencyComplexity}}| Application/ORM Dependency | {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.applicationORMDependency}} |{{/if}}
+{{#if metadata.migrationComplexity.operationalRuntimeRiskComplexity}}| Operational/Runtime Risk | {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.operationalRuntimeRisk}} |{{/if}}
+| **Overall** | **{{metadata.migrationComplexity.overall}}/100** | **{{metadata.migrationComplexity.difficulty}}** | - |
+{{/if}}
+
+---
+
+## 8. Code Quality Issues
+
+**Source:** Static analysis tool output
+
+{{#if metadata.quality_issues}}
+| Severity | Category | Description | Count | Source Locations |
+|----------|----------|-------------|-------|------------------|
+{{#each metadata.quality_issues}}
+| {{this.severity}} | {{this.category}} | {{this.description}} | {{this.count}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Code quality analysis not performed.
+{{/if}}
+
+---
+
+## 9. Configuration & Environment
+
+### 9.1 Configuration Files
+
+**Source:** Configuration file scan
+
+{{#if metadata.config_files}}
+| File | Type | Purpose | Source Path |
+|------|------|---------|-------------|
+{{#each metadata.config_files}}
+| {{this.name}} | {{this.type}} | {{this.purpose}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No configuration files detected.
+{{/if}}
+
+### 9.2 Environment Variables/Parameters
+
+**Source:** Environment reference extraction
+
+{{#if metadata.environment_params}}
+| Parameter | Type | Default | Used In |
+|-----------|------|---------|---------|
+{{#each metadata.environment_params}}
+| {{this.name}} | {{this.type}} | {{this.default}} | `{{this.used_in}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No environment parameters detected.
+{{/if}}
+
+### 9.3 Job/Batch Definitions
+
+**Source:** Job control/batch script analysis
+
+{{#if metadata.batch_jobs}}
+| Job Name | Schedule | Dependencies | Source File |
+|----------|----------|--------------|-------------|
+{{#each metadata.batch_jobs}}
+| {{this.name}} | {{this.schedule}} | {{this.dependencies}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No batch job definitions found.
+{{/if}}
+
+---
+
+## 10. Risk Assessment
+
+### 10.1 Identified Risks from Source Analysis
+
+{{#if metadata.risks}}
+| Risk ID | Category | Description | Severity | Source Evidence |
+|---------|----------|-------------|----------|-----------------|
+{{#each metadata.risks}}
+| {{this.id}} | {{this.category}} | {{this.description}} | {{this.severity}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Risk assessment requires manual analysis.
+{{/if}}
+
+### 10.2 Technical Debt
+
+**Source:** Code analysis findings
+
+{{#if metadata.technical_debt}}
+| Area | Description | Impact | Source Location |
+|------|-------------|--------|-----------------|
+{{#each metadata.technical_debt}}
+| {{this.area}} | {{this.description}} | {{this.impact}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Technical debt assessment not performed.
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Complete File List
+
+{{#if appendix.file_list}}
+```
+{{#each appendix.file_list}}
+{{this.path}} ({{this.size}} bytes, {{this.loc}} LOC)
+{{/each}}
+```
+{{else}}
+> File list not generated.
+{{/if}}
+
+### Appendix B: Source Code Metrics Summary
+
+{{#if appendix.metrics_summary}}
+| Metric | Value |
+|--------|-------|
+{{#each appendix.metrics_summary}}
+| {{this.metric}} | {{this.value}} |
+{{/each}}
+{{/if}}
+
+### Appendix C: Tool Versions
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+{{#each appendix.tools}}
+| {{this.name}} | {{this.version}} | {{this.purpose}} |
+{{/each}}
+
+---
+
+## Traceability Note
+
+All technical statements in this document are derived from actual source artifacts. References in the format `file:line` indicate the exact location in source code where the information was extracted. Items marked "Not found in source" indicate that the analysis tools could not automatically extract this information and manual review may be required.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated from source analysis) |
+
+---
+
+**End of As-Is Analysis Document**

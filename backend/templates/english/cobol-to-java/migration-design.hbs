@@ -1,618 +1,702 @@
-# Migration Design Document
+# Migration Design Document (COBOL → Java)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | COBOL → Java |
 | **Document Type** | Migration Design (Code & Database) |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Source-to-Target Architecture Mapping
 
-This document provides detailed design specifications for migrating **{{project.name}}** from **{{source.language}}/{{source.database}}** to **{{target.language}}/{{target.database}}**. It includes code architecture design, database schema design, and implementation guidelines.
+### 1.1 Architecture Derived from Source Analysis
 
----
+**Source:** COBOL program structure and dependency analysis
 
-## 1. Architecture Design
-
-### 1.1 Target Architecture
-
-```mermaid
-{{#if architecture.diagram}}
-{{{architecture.diagram}}}
-{{else}}
-graph TB
-    subgraph "Presentation Layer"
-        UI[Web UI]
-    end
-
-    subgraph "Application Layer"
-        API[REST API]
-        Service[Business Services]
-    end
-
-    subgraph "Data Layer"
-        Repo[Repositories]
-        DB[(PostgreSQL)]
-    end
-
-    UI --> API
-    API --> Service
-    Service --> Repo
-    Repo --> DB
-{{/if}}
-```
-
-### 1.2 Design Patterns
-
-{{#if architecture.patterns}}
-{{#each architecture.patterns}}
-- **{{this.name}}:** {{this.description}}
-  - **Used in:** {{this.usage}}
+{{#if architecture.source_derived}}
+| Source Component | Target Component | Pattern | Source Evidence |
+|------------------|------------------|---------|-----------------|
+{{#each architecture.source_derived}}
+| {{this.source}} | {{this.target}} | {{this.pattern}} | `{{this.evidence}}` |
 {{/each}}
 {{else}}
-- **Layered Architecture:** Presentation → Service → Repository → Data
-- **Dependency Injection:** Spring framework for IoC
-- **Repository Pattern:** Data access abstraction
-- **DTO Pattern:** Data transfer between layers
+| Source Component | Target Component | Pattern | Source |
+|------------------|------------------|---------|--------|
+| COBOL Programs ({{metadata.source_analysis.total_files}}) | Java Classes | 1:N | Program scan |
+| Copybooks ({{metadata.copybook_count}}) | DTO/Entity Classes | 1:1 | COPY extraction |
+| JCL Jobs ({{metadata.jcl_count}}) | Spring Batch Jobs | 1:1 | JCL scan |
+| DB2 Tables ({{metadata.db2_table_count}}) | JPA Entities | 1:1 | EXEC SQL extraction |
+
+> Source-specific architecture mapping requires complete dependency analysis.
 {{/if}}
 
-### 1.3 Module Structure
+### 1.2 Layer Mapping from Source
 
-{{#if architecture.modules}}
-{{#each architecture.modules}}
-#### {{this.name}} Module
+**Source:** COBOL division and paragraph analysis
 
-**Purpose:** {{this.purpose}}
-
-**Components:**
-{{#each this.components}}
-- {{this}}
-{{/each}}
-
-**Dependencies:**
-{{#each this.dependencies}}
-- {{this}}
-{{/each}}
-
----
-
+{{#if architecture.layer_mapping}}
+| COBOL Division/Section | Java Layer | Components | Source Locations |
+|------------------------|------------|------------|------------------|
+{{#each architecture.layer_mapping}}
+| {{this.cobol_layer}} | {{this.java_layer}} | {{this.components}} | {{this.locations}} |
 {{/each}}
 {{else}}
-*[Define module breakdown based on business domains]*
+| COBOL Division/Section | Java Layer | Rationale |
+|------------------------|------------|-----------|
+| PROCEDURE DIVISION | Service Layer | Business logic |
+| WORKING-STORAGE | Model/DTO | Data structures |
+| FILE SECTION | Repository Layer | Data access |
+| COPY statements | Shared DTOs | Reusable structures |
+| EXEC SQL | JPA/Repository | Database operations |
+| EXEC CICS | Controller/API | UI/Transaction handling |
+
+> Layer mapping requires COBOL structure analysis.
 {{/if}}
 
 ---
 
-## 2. Code Migration Design
+## 2. Program-to-Class Design
 
-### 2.1 Package Structure
+### 2.1 COBOL Program to Java Class Mapping
 
-```
-{{#if code_design.package_structure}}
-{{{code_design.package_structure}}}
-{{else}}
-src/main/java/com/company/project/
-├── controller/          # REST controllers
-├── service/            # Business logic services
-│   ├── impl/           # Service implementations
-│   └── dto/            # Data Transfer Objects
-├── repository/         # Data access layer
-├── entity/             # JPA entities
-├── config/             # Configuration classes
-├── exception/          # Custom exceptions
-├── util/               # Utility classes
-└── constant/           # Constants
+**Source:** COBOL program inventory and structure analysis
 
-src/main/resources/
-├── application.yml     # Application configuration
-├── db/migration/       # Flyway migration scripts
-└── static/             # Static resources
-{{/if}}
-```
-
-### 2.2 Component Mapping
-
-{{#if mappings.components}}
-| Source Component | Target Component | Mapping Type | Notes |
-|------------------|------------------|--------------|-------|
-{{#each mappings.components}}
-| {{this.source}} | {{this.target}} | {{this.type}} | {{this.notes}} |
+{{#if design.program_mapping}}
+| COBOL Program | Java Class | Package | Type | Source Path |
+|---------------|------------|---------|------|-------------|
+{{#each design.program_mapping}}
+| {{this.cobol_program}} | {{this.java_class}} | {{this.package}} | {{this.type}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-*[Auto-generated from source code analysis]*
-
-Example:
-| Source (COBOL) | Target (Java) | Mapping Type | Notes |
-|----------------|---------------|--------------|-------|
-| CUSTMGMT.cbl | CustomerService.java | 1:1 | Main business logic |
-| CUSTOMER-RECORD | Customer.java (Entity) | Data structure → Entity | JPA entity |
-| GET-CUSTOMER paragraph | getCustomer() method | Paragraph → Method | Service method |
+> **Not found in source:** Program-to-class mapping requires detailed analysis.
 {{/if}}
 
-### 2.3 Detailed Component Design
+### 2.2 Paragraph to Method Mapping
 
-{{#if code_design.components}}
-{{#each code_design.components}}
-#### {{this.name}}
+**Source:** PROCEDURE DIVISION paragraph extraction
 
-**Type:** {{this.type}}
+{{#if design.paragraph_mapping}}
+{{#each design.paragraph_mapping}}
+#### Program: {{this.program}}
 
-**Source File:** {{this.source_file}}
+**Source:** `{{this.source_path}}`
 
-**Target File:** {{this.target_file}}
+| Paragraph | Java Method | Visibility | Parameters | Source Location |
+|-----------|-------------|------------|------------|-----------------|
+{{#each this.paragraphs}}
+| {{this.paragraph}} | {{this.method}} | {{this.visibility}} | {{this.params}} | `{{this.location}}` |
+{{/each}}
 
-**Responsibilities:**
+{{/each}}
+{{else}}
+> **Not found in source:** Paragraph-to-method mapping requires PROCEDURE DIVISION analysis.
+{{/if}}
+
+### 2.3 Detailed Class Design from Source
+
+**Source:** COBOL program analysis
+
+{{#if design.class_details}}
+{{#each design.class_details}}
+#### Class: {{this.class_name}}
+
+**Source Program:** `{{this.source_program}}`
+
+**Source Path:** `{{this.source_path}}`
+
+**Responsibilities (Derived from COBOL):**
 {{#each this.responsibilities}}
-- {{this}}
+- {{this.description}} (Source: `{{this.source_location}}`)
 {{/each}}
 
-**Public Interface:**
+**Methods (From Paragraphs):**
+| Method | Return Type | Parameters | Source Paragraph | Lines |
+|--------|-------------|------------|------------------|-------|
+{{#each this.methods}}
+| `{{this.name}}` | {{this.return_type}} | {{this.params}} | {{this.source_paragraph}} | {{this.lines}} |
+{{/each}}
+
+**Fields (From WORKING-STORAGE):**
+| Field | Java Type | Source Variable | PIC Clause | Source Location |
+|-------|-----------|-----------------|------------|-----------------|
+{{#each this.fields}}
+| `{{this.name}}` | {{this.java_type}} | {{this.cobol_var}} | {{this.pic}} | `{{this.location}}` |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Class design details require complete program analysis.
+{{/if}}
+
+---
+
+## 3. Copybook to DTO/Entity Design
+
+### 3.1 Copybook Structure Mapping
+
+**Source:** Copybook file parsing
+
+{{#if design.copybook_mapping}}
+{{#each design.copybook_mapping}}
+#### Copybook: {{this.copybook_name}}
+
+**Source Path:** `{{this.path}}`
+
+**Target Class:** `{{this.target_class}}`
+
+**Used By:** {{this.used_by_programs}}
+
+**COBOL Structure:**
+```cobol
+{{{this.cobol_structure}}}
+```
+
+**Java DTO Design:**
 ```java
-{{this.interface_code}}
+{{{this.java_dto}}}
 ```
 
-**Key Implementation Notes:**
-{{#each this.notes}}
-- {{this}}
+**Field Mapping:**
+| Level | COBOL Field | PIC | Java Field | Java Type | Validation | Source Line |
+|-------|-------------|-----|------------|-----------|------------|-------------|
+{{#each this.fields}}
+| {{this.level}} | {{this.cobol_name}} | {{this.pic}} | {{this.java_name}} | {{this.java_type}} | {{this.validation}} | {{this.line}} |
 {{/each}}
 
 ---
 
 {{/each}}
+{{else}}
+> **Not found in source:** Copybook-to-DTO mapping requires copybook analysis.
 {{/if}}
 
-### 2.4 API Design
+### 3.2 REDEFINES Handling
 
-{{#if api_design.endpoints}}
-| Endpoint | Method | Description | Request | Response |
-|----------|--------|-------------|---------|----------|
-{{#each api_design.endpoints}}
-| {{this.path}} | {{this.method}} | {{this.description}} | {{this.request}} | {{this.response}} |
+**Source:** REDEFINES clause extraction
+
+{{#if design.redefines}}
+| Copybook | Original Field | Redefines Field | Handling Strategy | Source Location |
+|----------|----------------|-----------------|-------------------|-----------------|
+{{#each design.redefines}}
+| {{this.copybook}} | {{this.original}} | {{this.redefines}} | {{this.strategy}} | `{{this.location}}` |
 {{/each}}
 {{else}}
-*[API endpoints to be defined based on business requirements]*
+> **Not found in source:** No REDEFINES clauses detected for handling.
+{{/if}}
 
-Example:
-| Endpoint | Method | Description | Request | Response |
-|----------|--------|-------------|---------|----------|
-| /api/customers | GET | Get all customers | Query params | Customer[] |
-| /api/customers/{id} | GET | Get customer by ID | Path param | Customer |
-| /api/customers | POST | Create customer | Customer DTO | Customer |
-| /api/customers/{id} | PUT | Update customer | Customer DTO | Customer |
-| /api/customers/{id} | DELETE | Delete customer | Path param | 204 No Content |
+### 3.3 OCCURS/Array Handling
+
+**Source:** OCCURS clause extraction
+
+{{#if design.occurs}}
+| Copybook | Field | OCCURS | DEPENDING ON | Java Collection | Source Location |
+|----------|-------|--------|--------------|-----------------|-----------------|
+{{#each design.occurs}}
+| {{this.copybook}} | {{this.field}} | {{this.occurs}} | {{this.depending_on}} | {{this.java_type}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No OCCURS clauses detected for handling.
 {{/if}}
 
 ---
 
-## 3. Database Design
+## 4. Database Design
 
-### 3.1 Schema Overview
+### 4.1 DB2 to Java/JPA Mapping
 
-```mermaid
-{{#if db_design.erd}}
-{{{db_design.erd}}}
-{{else}}
-erDiagram
-    CUSTOMER ||--o{ ORDER : places
-    CUSTOMER {
-        int customer_id PK
-        string name
-        string email
-        timestamp created_at
-    }
-    ORDER {
-        int order_id PK
-        int customer_id FK
-        decimal total_amount
-        timestamp order_date
-    }
-{{/if}}
+**Source:** EXEC SQL and DCLGEN extraction
+
+{{#if design.db2_mapping}}
+{{#each design.db2_mapping}}
+#### Table: {{this.table_name}}
+
+**Source DCLGEN:** `{{this.dclgen_path}}`
+
+**Used In Programs:** {{this.programs}}
+
+**JPA Entity Design:**
+```java
+{{{this.jpa_entity}}}
 ```
 
-### 3.2 Table Definitions
-
-{{#if db_design.tables}}
-{{#each db_design.tables}}
-#### Table: `{{this.name}}`
-
-**Source Table:** {{this.source_table}}
-
-**Purpose:** {{this.purpose}}
-
-**DDL:**
-```sql
-CREATE TABLE {{this.name}} (
+**Column Mapping:**
+| DB2 Column | DB2 Type | JPA Field | Java Type | Annotations | Source |
+|------------|----------|-----------|-----------|-------------|--------|
 {{#each this.columns}}
-    {{this.name}} {{this.type}}{{#if this.nullable}} NULL{{else}} NOT NULL{{/if}}{{#if this.default}} DEFAULT {{this.default}}{{/if}},
-{{/each}}
-    PRIMARY KEY ({{this.primary_key}}),
-{{#each this.foreign_keys}}
-    FOREIGN KEY ({{this.column}}) REFERENCES {{this.ref_table}}({{this.ref_column}}),
-{{/each}}
-);
-```
-
-**Indexes:**
-{{#each this.indexes}}
-- `{{this.name}}`: {{this.columns}} ({{this.type}})
-{{/each}}
-
-**Migration Notes:**
-{{#each this.migration_notes}}
-- {{this}}
+| {{this.db2_column}} | {{this.db2_type}} | {{this.jpa_field}} | {{this.java_type}} | {{this.annotations}} | `{{this.source}}` |
 {{/each}}
 
 ---
 
 {{/each}}
 {{else}}
-*[Auto-generate from DDL analysis]*
+> **Not found in source:** No EXEC SQL/DCLGEN detected for database mapping.
 {{/if}}
 
-### 3.3 Data Type Conversion Matrix
+### 4.2 SQL Statement Transformation
 
-{{#if db_design.type_conversions}}
-| Source Type ({{source.database}}) | Target Type ({{target.database}}) | Conversion Rule | Risk |
-|-----------------------------------|-----------------------------------|-----------------|------|
-{{#each db_design.type_conversions}}
-| {{this.source}} | {{this.target}} | {{this.rule}} | {{this.risk}} |
-{{/each}}
-{{else}}
-| Source (Oracle) | Target (PostgreSQL) | Conversion Rule | Risk |
-|-----------------|---------------------|-----------------|------|
-| NUMBER(10,0) | INTEGER | Direct mapping | Low |
-| NUMBER(10,2) | NUMERIC(10,2) | Direct mapping | Low |
-| VARCHAR2(n) | VARCHAR(n) | Direct mapping | Low |
-| DATE | TIMESTAMP | Oracle DATE includes time | Medium |
-| CLOB | TEXT | Direct mapping | Low |
-| BLOB | BYTEA | Direct mapping | Low |
-| RAW(n) | BYTEA | Direct mapping | Low |
-{{/if}}
+**Source:** EXEC SQL block extraction
 
-### 3.4 Stored Procedure Migration
+{{#if design.sql_transformation}}
+{{#each design.sql_transformation}}
+#### SQL: {{this.id}}
 
-{{#if db_design.procedures}}
-{{#each db_design.procedures}}
-#### Procedure: {{this.source_name}}
+**Source Program:** `{{this.program}}`
 
-**Migration Approach:** {{this.approach}}
+**Source Location:** `{{this.location}}`
+
+**Original DB2 SQL:**
+```sql
+{{{this.original_sql}}}
+```
 
 **Target Implementation:**
-{{#if this.move_to_code}}
-- **Location:** {{this.target_service}} (Java service)
-- **Rationale:** {{this.rationale}}
-{{else}}
-- **Location:** PostgreSQL function
-- **Name:** {{this.target_name}}
-{{/if}}
-
-**Source Code (Oracle PL/SQL):**
-```sql
-{{this.source_code}}
+```java
+{{{this.java_implementation}}}
 ```
 
-**Target Code:**
-```{{#if this.move_to_code}}java{{else}}sql{{/if}}
-{{this.target_code}}
+**Host Variable Mapping:**
+| Host Variable | COBOL Type | Java Parameter | Notes |
+|---------------|------------|----------------|-------|
+{{#each this.host_vars}}
+| {{this.host_var}} | {{this.cobol_type}} | {{this.java_param}} | {{this.notes}} |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** SQL transformation requires EXEC SQL analysis.
+{{/if}}
+
+### 4.3 Cursor to Repository Method Mapping
+
+**Source:** DECLARE CURSOR extraction
+
+{{#if design.cursor_mapping}}
+| Cursor Name | Program | Repository Method | Return Type | Source Location |
+|-------------|---------|-------------------|-------------|-----------------|
+{{#each design.cursor_mapping}}
+| {{this.cursor}} | {{this.program}} | {{this.method}} | {{this.return_type}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No DECLARE CURSOR statements detected.
+{{/if}}
+
+---
+
+## 5. File I/O Design
+
+### 5.1 VSAM to Java File Mapping
+
+**Source:** FILE SECTION and SELECT/ASSIGN extraction
+
+{{#if design.vsam_mapping}}
+{{#each design.vsam_mapping}}
+#### File: {{this.dd_name}}
+
+**Source Program:** `{{this.program}}`
+
+**Source Location:** `{{this.location}}`
+
+**COBOL Definition:**
+```cobol
+{{{this.cobol_definition}}}
+```
+
+**File Attributes:**
+| Attribute | COBOL Value | Java Implementation |
+|-----------|-------------|---------------------|
+| Organization | {{this.organization}} | {{this.java_impl}} |
+| Access Mode | {{this.access_mode}} | {{this.java_access}} |
+| Record Key | {{this.record_key}} | {{this.java_key}} |
+| Record Length | {{this.record_length}} | {{this.java_record}} |
+
+**Java Implementation:**
+```java
+{{{this.java_code}}}
 ```
 
 ---
 
 {{/each}}
 {{else}}
-*[Analyze stored procedures and define migration strategy]*
+> **Not found in source:** No VSAM file definitions detected.
+{{/if}}
+
+### 5.2 File I/O Statement Mapping
+
+**Source:** File I/O statement extraction
+
+{{#if design.file_io_mapping}}
+| COBOL Statement | Occurrences | Java Equivalent | Example Source |
+|-----------------|-------------|-----------------|----------------|
+{{#each design.file_io_mapping}}
+| {{this.cobol_stmt}} | {{this.count}} | {{this.java_equiv}} | `{{this.example}}` |
+{{/each}}
+{{else}}
+| COBOL Statement | Java Equivalent |
+|-----------------|-----------------|
+| OPEN INPUT | FileReader / BufferedReader |
+| OPEN OUTPUT | FileWriter / BufferedWriter |
+| READ | reader.readLine() |
+| WRITE | writer.write() |
+| REWRITE | RandomAccessFile |
+| DELETE | Files.delete() |
+| CLOSE | reader/writer.close() |
+
+> File I/O mapping requires FILE SECTION analysis.
 {{/if}}
 
 ---
 
-## 4. Data Migration Design
+## 6. CICS Transaction Design
 
-### 4.1 Migration Workflow
+### 6.1 CICS to Spring MVC Mapping
 
+**Source:** EXEC CICS command extraction
+
+{{#if design.cics_mapping}}
+{{#each design.cics_mapping}}
+#### Transaction: {{this.transaction_id}}
+
+**Source Program:** `{{this.program}}`
+
+**Source Path:** `{{this.path}}`
+
+**CICS Commands:**
+| Command | Resource | Java Equivalent | Source Location |
+|---------|----------|-----------------|-----------------|
+{{#each this.commands}}
+| {{this.command}} | {{this.resource}} | {{this.java_equiv}} | `{{this.location}}` |
+{{/each}}
+
+**Controller Design:**
+```java
+{{{this.controller_code}}}
+```
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** No EXEC CICS commands detected.
+{{/if}}
+
+### 6.2 BMS Map to View Mapping
+
+**Source:** BMS mapset extraction
+
+{{#if design.bms_mapping}}
+| BMS Map | Fields | Java View | Template | Source Path |
+|---------|--------|-----------|----------|-------------|
+{{#each design.bms_mapping}}
+| {{this.map_name}} | {{this.field_count}} | {{this.java_view}} | {{this.template}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No BMS mapsets detected.
+{{/if}}
+
+---
+
+## 7. Batch Job Design
+
+### 7.1 JCL to Spring Batch Mapping
+
+**Source:** JCL job parsing
+
+{{#if design.jcl_mapping}}
+{{#each design.jcl_mapping}}
+#### Job: {{this.job_name}}
+
+**Source Path:** `{{this.path}}`
+
+**JCL Structure:**
+```jcl
+{{{this.jcl_snippet}}}
+```
+
+**Spring Batch Design:**
+```java
+{{{this.spring_batch_code}}}
+```
+
+**Step Mapping:**
+| JCL Step | Program | Spring Step | Tasklet/Chunk | Source |
+|----------|---------|-------------|---------------|--------|
+{{#each this.steps}}
+| {{this.jcl_step}} | {{this.program}} | {{this.spring_step}} | {{this.type}} | `{{this.source}}` |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** No JCL jobs detected.
+{{/if}}
+
+### 7.2 DD Statement to Resource Mapping
+
+**Source:** JCL DD statement extraction
+
+{{#if design.dd_mapping}}
+| DD Name | DSN/File | Java Resource | Type | Source Job |
+|---------|----------|---------------|------|------------|
+{{#each design.dd_mapping}}
+| {{this.dd_name}} | {{this.dsn}} | {{this.java_resource}} | {{this.type}} | `{{this.job}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** DD statement mapping requires JCL analysis.
+{{/if}}
+
+---
+
+## 8. Package Structure Design
+
+### 8.1 Package Structure from Source
+
+**Source:** Derived from COBOL program categories
+
+{{#if design.package_structure}}
+```
+{{{design.package_structure}}}
+```
+{{else}}
+```
+com.{{project.package_base}}/
+├── batch/                  # From JCL batch programs
+│   ├── job/               # Spring Batch job configs
+│   ├── step/              # Step implementations
+│   └── tasklet/           # Tasklet processors
+├── online/                # From CICS programs
+│   ├── controller/        # REST/Web controllers
+│   └── view/              # View models
+├── service/               # Business logic
+│   ├── impl/              # Service implementations
+│   └── dto/               # Data transfer objects
+├── repository/            # Data access
+│   ├── entity/            # JPA entities
+│   └── mapper/            # MyBatis mappers (if used)
+├── model/                 # From copybooks
+│   ├── dto/               # DTOs from copybooks
+│   └── domain/            # Domain models
+├── util/                  # Utility classes
+│   ├── converter/         # Type converters
+│   └── validation/        # Validators
+└── config/                # Configuration
+    ├── batch/             # Batch config
+    └── db/                # Database config
+```
+
+> Package structure derived from program classification.
+{{/if}}
+
+### 8.2 Module Dependencies
+
+**Source:** CALL and COPY dependency analysis
+
+{{#if design.module_dependencies}}
 ```mermaid
-{{#if data_migration.workflow}}
-{{{data_migration.workflow}}}
-{{else}}
-graph LR
-    A[Extract from Oracle] --> B[Transform Data]
-    B --> C[Validate]
-    C --> D[Load to PostgreSQL]
-    D --> E[Verify]
-    E --> F{OK?}
-    F -->|Yes| G[Complete]
-    F -->|No| H[Rollback]
-{{/if}}
+{{{design.module_dependencies}}}
 ```
-
-### 4.2 Table Migration Priority
-
-{{#if data_migration.priorities}}
-| Priority | Table Name | Rows (Est.) | Dependencies | Strategy |
-|----------|------------|-------------|--------------|----------|
-{{#each data_migration.priorities}}
-| {{this.priority}} | {{this.table}} | {{this.rows}} | {{this.dependencies}} | {{this.strategy}} |
-{{/each}}
 {{else}}
-*[Define migration order based on foreign key dependencies]*
-{{/if}}
-
-### 4.3 Data Transformation Rules
-
-{{#if data_migration.transformations}}
-{{#each data_migration.transformations}}
-#### {{this.table}}.{{this.column}}
-
-**Transformation:** {{this.description}}
-
-**Rule:**
-```
-{{this.rule}}
-```
-
-**Example:**
-- **Before:** {{this.example_before}}
-- **After:** {{this.example_after}}
-
----
-
-{{/each}}
-{{/if}}
-
-### 4.4 Data Validation Strategy
-
-{{#if data_migration.validation}}
-{{#each data_migration.validation}}
-- **{{this.check}}:** {{this.description}}
-  - **Query:** `{{this.query}}`
-  - **Expected Result:** {{this.expected}}
-{{/each}}
-{{else}}
-- **Row Count Validation:** Compare row counts between source and target
-- **Checksum Validation:** MD5/SHA hash of critical tables
-- **Sample Data Validation:** Manual review of sample records
-- **Referential Integrity:** Verify all foreign keys are valid
-- **Business Rule Validation:** Execute business logic checks
+> **Not found in source:** Module dependency graph requires CALL analysis.
 {{/if}}
 
 ---
 
-## 5. Configuration Management
+## 9. Data Type Conversion Design
 
-### 5.1 Environment Configuration
+### 9.1 PIC Clause to Java Type Mapping
 
-{{#if config.environments}}
-{{#each config.environments}}
-#### {{this.name}} Environment
+**Source:** DATA DIVISION PIC clause extraction
 
-**Database:**
-- Host: {{this.db_host}}
-- Port: {{this.db_port}}
-- Database: {{this.db_name}}
-
-**Application:**
-- Server: {{this.app_server}}
-- Port: {{this.app_port}}
-
-**Configuration File:**
-```yaml
-{{this.config_content}}
-```
-
----
-
+{{#if design.pic_mapping}}
+| PIC Pattern | Occurrences | Java Type | Conversion Method | Example Source |
+|-------------|-------------|-----------|-------------------|----------------|
+{{#each design.pic_mapping}}
+| `{{this.pic}}` | {{this.count}} | {{this.java_type}} | {{this.conversion}} | `{{this.example}}` |
 {{/each}}
 {{else}}
-*[Define configuration for dev, test, staging, production]*
+| PIC Pattern | Java Type | Conversion Notes |
+|-------------|-----------|------------------|
+| PIC 9(n) where n≤9 | int | Direct conversion |
+| PIC 9(n) where n>9 | long | Direct conversion |
+| PIC 9(n)V9(m) | BigDecimal | Scale = m |
+| PIC S9(n) | int/long | Handle sign |
+| PIC S9(n)V9(m) | BigDecimal | Handle sign, scale = m |
+| PIC X(n) | String | Trim trailing spaces |
+| PIC A(n) | String | Alphabetic only |
+| PIC 9(n) COMP | int/long | Binary format |
+| PIC 9(n) COMP-3 | BigDecimal | Packed decimal |
+
+> PIC-to-Java mapping requires DATA DIVISION analysis.
 {{/if}}
 
-### 5.2 External Dependencies
+### 9.2 Numeric Precision Handling
 
-{{#if config.dependencies}}
-| Dependency | Purpose | Configuration |
-|------------|---------|---------------|
-{{#each config.dependencies}}
-| {{this.name}} | {{this.purpose}} | {{this.config}} |
+**Source:** Numeric field analysis
+
+{{#if design.numeric_handling}}
+| Field | PIC | Java Type | Precision | Scale | Rounding | Source |
+|-------|-----|-----------|-----------|-------|----------|--------|
+{{#each design.numeric_handling}}
+| {{this.field}} | {{this.pic}} | {{this.java_type}} | {{this.precision}} | {{this.scale}} | {{this.rounding}} | `{{this.source}}` |
 {{/each}}
-{{/if}}
-
----
-
-## 6. Error Handling & Logging
-
-### 6.1 Exception Hierarchy
-
-{{#if error_handling.exceptions}}
-```
-{{error_handling.exceptions}}
-```
 {{else}}
-```
-RuntimeException
-├── BusinessException
-│   ├── CustomerNotFoundException
-│   ├── InvalidOrderException
-│   └── DuplicateRecordException
-└── TechnicalException
-    ├── DatabaseException
-    ├── IntegrationException
-    └── ConfigurationException
-```
-{{/if}}
-
-### 6.2 Logging Strategy
-
-{{#if error_handling.logging}}
-{{error_handling.logging}}
-{{else}}
-**Log Levels:**
-- **ERROR:** System errors, exceptions
-- **WARN:** Business validation failures, deprecated API usage
-- **INFO:** Key business events, API calls
-- **DEBUG:** Detailed flow information (dev/test only)
-
-**Log Format:**
-```
-[timestamp] [level] [thread] [class] - message
-```
-
-**Log Storage:**
-- Development: Console + file
-- Production: File + ELK Stack (Elasticsearch, Logstash, Kibana)
+> **Not found in source:** Numeric precision handling requires field analysis.
 {{/if}}
 
 ---
 
-## 7. Performance Optimization
+## 10. Error Handling Design
 
-### 7.1 Database Optimization
+### 10.1 COBOL Error Handling to Java Exception Mapping
 
-{{#if performance.database}}
-{{#each performance.database}}
-- **{{this.area}}:** {{this.description}}
-  - **Implementation:** {{this.implementation}}
+**Source:** Error handling pattern extraction
+
+{{#if design.error_handling}}
+| COBOL Pattern | Occurrences | Java Exception | Handling Strategy | Example Source |
+|---------------|-------------|----------------|-------------------|----------------|
+{{#each design.error_handling}}
+| {{this.cobol_pattern}} | {{this.count}} | {{this.java_exception}} | {{this.strategy}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- **Indexing Strategy:** Create indexes on foreign keys and frequently queried columns
-- **Connection Pooling:** HikariCP with optimized pool size
-- **Query Optimization:** Use EXPLAIN ANALYZE to optimize slow queries
-- **Caching:** Implement second-level cache for read-heavy entities
+| COBOL Pattern | Java Exception |
+|---------------|----------------|
+| FILE STATUS ≠ 00 | IOException / FileProcessingException |
+| SQLCODE < 0 | DataAccessException |
+| SQLCODE = 100 | EmptyResultDataAccessException |
+| CICS EIBRESP ≠ 0 | TransactionException |
+| ABEND | RuntimeException subclass |
+
+> Error handling mapping requires source pattern analysis.
 {{/if}}
 
-### 7.2 Application Optimization
+### 10.2 Return Code Mapping
 
-{{#if performance.application}}
-{{#each performance.application}}
-- **{{this.area}}:** {{this.description}}
+**Source:** RETURN-CODE and status field extraction
+
+{{#if design.return_codes}}
+| Program | Return Code | Meaning | Java Handling | Source Location |
+|---------|-------------|---------|---------------|-----------------|
+{{#each design.return_codes}}
+| {{this.program}} | {{this.code}} | {{this.meaning}} | {{this.java_handling}} | `{{this.location}}` |
 {{/each}}
 {{else}}
-- **Lazy Loading:** Use lazy loading for large object graphs
-- **Batch Processing:** Process bulk operations in batches
-- **Async Processing:** Use @Async for long-running operations
-- **Caching:** Redis for distributed caching
+> **Not found in source:** Return code mapping requires program analysis.
 {{/if}}
 
 ---
 
-## 8. Security Design
+## 11. Configuration Design
 
-### 8.1 Authentication & Authorization
+### 11.1 Externalized Configuration from Source
 
-{{#if security.auth}}
-{{security.auth}}
-{{else}}
-- **Authentication:** JWT-based authentication
-- **Authorization:** Role-based access control (RBAC)
-- **Password Policy:** BCrypt hashing, minimum 8 characters
-{{/if}}
+**Source:** Hardcoded values and PARM extraction
 
-### 8.2 Data Security
-
-{{#if security.data}}
-{{#each security.data}}
-- **{{this.aspect}}:** {{this.implementation}}
+{{#if design.config_mapping}}
+| Source Location | Hardcoded Value | Config Property | Type | Source |
+|-----------------|-----------------|-----------------|------|--------|
+{{#each design.config_mapping}}
+| {{this.location}} | {{this.value}} | {{this.property}} | {{this.type}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- **Encryption at Rest:** Database-level encryption
-- **Encryption in Transit:** TLS 1.2+ for all communications
-- **Sensitive Data:** Mask PII in logs
-- **SQL Injection Prevention:** Use parameterized queries/JPA
+> **Not found in source:** Configuration mapping requires hardcoded value extraction.
+{{/if}}
+
+### 11.2 Environment-Specific Settings
+
+**Source:** JCL PARM, SYSIN, and environment references
+
+{{#if design.env_settings}}
+| Setting | JCL Source | Config Property | Default Value | Source |
+|---------|------------|-----------------|---------------|--------|
+{{#each design.env_settings}}
+| {{this.setting}} | {{this.jcl_source}} | {{this.property}} | {{this.default}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Environment settings require JCL analysis.
 {{/if}}
 
 ---
 
-## 9. Implementation Guidelines
+## 12. Testing Design Considerations
 
-### 9.1 Coding Standards
+### 12.1 Unit Test Coverage from Source
 
-{{#if guidelines.coding_standards}}
-{{guidelines.coding_standards}}
-{{else}}
-- Follow Java Code Conventions
-- Use SonarQube for code quality checks
-- Maintain 80%+ unit test coverage
-- Document all public APIs with Javadoc
-- Use meaningful variable and method names
-{{/if}}
+**Source:** Business logic complexity analysis
 
-### 9.2 Code Review Checklist
-
-{{#if guidelines.code_review}}
-{{#each guidelines.code_review}}
-- [ ] {{this}}
+{{#if design.test_coverage}}
+| Class | Methods | Complexity | Test Priority | Source Evidence |
+|-------|---------|------------|---------------|-----------------|
+{{#each design.test_coverage}}
+| {{this.class}} | {{this.methods}} | {{this.complexity}} | {{this.priority}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-- [ ] Code follows coding standards
-- [ ] Unit tests exist and pass
-- [ ] No hardcoded values (use configuration)
-- [ ] Error handling is appropriate
-- [ ] Logging is adequate
-- [ ] No security vulnerabilities
-- [ ] Performance considerations addressed
+> **Not found in source:** Test coverage plan requires complexity analysis.
 {{/if}}
 
----
+### 12.2 Critical Business Logic for Testing
 
-## 10. Deployment Design
+**Source:** Business rule extraction
 
-### 10.1 Build & Deployment Pipeline
-
-```mermaid
-{{#if deployment.pipeline}}
-{{{deployment.pipeline}}}
-{{else}}
-graph LR
-    A[Code Commit] --> B[Build]
-    B --> C[Unit Tests]
-    C --> D[Integration Tests]
-    D --> E[Package]
-    E --> F[Deploy to Dev]
-    F --> G[Deploy to Test]
-    G --> H[UAT]
-    H --> I[Deploy to Prod]
-{{/if}}
-```
-
-### 10.2 Deployment Artifacts
-
-{{#if deployment.artifacts}}
-{{#each deployment.artifacts}}
-- **{{this.name}}:** {{this.description}}
-  - **Format:** {{this.format}}
-  - **Location:** {{this.location}}
+{{#if design.critical_logic}}
+| Business Logic | Source Program | Source Location | Test Cases Required |
+|----------------|----------------|-----------------|---------------------|
+{{#each design.critical_logic}}
+| {{this.logic}} | {{this.program}} | `{{this.location}}` | {{this.test_cases}} |
 {{/each}}
 {{else}}
-- **Application JAR:** Spring Boot executable JAR
-- **Database Scripts:** Flyway migration scripts
-- **Configuration Files:** application-{env}.yml
-- **Deployment Scripts:** Shell scripts for automation
+> **Not found in source:** Critical logic identification requires business rule extraction.
 {{/if}}
 
 ---
 
 ## Appendices
 
-### Appendix A: Database DDL Scripts
+### Appendix A: Complete Program-to-Class Matrix
 
-*[Full DDL scripts for all tables, indexes, constraints]*
-
-### Appendix B: Sample Code
-
-{{#if appendix.sample_code}}
-*[Code examples for key components]*
+{{#if appendix.program_matrix}}
+| Program | Type | LOC | Classes | Source Path |
+|---------|------|-----|---------|-------------|
+{{#each appendix.program_matrix}}
+| {{this.program}} | {{this.type}} | {{this.loc}} | {{this.classes}} | `{{this.path}}` |
+{{/each}}
 {{/if}}
 
-### Appendix C: API Specifications
+### Appendix B: Copybook-to-DTO Matrix
 
-{{#if appendix.api_spec}}
-*[OpenAPI/Swagger specification file]*
+{{#if appendix.copybook_matrix}}
+| Copybook | Fields | DTO Class | Used By | Source Path |
+|----------|--------|-----------|---------|-------------|
+{{#each appendix.copybook_matrix}}
+| {{this.copybook}} | {{this.fields}} | {{this.dto}} | {{this.used_by}} | `{{this.path}}` |
+{{/each}}
 {{/if}}
+
+### Appendix C: DB2 Table-to-Entity Matrix
+
+{{#if appendix.db2_matrix}}
+| Table | Columns | Entity Class | Source Programs |
+|-------|---------|--------------|-----------------|
+{{#each appendix.db2_matrix}}
+| {{this.table}} | {{this.columns}} | {{this.entity}} | {{this.programs}} |
+{{/each}}
+{{/if}}
+
+---
+
+## Traceability Note
+
+All design decisions in this document are derived from COBOL source code analysis. Each component includes source evidence (file name, line number). Items marked "Not found in source" require manual analysis or design decisions.
 
 ---
 
@@ -620,7 +704,7 @@ graph LR
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
 
 ---
 

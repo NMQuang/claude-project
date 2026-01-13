@@ -1,0 +1,650 @@
+# Migration Design Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Source Technology** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **Target Technology** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **Document Type** | Migration Design |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+
+---
+
+## Executive Summary
+
+**Source:** Detailed design derived from As-Is Analysis and Migration Strategy.
+
+| Metric | Value | Source Reference |
+|--------|-------|------------------|
+| Components to Migrate | {{metadata.source_analysis.total_files}} | As-Is Analysis |
+| Total LOC | {{metadata.source_analysis.total_loc}} | As-Is Analysis |
+| Complexity Level | {{metadata.migrationComplexity.difficulty}} | Complexity Analysis |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} | Schema Analysis |{{/if}}
+
+---
+
+## 1. Component Mapping
+
+### 1.1 Source to Target Component Mapping
+
+**Source:** Derived from source code analysis
+
+{{#if mappings.components}}
+| Source Component | Source Location | Target Component | Target Location | Mapping Type |
+|------------------|-----------------|------------------|-----------------|--------------|
+{{#each mappings.components}}
+| {{this.source_name}} | `{{this.source_path}}` | {{this.target_name}} | `{{this.target_path}}` | {{this.type}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Component mappings require source analysis completion.
+{{/if}}
+
+### 1.2 Mapping Details
+
+{{#if mappings.component_details}}
+{{#each mappings.component_details}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**Source:** `{{this.source_path}}` ({{this.source_loc}} LOC)
+
+| Attribute | Source | Target |
+|-----------|--------|--------|
+| Type | {{this.source_type}} | {{this.target_type}} |
+| LOC | {{this.source_loc}} | {{this.estimated_target_loc}} |
+| Complexity | {{this.complexity}} | - |
+| Dependencies | {{this.dependencies}} | {{this.target_dependencies}} |
+
+**Mapping Rules Applied:**
+{{#each this.rules}}
+- {{this}}
+{{/each}}
+
+**Source Code Reference:**
+```{{source.language}}
+{{{this.source_snippet}}}
+```
+**Location:** `{{this.source_path}}:{{this.start_line}}-{{this.end_line}}`
+
+{{#if this.target_template}}
+**Target Code Template:**
+```{{target.language}}
+{{{this.target_template}}}
+```
+{{/if}}
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 2. Code Conversion Design
+
+### 2.1 Conversion Rules
+
+**Source:** Pattern extraction from source code
+
+{{#if design.conversion_rules}}
+| Rule ID | Source Pattern | Target Pattern | Occurrences | Source Examples |
+|---------|----------------|----------------|-------------|-----------------|
+{{#each design.conversion_rules}}
+| {{this.id}} | `{{this.source_pattern}}` | `{{this.target_pattern}}` | {{this.count}} | {{this.examples}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Conversion rules require pattern analysis.
+{{/if}}
+
+### 2.2 Detailed Conversion Specifications
+
+{{#if design.conversion_specs}}
+{{#each design.conversion_specs}}
+#### {{this.category}}
+
+**Source Pattern:**
+```{{source.language}}
+{{{this.source_example}}}
+```
+**Location:** `{{this.source_file}}:{{this.source_line}}`
+
+**Target Pattern:**
+```{{target.language}}
+{{{this.target_example}}}
+```
+
+**Conversion Notes:**
+{{#each this.notes}}
+- {{this}}
+{{/each}}
+
+**Affected Components:**
+{{#each this.affected}}
+- `{{this}}`
+{{/each}}
+
+---
+
+{{/each}}
+{{/if}}
+
+### 2.3 Data Structure Conversion
+
+**Source:** Data structure extraction from source code
+
+{{#if design.data_structure_conversion}}
+{{#each design.data_structure_conversion}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**Source Definition:** `{{this.source_file}}:{{this.source_line}}`
+
+| Source Field | Source Type | Target Field | Target Type | Conversion |
+|--------------|-------------|--------------|-------------|------------|
+{{#each this.fields}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} | {{this.conversion}} |
+{{/each}}
+
+**Source Code:**
+```{{source.language}}
+{{{this.source_code}}}
+```
+
+**Target Code:**
+```{{target.language}}
+{{{this.target_code}}}
+```
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Data structure conversion requires structure extraction.
+{{/if}}
+
+---
+
+## 3. Interface Design
+
+### 3.1 API/Service Design
+
+**Source:** Interface extraction from source code
+
+{{#if design.interfaces}}
+{{#each design.interfaces}}
+#### {{this.name}}
+
+**Source:** `{{this.source_file}}:{{this.source_line}}`
+
+| Attribute | Source | Target |
+|-----------|--------|--------|
+| Interface Type | {{this.source_type}} | {{this.target_type}} |
+| Protocol | {{this.source_protocol}} | {{this.target_protocol}} |
+
+**Source Interface:**
+```{{source.language}}
+{{{this.source_code}}}
+```
+
+**Target Interface:**
+```{{target.language}}
+{{{this.target_code}}}
+```
+
+**Parameters Mapping:**
+| Source Parameter | Source Type | Target Parameter | Target Type |
+|------------------|-------------|------------------|-------------|
+{{#each this.parameters}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Interface design requires interface extraction.
+{{/if}}
+
+### 3.2 External Integration Design
+
+**Source:** Integration point extraction
+
+{{#if design.integrations}}
+| Integration | Source Implementation | Target Implementation | Source Location |
+|-------------|----------------------|----------------------|-----------------|
+{{#each design.integrations}}
+| {{this.name}} | {{this.source_impl}} | {{this.target_impl}} | `{{this.source_file}}:{{this.source_line}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Integration design requires integration point analysis.
+{{/if}}
+
+---
+
+## 4. Database Design
+
+{{#if source.database}}
+
+### 4.1 Schema Conversion Design
+
+**Source:** DDL extraction from {{source.database}}
+
+{{#if design.schema_conversion}}
+{{#each design.schema_conversion}}
+#### Table: {{this.source_table}} → {{this.target_table}}
+
+**Source DDL:** `{{this.source_ddl_file}}`
+
+**Source Definition:**
+```sql
+{{{this.source_ddl}}}
+```
+
+**Target Definition:**
+```sql
+{{{this.target_ddl}}}
+```
+
+**Column Mapping:**
+| Source Column | Source Type | Target Column | Target Type | Conversion Notes |
+|---------------|-------------|---------------|-------------|------------------|
+{{#each this.columns}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} | {{this.notes}} |
+{{/each}}
+
+**Constraint Changes:**
+{{#each this.constraints}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Schema conversion design requires DDL analysis.
+{{/if}}
+
+### 4.2 Index Conversion Design
+
+**Source:** Index extraction from schema
+
+{{#if design.index_conversion}}
+| Source Index | Source Type | Target Index | Target Type | Source Table |
+|--------------|-------------|--------------|-------------|--------------|
+{{#each design.index_conversion}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} | {{this.table}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Index conversion requires index extraction.
+{{/if}}
+
+### 4.3 Stored Procedure Conversion Design
+
+**Source:** Procedure extraction from database
+
+{{#if design.procedure_conversion}}
+{{#each design.procedure_conversion}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**Source:** `{{this.source_file}}`
+
+**Source Code:**
+```sql
+{{{this.source_code}}}
+```
+
+**Target Code:**
+```sql
+{{{this.target_code}}}
+```
+
+**Conversion Notes:**
+{{#each this.notes}}
+- {{this}}
+{{/each}}
+
+**Parameter Changes:**
+| Source Parameter | Source Type | Target Parameter | Target Type |
+|------------------|-------------|------------------|-------------|
+{{#each this.parameters}}
+| {{this.source_name}} | {{this.source_type}} | {{this.target_name}} | {{this.target_type}} |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Procedure conversion requires procedure extraction.
+{{/if}}
+
+### 4.4 View Conversion Design
+
+{{#if design.view_conversion}}
+{{#each design.view_conversion}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**Source:** `{{this.source_file}}`
+
+**Source Definition:**
+```sql
+{{{this.source_code}}}
+```
+
+**Target Definition:**
+```sql
+{{{this.target_code}}}
+```
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** View conversion requires view extraction.
+{{/if}}
+
+### 4.5 Trigger Conversion Design
+
+{{#if design.trigger_conversion}}
+{{#each design.trigger_conversion}}
+#### {{this.source_name}} → {{this.target_name}}
+
+**Source:** `{{this.source_file}}`
+
+**Trigger Event:** {{this.event}}
+
+**Source Code:**
+```sql
+{{{this.source_code}}}
+```
+
+**Target Code:**
+```sql
+{{{this.target_code}}}
+```
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Trigger conversion requires trigger extraction.
+{{/if}}
+
+{{else}}
+> **Not applicable:** No database component in this migration.
+{{/if}}
+
+---
+
+## 5. Data Migration Design
+
+{{#if source.database}}
+
+### 5.1 Data Migration Workflow
+
+**Source:** Table dependency analysis
+
+{{#if design.data_migration.workflow}}
+```mermaid
+{{{design.data_migration.workflow}}}
+```
+{{else}}
+> **Not found in source:** Data migration workflow requires dependency analysis.
+{{/if}}
+
+### 5.2 Table Migration Order
+
+**Source:** Foreign key dependency analysis
+
+{{#if design.data_migration.order}}
+| Order | Table | Row Count | Dependencies | Strategy |
+|-------|-------|-----------|--------------|----------|
+{{#each design.data_migration.order}}
+| {{this.order}} | {{this.table}} | {{this.rows}} | {{this.dependencies}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Migration order requires dependency analysis.
+{{/if}}
+
+### 5.3 Data Transformation Rules
+
+**Source:** Data format analysis
+
+{{#if design.data_migration.transformations}}
+{{#each design.data_migration.transformations}}
+#### {{this.table}}.{{this.column}}
+
+**Source Type:** {{this.source_type}}
+**Target Type:** {{this.target_type}}
+
+**Transformation Rule:**
+```
+{{this.rule}}
+```
+
+**Example:**
+- Before: `{{this.example_before}}`
+- After: `{{this.example_after}}`
+
+**Source Reference:** `{{this.source_file}}`
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Transformation rules require data format analysis.
+{{/if}}
+
+{{/if}}
+
+---
+
+## 6. Configuration Design
+
+### 6.1 Configuration Mapping
+
+**Source:** Configuration file analysis
+
+{{#if design.config_mapping}}
+| Source Config | Source Location | Target Config | Target Location |
+|---------------|-----------------|---------------|-----------------|
+{{#each design.config_mapping}}
+| {{this.source_name}} | `{{this.source_path}}` | {{this.target_name}} | `{{this.target_path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Configuration mapping requires config file analysis.
+{{/if}}
+
+### 6.2 Parameter Conversion
+
+{{#if design.param_conversion}}
+| Source Parameter | Source Value | Target Parameter | Target Value | Source File |
+|------------------|--------------|------------------|--------------|-------------|
+{{#each design.param_conversion}}
+| {{this.source_name}} | {{this.source_value}} | {{this.target_name}} | {{this.target_value}} | `{{this.source_file}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Parameter conversion requires parameter extraction.
+{{/if}}
+
+---
+
+## 7. Error Handling Design
+
+### 7.1 Error Code Mapping
+
+**Source:** Error handling extraction from source code
+
+{{#if design.error_mapping}}
+| Source Error | Source Location | Target Error | Handling Strategy |
+|--------------|-----------------|--------------|-------------------|
+{{#each design.error_mapping}}
+| {{this.source_error}} | `{{this.source_file}}:{{this.source_line}}` | {{this.target_error}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Error mapping requires error handling extraction.
+{{/if}}
+
+### 7.2 Exception Handling Design
+
+{{#if design.exception_handling}}
+{{#each design.exception_handling}}
+#### {{this.source_pattern}}
+
+**Source:** `{{this.source_file}}:{{this.source_line}}`
+
+**Source Pattern:**
+```{{source.language}}
+{{{this.source_code}}}
+```
+
+**Target Pattern:**
+```{{target.language}}
+{{{this.target_code}}}
+```
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 8. Logging Design
+
+### 8.1 Log Statement Mapping
+
+**Source:** Log statement extraction
+
+{{#if design.log_mapping}}
+| Source Log Type | Occurrences | Target Log Type | Source Locations |
+|-----------------|-------------|-----------------|------------------|
+{{#each design.log_mapping}}
+| {{this.source_type}} | {{this.count}} | {{this.target_type}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Log mapping requires log statement extraction.
+{{/if}}
+
+---
+
+## 9. Testing Design
+
+### 9.1 Test Case Mapping
+
+**Source:** Existing test extraction
+
+{{#if design.test_mapping}}
+| Source Test | Source Location | Target Test | Test Type |
+|-------------|-----------------|-------------|-----------|
+{{#each design.test_mapping}}
+| {{this.source_name}} | `{{this.source_file}}` | {{this.target_name}} | {{this.type}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Test mapping requires existing test extraction.
+{{/if}}
+
+### 9.2 Validation Test Design
+
+**Source:** Based on source component functionality
+
+{{#if design.validation_tests}}
+{{#each design.validation_tests}}
+#### Test: {{this.name}}
+
+**Source Component:** `{{this.source_component}}`
+
+**Test Objective:** {{this.objective}}
+
+**Test Data:**
+- Input: {{this.input}}
+- Expected Output: {{this.expected_output}}
+
+**Source Reference:** `{{this.source_file}}:{{this.source_line}}`
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 10. Implementation Checklist
+
+### 10.1 Pre-Implementation Checklist
+
+{{#if implementation.pre_checklist}}
+{{#each implementation.pre_checklist}}
+- [ ] {{this}}
+{{/each}}
+{{else}}
+- [ ] All source artifacts analyzed and documented
+- [ ] All conversion rules defined and verified
+- [ ] Target architecture confirmed
+- [ ] Development environment set up
+{{/if}}
+
+### 10.2 Implementation Sequence
+
+**Source:** Dependency analysis
+
+{{#if implementation.sequence}}
+| Step | Component | Dependencies | Source Reference |
+|------|-----------|--------------|------------------|
+{{#each implementation.sequence}}
+| {{this.step}} | {{this.component}} | {{this.dependencies}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Implementation sequence requires dependency analysis.
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Complete Mapping Matrix
+
+{{#if appendix.mapping_matrix}}
+{{appendix.mapping_matrix}}
+{{else}}
+> Mapping matrix not generated.
+{{/if}}
+
+### Appendix B: Conversion Rule Reference
+
+{{#if appendix.conversion_rules}}
+{{appendix.conversion_rules}}
+{{else}}
+> Conversion rule reference not generated.
+{{/if}}
+
+### Appendix C: DDL Scripts
+
+{{#if appendix.ddl_scripts}}
+```sql
+{{{appendix.ddl_scripts}}}
+```
+{{/if}}
+
+---
+
+## Traceability Note
+
+All design specifications in this document are derived from actual source artifacts. Each design element includes:
+- **Source Reference:** File path and line number where the source element was found
+- **Source Code:** Actual code snippets from source system
+
+Items marked "Not found in source" indicate that the design element could not be automatically extracted and requires manual specification.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated from source analysis) |
+
+---
+
+**End of Migration Design Document**

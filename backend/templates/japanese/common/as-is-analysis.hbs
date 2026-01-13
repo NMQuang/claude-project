@@ -1,0 +1,451 @@
+# 現状分析ドキュメント (As-Is Analysis)
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **マイグレーションタイプ** | {{project.migration_type}} |
+| **ソース技術** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **ターゲット技術** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **ドキュメントタイプ** | 現状分析 |
+| **作成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+
+---
+
+## エグゼクティブサマリー
+
+**ソース:** {{metadata.source_analysis.total_files}}個のソースファイルの分析から抽出
+
+| メトリクス | 値 | ソース参照 |
+|------------|------|------------|
+| 総ソースファイル数 | {{metadata.source_analysis.total_files}} | {{source.base_path}}のスキャン |
+| 総コード行数 | {{metadata.source_analysis.total_loc}} | LOC分析 |
+| ソース言語 | {{source.language}} | ファイル拡張子分析 |
+{{#if source.database}}| ソースデータベース | {{source.database}} | 接続/DDL分析 |{{/if}}
+| 複雑度スコア | {{metadata.complexity_summary}} | サイクロマティック複雑度分析 |
+
+---
+
+## 1. ソース成果物インベントリ
+
+### 1.1 ファイルインベントリ
+
+**ソース:** `{{source.base_path}}`のディレクトリスキャン
+
+{{#if metadata.source_analysis.programs}}
+| ファイル名 | タイプ | LOC | 複雑度 | ソースパス |
+|------------|--------|-----|--------|------------|
+{{#each metadata.source_analysis.programs}}
+| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** スキャンでプログラムファイルが検出されませんでした。
+{{/if}}
+
+**サマリー:**
+- 総ファイル数: {{metadata.source_analysis.total_files}}
+- 総LOC: {{metadata.source_analysis.total_loc}}
+
+### 1.2 ファイルタイプ分布
+
+**ソース:** ファイル拡張子分析
+
+{{#if metadata.file_type_distribution}}
+| ファイルタイプ | 件数 | 割合 | サンプルファイル |
+|----------------|------|------|------------------|
+{{#each metadata.file_type_distribution}}
+| {{this.type}} | {{this.count}} | {{this.percentage}}% | {{this.examples}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** ファイルタイプ分布は分析されていません。
+{{/if}}
+
+---
+
+## 2. ソースコード構造
+
+### 2.1 モジュール/コンポーネント構造
+
+**ソース:** 静的コード分析
+
+{{#if metadata.modules}}
+| モジュール名 | ファイル数 | LOC | 目的 | ソースパス |
+|--------------|------------|-----|------|------------|
+{{#each metadata.modules}}
+| {{this.name}} | {{this.file_count}} | {{this.loc}} | {{this.purpose}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** モジュール構造は検出されませんでした。
+{{/if}}
+
+### 2.2 エントリポイント
+
+**ソース:** コールグラフ分析
+
+{{#if metadata.entry_points}}
+| エントリポイント | タイプ | 呼び出し元 | ソース位置 |
+|------------------|--------|------------|------------|
+{{#each metadata.entry_points}}
+| {{this.name}} | {{this.type}} | {{this.caller}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** エントリポイントは特定されませんでした。
+{{/if}}
+
+### 2.3 コンポーネント間の依存関係
+
+**ソース:** Import/Include分析
+
+{{#if metadata.dependency_graph}}
+```mermaid
+{{{metadata.dependency_graph}}}
+```
+{{else}}
+> **ソースに見つかりません:** 依存関係グラフは生成されませんでした。
+{{/if}}
+
+{{#if metadata.dependencies}}
+| ソースコンポーネント | 依存先 | 依存タイプ | ソース位置 |
+|----------------------|--------|------------|------------|
+{{#each metadata.dependencies}}
+| {{this.source}} | {{this.target}} | {{this.type}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{/if}}
+
+---
+
+## 3. データ構造
+
+### 3.1 データ定義
+
+**ソース:** ソースコードからのデータ構造抽出
+
+{{#if metadata.data_structures}}
+| 構造名 | タイプ | フィールド数 | ソース位置 | 使用先 |
+|--------|--------|--------------|------------|--------|
+{{#each metadata.data_structures}}
+| {{this.name}} | {{this.type}} | {{this.field_count}} | `{{this.file}}:{{this.line}}` | {{this.used_by}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** データ構造は抽出されませんでした。
+{{/if}}
+
+### 3.2 データ構造詳細
+
+{{#if metadata.data_structure_details}}
+{{#each metadata.data_structure_details}}
+#### {{this.name}}
+
+**ソース:** `{{this.file}}:{{this.line}}`
+
+| フィールド名 | データ型 | 長さ | NULL許可 | 説明 |
+|--------------|----------|------|----------|------|
+{{#each this.fields}}
+| {{this.name}} | {{this.type}} | {{this.length}} | {{this.nullable}} | {{this.description}} |
+{{/each}}
+
+{{/each}}
+{{/if}}
+
+---
+
+## 4. データベース分析
+
+{{#if source.database}}
+
+### 4.1 データベースオブジェクトサマリー
+
+**ソース:** {{source.database}}からのDDL/スキーマ抽出
+
+| オブジェクトタイプ | 件数 | ソース |
+|--------------------|------|--------|
+| テーブル | {{metadata.source_analysis.database.tables}} | スキーマスキャン |
+| ビュー | {{metadata.source_analysis.database.views}} | スキーマスキャン |
+| インデックス | {{metadata.source_analysis.database.indexes}} | スキーマスキャン |
+| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | スキーマスキャン |
+| ファンクション | {{metadata.source_analysis.database.functions}} | スキーマスキャン |
+| トリガー | {{metadata.source_analysis.database.triggers}} | スキーマスキャン |
+{{#if metadata.source_analysis.database.sequences}}| シーケンス | {{metadata.source_analysis.database.sequences}} | スキーマスキャン |{{/if}}
+{{#if metadata.source_analysis.database.partitionedTables}}| パーティションテーブル | {{metadata.source_analysis.database.partitionedTables}} | スキーマスキャン |{{/if}}
+
+### 4.2 テーブルインベントリ
+
+**ソース:** データベーススキーマ抽出
+
+{{#if metadata.database.tables}}
+| テーブル名 | 行数（推定） | 列数 | 主キー | インデックス数 | ソースDDL |
+|------------|--------------|------|--------|----------------|-----------|
+{{#each metadata.database.tables}}
+| {{this.name}} | {{this.row_count}} | {{this.column_count}} | {{this.pk}} | {{this.index_count}} | `{{this.ddl_file}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** テーブルインベントリは利用できません。
+{{/if}}
+
+### 4.3 ストアドプロシージャ/ファンクション
+
+**ソース:** プロシージャ/ファンクション抽出
+
+{{#if metadata.database.stored_procedures_details}}
+| 名前 | タイプ | パラメータ数 | LOC | 複雑度 | ソース位置 |
+|------|--------|--------------|-----|--------|------------|
+{{#each metadata.database.stored_procedures_details}}
+| {{this.name}} | {{this.type}} | {{this.param_count}} | {{this.loc}} | {{this.complexity}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** ストアドプロシージャ/ファンクションは見つかりませんでした。
+{{/if}}
+
+### 4.4 データベース固有機能
+
+**ソース:** 機能使用検出分析
+
+{{#if metadata.database_specific_features}}
+| 機能 | 使用回数 | 影響 | ソース位置 |
+|------|----------|------|------------|
+{{#each metadata.database_specific_features}}
+| {{this.feature}} | {{this.count}} | {{this.impact}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** データベース固有機能は検出されませんでした。
+{{/if}}
+
+{{else}}
+> **該当なし:** このマイグレーションにはデータベースコンポーネントがありません。
+{{/if}}
+
+---
+
+## 5. 外部インターフェース
+
+### 5.1 ファイルI/O操作
+
+**ソース:** ソースコードからのファイル操作抽出
+
+{{#if metadata.file_operations}}
+| 操作 | ファイルタイプ | モード | ソース位置 |
+|------|----------------|--------|------------|
+{{#each metadata.file_operations}}
+| {{this.operation}} | {{this.file_type}} | {{this.mode}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** ファイルI/O操作は検出されませんでした。
+{{/if}}
+
+### 5.2 外部システム連携
+
+**ソース:** 連携ポイント分析
+
+{{#if metadata.integrations}}
+| システム/サービス | プロトコル | 方向 | ソース位置 |
+|--------------------|------------|------|------------|
+{{#each metadata.integrations}}
+| {{this.system}} | {{this.protocol}} | {{this.direction}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 外部連携は検出されませんでした。
+{{/if}}
+
+---
+
+## 6. ビジネスロジック抽出
+
+### 6.1 ビジネスルール
+
+**ソース:** ソースコードからのルール抽出
+
+{{#if metadata.business_rules}}
+| ルールID | 説明 | 実装 | ソース位置 |
+|----------|------|------|------------|
+{{#each metadata.business_rules}}
+| {{this.id}} | {{this.description}} | {{this.implementation}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** ビジネスルールは手動抽出が必要です。
+{{/if}}
+
+### 6.2 計算/アルゴリズム抽出
+
+**ソース:** ソースコードからのアルゴリズム検出
+
+{{#if metadata.algorithms}}
+| アルゴリズム | 目的 | 入力 | 出力 | ソース位置 |
+|--------------|------|------|------|------------|
+{{#each metadata.algorithms}}
+| {{this.name}} | {{this.purpose}} | {{this.inputs}} | {{this.outputs}} | `{{this.file}}:{{this.line}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** アルゴリズムは手動抽出が必要です。
+{{/if}}
+
+---
+
+## 7. 複雑度評価
+
+### 7.1 複雑度メトリクス
+
+**ソース:** 静的コード分析
+
+{{#if metadata.complexity}}
+| メトリクス | 値 | 閾値 | ステータス | ソース |
+|------------|------|------|------------|--------|
+| 平均サイクロマティック複雑度 | {{metadata.complexity.avg_cyclomatic}} | {{complexity_thresholds.cyclomatic}} | {{metadata.complexity.cyclomatic_status}} | 分析ツール |
+| 最大サイクロマティック複雑度 | {{metadata.complexity.max_cyclomatic}} | - | {{metadata.complexity.max_status}} | 分析ツール |
+| 平均メソッド/パラグラフ長 | {{metadata.complexity.avg_method_length}} | {{complexity_thresholds.method_length}} | {{metadata.complexity.method_status}} | 分析ツール |
+| 最大ネスト深度 | {{metadata.complexity.max_nesting}} | {{complexity_thresholds.nesting}} | {{metadata.complexity.nesting_status}} | 分析ツール |
+{{else}}
+> **ソースに見つかりません:** 複雑度メトリクスは計算されませんでした。
+{{/if}}
+
+### 7.2 高複雑度コンポーネント
+
+**ソース:** 複雑度分析ランキング
+
+{{#if metadata.high_complexity_modules}}
+| コンポーネント | 複雑度スコア | LOC | リスクレベル | ソース位置 |
+|----------------|--------------|-----|--------------|------------|
+{{#each metadata.high_complexity_modules}}
+| {{this.name}} | {{this.score}} | {{this.loc}} | {{this.risk}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 高複雑度モジュールは特定されませんでした。
+{{/if}}
+
+### 7.3 マイグレーション複雑度（次元別）
+
+{{#if metadata.migrationComplexity}}
+| 次元 | スコア | 評価 | 主要因子 |
+|------|--------|------|----------|
+{{#if metadata.migrationComplexity.schemaDataTypeComplexity}}| スキーマ＆データ型 | {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.schemaDataType}} |{{/if}}
+{{#if metadata.migrationComplexity.sqlQueryRewriteComplexity}}| SQL＆クエリ書き換え | {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.sqlQueryRewrite}} |{{/if}}
+{{#if metadata.migrationComplexity.procedureFunctionTriggerComplexity}}| プロシージャ/ファンクション/トリガー | {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.procedureFunctionTrigger}} |{{/if}}
+{{#if metadata.migrationComplexity.codeComplexity}}| コード複雑度 | {{metadata.migrationComplexity.codeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.codeComplexity}} |{{/if}}
+{{#if metadata.migrationComplexity.dataVolumeMigrationComplexity}}| データボリューム | {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.dataVolumeMigration}} |{{/if}}
+{{#if metadata.migrationComplexity.applicationORMDependencyComplexity}}| アプリケーション/ORM依存 | {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.applicationORMDependency}} |{{/if}}
+{{#if metadata.migrationComplexity.operationalRuntimeRiskComplexity}}| 運用/ランタイムリスク | {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} | {{metadata.migrationComplexity.details.operationalRuntimeRisk}} |{{/if}}
+| **総合** | **{{metadata.migrationComplexity.overall}}/100** | **{{metadata.migrationComplexity.difficulty}}** | - |
+{{/if}}
+
+---
+
+## 8. コード品質問題
+
+**ソース:** 静的分析ツール出力
+
+{{#if metadata.quality_issues}}
+| 重要度 | カテゴリ | 説明 | 件数 | ソース位置 |
+|--------|----------|------|------|------------|
+{{#each metadata.quality_issues}}
+| {{this.severity}} | {{this.category}} | {{this.description}} | {{this.count}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** コード品質分析は実行されませんでした。
+{{/if}}
+
+---
+
+## 9. 設定＆環境
+
+### 9.1 設定ファイル
+
+**ソース:** 設定ファイルスキャン
+
+{{#if metadata.config_files}}
+| ファイル | タイプ | 目的 | ソースパス |
+|----------|--------|------|------------|
+{{#each metadata.config_files}}
+| {{this.name}} | {{this.type}} | {{this.purpose}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 設定ファイルは検出されませんでした。
+{{/if}}
+
+### 9.2 バッチジョブ定義
+
+**ソース:** ジョブ制御/バッチスクリプト分析
+
+{{#if metadata.batch_jobs}}
+| ジョブ名 | スケジュール | 依存関係 | ソースファイル |
+|----------|--------------|----------|----------------|
+{{#each metadata.batch_jobs}}
+| {{this.name}} | {{this.schedule}} | {{this.dependencies}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** バッチジョブ定義は見つかりませんでした。
+{{/if}}
+
+---
+
+## 10. リスク評価
+
+### 10.1 ソース分析から特定されたリスク
+
+{{#if metadata.risks}}
+| リスクID | カテゴリ | 説明 | 重要度 | ソースエビデンス |
+|----------|----------|------|--------|------------------|
+{{#each metadata.risks}}
+| {{this.id}} | {{this.category}} | {{this.description}} | {{this.severity}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** リスク評価は手動分析が必要です。
+{{/if}}
+
+### 10.2 技術的負債
+
+**ソース:** コード分析結果
+
+{{#if metadata.technical_debt}}
+| 領域 | 説明 | 影響 | ソース位置 |
+|------|------|------|------------|
+{{#each metadata.technical_debt}}
+| {{this.area}} | {{this.description}} | {{this.impact}} | `{{this.location}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 技術的負債評価は実行されませんでした。
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: 完全ファイルリスト
+
+{{#if appendix.file_list}}
+```
+{{#each appendix.file_list}}
+{{this.path}} ({{this.size}}バイト, {{this.loc}} LOC)
+{{/each}}
+```
+{{else}}
+> ファイルリストは生成されませんでした。
+{{/if}}
+
+### 付録B: ソースコードメトリクスサマリー
+
+{{#if appendix.metrics_summary}}
+| メトリクス | 値 |
+|------------|------|
+{{#each appendix.metrics_summary}}
+| {{this.metric}} | {{this.value}} |
+{{/each}}
+{{/if}}
+
+---
+
+## トレーサビリティノート
+
+このドキュメントのすべての技術的ステートメントは、実際のソース成果物から派生しています。`file:line`形式の参照は、情報が抽出されたソースコード内の正確な位置を示しています。「ソースに見つかりません」とマークされた項目は、分析ツールがこの情報を自動的に抽出できなかったことを示し、手動レビューが必要な場合があります。
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|------------|------|--------|----------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（ソース分析から自動生成） |
+
+---
+
+**現状分析ドキュメント終了**

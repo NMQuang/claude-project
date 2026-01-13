@@ -1,0 +1,517 @@
+# Migration Strategy Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Project Name** | {{project.name}} |
+| **Migration Type** | {{project.migration_type}} |
+| **Source Technology** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **Target Technology** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **Document Type** | Migration Strategy |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+
+---
+
+## Executive Summary
+
+**Source:** Derived from As-Is Analysis of {{metadata.source_analysis.total_files}} source files.
+
+### Migration Scope Summary
+
+| Metric | Value | Source Reference |
+|--------|-------|------------------|
+| Total Source Files | {{metadata.source_analysis.total_files}} | As-Is Analysis |
+| Total Lines of Code | {{metadata.source_analysis.total_loc}} | As-Is Analysis |
+| Complexity Score | {{metadata.migrationComplexity.overall}}/100 | Complexity Analysis |
+| Difficulty Level | {{metadata.migrationComplexity.difficulty}} | Complexity Analysis |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} | Schema Analysis |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Schema Analysis |{{/if}}
+
+---
+
+## 1. Migration Scope
+
+### 1.1 Components In Scope
+
+**Source:** Extracted from source analysis
+
+{{#if scope.in_scope}}
+| Component | Type | Count | Source Evidence |
+|-----------|------|-------|-----------------|
+{{#each scope.in_scope}}
+| {{this.name}} | {{this.type}} | {{this.count}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+| Component | Type | Count | Source Evidence |
+|-----------|------|-------|-----------------|
+| Source Files | {{source.language}} | {{metadata.source_analysis.total_files}} | Directory scan |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{source.database}} | {{metadata.source_analysis.database.tables}} | Schema extraction |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{source.database}} | {{metadata.source_analysis.database.stored_procedures}} | Schema extraction |{{/if}}
+{{#if metadata.source_analysis.database.views}}| Views | {{source.database}} | {{metadata.source_analysis.database.views}} | Schema extraction |{{/if}}
+{{/if}}
+
+### 1.2 Components Out of Scope
+
+{{#if scope.out_scope}}
+| Component | Reason | Documentation Reference |
+|-----------|--------|-------------------------|
+{{#each scope.out_scope}}
+| {{this.name}} | {{this.reason}} | {{this.reference}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Out-of-scope items require manual definition.
+{{/if}}
+
+---
+
+## 2. Migration Approach Selection
+
+### 2.1 Approach Recommendation Based on Source Analysis
+
+**Source:** Complexity and dependency analysis
+
+{{#if strategy.selected_approach}}
+| Criteria | Analysis Result | Recommendation Impact |
+|----------|-----------------|----------------------|
+{{#each strategy.criteria_analysis}}
+| {{this.criteria}} | {{this.result}} | {{this.impact}} |
+{{/each}}
+
+**Selected Approach:** {{strategy.selected_approach}}
+
+**Evidence-Based Rationale:**
+{{#each strategy.rationale}}
+- {{this.point}} (Source: {{this.evidence}})
+{{/each}}
+{{else}}
+| Criteria | Analysis Result | Source |
+|----------|-----------------|--------|
+| Total LOC | {{metadata.source_analysis.total_loc}} | File analysis |
+| Complexity Score | {{metadata.migrationComplexity.overall}}/100 | Complexity analysis |
+| Component Coupling | {{metadata.coupling_level}} | Dependency analysis |
+{{#if metadata.source_analysis.database.tables}}| Database Size | {{metadata.source_analysis.database.tables}} tables | Schema analysis |{{/if}}
+
+> **Approach selection requires manual review based on above metrics.**
+{{/if}}
+
+### 2.2 Approach Options Analysis
+
+{{#if strategy.options}}
+{{#each strategy.options}}
+#### Option {{@index}}: {{this.name}}
+
+**Applicability based on source analysis:**
+
+| Factor | Source Value | Suitability |
+|--------|--------------|-------------|
+{{#each this.factors}}
+| {{this.factor}} | {{this.value}} | {{this.suitability}} |
+{{/each}}
+
+**Pros:**
+{{#each this.pros}}
+- {{this}}
+{{/each}}
+
+**Cons:**
+{{#each this.cons}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Approach options require manual definition.
+{{/if}}
+
+---
+
+## 3. Component Migration Strategy
+
+### 3.1 Migration Order Based on Dependencies
+
+**Source:** Dependency analysis from source code
+
+{{#if strategy.migration_order}}
+| Priority | Component | Dependencies | Reason | Source Reference |
+|----------|-----------|--------------|--------|------------------|
+{{#each strategy.migration_order}}
+| {{this.priority}} | {{this.component}} | {{this.dependencies}} | {{this.reason}} | `{{this.source_ref}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Migration order requires dependency analysis completion.
+{{/if}}
+
+### 3.2 Component-Level Strategy
+
+{{#if strategy.component_strategies}}
+{{#each strategy.component_strategies}}
+#### {{this.component}}
+
+**Source:** `{{this.source_path}}`
+
+| Attribute | Value |
+|-----------|-------|
+| LOC | {{this.loc}} |
+| Complexity | {{this.complexity}} |
+| Dependencies | {{this.dependency_count}} |
+| Migration Approach | {{this.approach}} |
+
+**Migration Actions:**
+{{#each this.actions}}
+- {{this.action}} (Effort: {{this.effort}})
+{{/each}}
+
+**Source Evidence:**
+{{#each this.evidence}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{/if}}
+
+---
+
+## 4. Code Migration Strategy
+
+### 4.1 Language/Technology Mapping
+
+**Source:** Source code pattern analysis
+
+{{#if mappings.code}}
+| Source Pattern | Target Pattern | Occurrence Count | Source Examples |
+|----------------|----------------|------------------|-----------------|
+{{#each mappings.code}}
+| {{this.source}} | {{this.target}} | {{this.count}} | {{this.examples}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Code mappings require manual definition based on source analysis.
+{{/if}}
+
+### 4.2 Conversion Rules
+
+{{#if mappings.conversion_rules}}
+{{#each mappings.conversion_rules}}
+#### Rule: {{this.name}}
+
+**Source Pattern:** `{{this.source_pattern}}`
+
+**Target Pattern:** `{{this.target_pattern}}`
+
+**Applies to:** {{this.applies_to}} occurrences
+
+**Source Evidence:**
+- Found in: {{this.found_in}}
+
+{{/each}}
+{{else}}
+> **Not found in source:** Conversion rules require source code pattern extraction.
+{{/if}}
+
+---
+
+## 5. Database Migration Strategy
+
+{{#if source.database}}
+
+### 5.1 Schema Migration Approach
+
+**Source:** Database schema analysis
+
+{{#if db_migration.schema_analysis}}
+| Object Type | Count | Complexity | Approach | Source |
+|-------------|-------|------------|----------|--------|
+{{#each db_migration.schema_analysis}}
+| {{this.type}} | {{this.count}} | {{this.complexity}} | {{this.approach}} | Schema extraction |
+{{/each}}
+{{else}}
+| Object Type | Count | Source |
+|-------------|-------|--------|
+| Tables | {{metadata.source_analysis.database.tables}} | Schema extraction |
+| Views | {{metadata.source_analysis.database.views}} | Schema extraction |
+| Indexes | {{metadata.source_analysis.database.indexes}} | Schema extraction |
+| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Schema extraction |
+| Functions | {{metadata.source_analysis.database.functions}} | Schema extraction |
+| Triggers | {{metadata.source_analysis.database.triggers}} | Schema extraction |
+{{/if}}
+
+### 5.2 Data Type Mapping
+
+**Source:** DDL analysis
+
+{{#if mappings.database}}
+| Source Type ({{source.database}}) | Target Type ({{target.database}}) | Occurrences | Conversion Notes | Source Tables |
+|-----------------------------------|-----------------------------------|-------------|------------------|---------------|
+{{#each mappings.database}}
+| {{this.source}} | {{this.target}} | {{this.count}} | {{this.notes}} | {{this.tables}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Data type mappings require DDL analysis.
+{{/if}}
+
+### 5.3 Database-Specific Feature Migration
+
+**Source:** Feature usage detection
+
+{{#if db_migration.feature_migration}}
+| Feature | Usage Count | Target Approach | Impact | Source Evidence |
+|---------|-------------|-----------------|--------|-----------------|
+{{#each db_migration.feature_migration}}
+| {{this.feature}} | {{this.count}} | {{this.approach}} | {{this.impact}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Database-specific features require analysis.
+{{/if}}
+
+### 5.4 Stored Procedure/Function Strategy
+
+**Source:** Procedure analysis
+
+{{#if db_migration.procedure_strategy}}
+| Procedure Name | LOC | Complexity | Strategy | Source File |
+|----------------|-----|------------|----------|-------------|
+{{#each db_migration.procedure_strategy}}
+| {{this.name}} | {{this.loc}} | {{this.complexity}} | {{this.strategy}} | `{{this.file}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Stored procedure strategy requires procedure analysis.
+{{/if}}
+
+### 5.5 Data Migration Strategy
+
+**Source:** Data volume analysis
+
+{{#if db_migration.data_strategy}}
+| Table | Row Count | Size | Strategy | Priority |
+|-------|-----------|------|----------|----------|
+{{#each db_migration.data_strategy}}
+| {{this.table}} | {{this.rows}} | {{this.size}} | {{this.strategy}} | {{this.priority}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Data migration strategy requires volume analysis.
+{{/if}}
+
+{{else}}
+> **Not applicable:** No database component in this migration.
+{{/if}}
+
+---
+
+## 6. Risk Mitigation Strategy
+
+### 6.1 Risks Identified from Source Analysis
+
+**Source:** As-Is analysis and complexity assessment
+
+{{#if risks}}
+| Risk ID | Category | Description | Probability | Impact | Source Evidence |
+|---------|----------|-------------|-------------|--------|-----------------|
+{{#each risks}}
+| {{this.id}} | {{this.category}} | {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Risks require manual identification from analysis results.
+{{/if}}
+
+### 6.2 Mitigation Actions
+
+{{#if mitigation_actions}}
+| Risk ID | Mitigation Action | Verification Method |
+|---------|-------------------|---------------------|
+{{#each mitigation_actions}}
+| {{this.risk_id}} | {{this.action}} | {{this.verification}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Mitigation actions require manual definition.
+{{/if}}
+
+---
+
+## 7. Quality Assurance Strategy
+
+### 7.1 Testing Scope Based on Source Analysis
+
+**Source:** Component and complexity analysis
+
+{{#if qa.testing_scope}}
+| Test Area | Component Count | Complexity | Test Approach | Source Reference |
+|-----------|-----------------|------------|---------------|------------------|
+{{#each qa.testing_scope}}
+| {{this.area}} | {{this.count}} | {{this.complexity}} | {{this.approach}} | {{this.source}} |
+{{/each}}
+{{else}}
+| Test Area | Value | Source |
+|-----------|-------|--------|
+| Total Files to Test | {{metadata.source_analysis.total_files}} | File analysis |
+| High Complexity Components | {{metadata.high_complexity_count}} | Complexity analysis |
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures to Test | {{metadata.source_analysis.database.stored_procedures}} | Schema analysis |{{/if}}
+{{/if}}
+
+### 7.2 Validation Criteria
+
+{{#if qa.validation_criteria}}
+| Criteria | Expected | Measurement Method | Source Reference |
+|----------|----------|-------------------|------------------|
+{{#each qa.validation_criteria}}
+| {{this.criteria}} | {{this.expected}} | {{this.method}} | {{this.source}} |
+{{/each}}
+{{else}}
+| Criteria | Measurement | Source |
+|----------|-------------|--------|
+| Functional Parity | Compare output with source system | Source system tests |
+| Data Integrity | Row count and checksum validation | Source database |
+| Performance | Response time comparison | Source system metrics |
+{{/if}}
+
+---
+
+## 8. Resource Requirements
+
+### 8.1 Effort Estimation Based on Source Metrics
+
+**Source:** LOC and complexity analysis
+
+{{#if resources.effort_estimate}}
+| Component | Metric | Estimated Effort | Basis |
+|-----------|--------|------------------|-------|
+{{#each resources.effort_estimate}}
+| {{this.component}} | {{this.metric}} | {{this.effort}} | {{this.basis}} |
+{{/each}}
+{{else}}
+| Metric | Value | Effort Factor |
+|--------|-------|----------------|
+| Total LOC | {{metadata.source_analysis.total_loc}} | Based on LOC conversion rate |
+| Complexity Score | {{metadata.migrationComplexity.overall}}/100 | Complexity multiplier |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} | Based on table conversion rate |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | Based on procedure conversion rate |{{/if}}
+{{/if}}
+
+### 8.2 Skill Requirements
+
+{{#if resources.skills}}
+| Skill Area | Required For | Source Evidence |
+|------------|--------------|-----------------|
+{{#each resources.skills}}
+| {{this.skill}} | {{this.required_for}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+| Skill Area | Required For |
+|------------|--------------|
+| {{source.language}} expertise | Source code understanding |
+| {{target.language}} expertise | Target code development |
+{{#if source.database}}| {{source.database}} expertise | Source database analysis |{{/if}}
+{{#if target.database}}| {{target.database}} expertise | Target database development |{{/if}}
+{{/if}}
+
+---
+
+## 9. Migration Phases
+
+### 9.1 Phase Definition Based on Dependencies
+
+{{#if phases}}
+{{#each phases}}
+#### Phase {{@index}}: {{this.name}}
+
+**Components:**
+{{#each this.components}}
+- {{this.name}} ({{this.loc}} LOC, Complexity: {{this.complexity}})
+{{/each}}
+
+**Dependencies:** {{this.dependencies}}
+
+**Entry Criteria:**
+{{#each this.entry_criteria}}
+- {{this}}
+{{/each}}
+
+**Exit Criteria:**
+{{#each this.exit_criteria}}
+- {{this}}
+{{/each}}
+
+**Source Reference:** {{this.source_reference}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Phase definition requires dependency analysis completion.
+{{/if}}
+
+---
+
+## 10. Success Criteria
+
+### 10.1 Technical Success Criteria
+
+**Source:** Derived from source analysis metrics
+
+{{#if success_criteria.technical}}
+| Criteria | Target | Measurement | Source Baseline |
+|----------|--------|-------------|-----------------|
+{{#each success_criteria.technical}}
+| {{this.criteria}} | {{this.target}} | {{this.measurement}} | {{this.baseline}} |
+{{/each}}
+{{else}}
+| Criteria | Target | Baseline Source |
+|----------|--------|-----------------|
+| Functional Parity | 100% | Source system test cases |
+| Code Coverage | ≥80% | - |
+| Performance | ≥ Source system | Source system metrics |
+| Data Integrity | 100% | Source database |
+{{/if}}
+
+### 10.2 Quality Gates
+
+{{#if success_criteria.quality_gates}}
+| Gate | Criteria | Required for |
+|------|----------|--------------|
+{{#each success_criteria.quality_gates}}
+| {{this.gate}} | {{this.criteria}} | {{this.required_for}} |
+{{/each}}
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Source Analysis Summary
+
+| Metric | Value |
+|--------|-------|
+| Analysis Date | {{generated_date}} |
+| Total Files Analyzed | {{metadata.source_analysis.total_files}} |
+| Total LOC | {{metadata.source_analysis.total_loc}} |
+| Complexity Score | {{metadata.migrationComplexity.overall}}/100 |
+{{#if metadata.source_analysis.database.tables}}| Database Tables | {{metadata.source_analysis.database.tables}} |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} |{{/if}}
+
+### Appendix B: Mapping Rules Reference
+
+{{#if appendix.mapping_reference}}
+{{appendix.mapping_reference}}
+{{/if}}
+
+---
+
+## Traceability Note
+
+All strategic recommendations in this document are derived from actual source analysis results. Each recommendation includes a "Source Evidence" or "Source Reference" column indicating the analysis that supports it. Items marked "Not found in source" require manual analysis or decision-making.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated from source analysis) |
+
+---
+
+**End of Migration Strategy Document**

@@ -1,608 +1,546 @@
-# Test Strategy Document
+# Test Strategy Document (PostgreSQL → Oracle)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | PostgreSQL → Oracle |
 | **Document Type** | Test Strategy |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Test Scope from Source Analysis
 
-This document outlines the comprehensive testing strategy for the PostgreSQL-to-Oracle migration of **{{project.name}}**. The strategy ensures data integrity, functional correctness, performance validation, and business continuity while adhering to the minimal Java changes principle.
+### 1.1 Scope Summary
 
-### Testing Objectives
+**Source:** PostgreSQL catalog and application code inventory
 
-1. **Data Integrity** - Verify 100% data accuracy post-migration
-2. **Functional Correctness** - Ensure all application features work identically
-3. **Performance Validation** - Meet or exceed PostgreSQL baseline performance
-4. **Zero Business Logic Changes** - Validate no unintended logic modifications
-5. **Rollback Readiness** - Verify rollback procedures work correctly
+| Component | Count | Test Coverage Required | Source |
+|-----------|-------|------------------------|--------|
+| Database Tables | {{metadata.source_analysis.database.tables}} | Schema + Data validation | `pg_tables` |
+| Views | {{metadata.source_analysis.database.views}} | Query result validation | `pg_views` |
+| Functions/Procedures | {{metadata.source_analysis.database.functions}} | Unit test each | `pg_proc` |
+| Triggers | {{metadata.source_analysis.database.triggers}} | Integration test | `pg_trigger` |
+| Native SQL Queries | {{metadata.source_analysis.nativeQueryCount}} | Query result validation | @Query extraction |
+| Entity Classes | {{metadata.source_analysis.entityCount}} | Mapping validation | JPA scan |
+| Sequences | {{metadata.source_analysis.database.sequences}} | Auto-increment test | `pg_sequences` |
 
----
+### 1.2 Components with PostgreSQL-Specific Features
 
-## 1. Test Scope
+**Source:** PostgreSQL feature detection
 
-### 1.1 In-Scope Testing
-
-- ✓ Database schema validation
-- ✓ Data migration validation
-- ✓ SQL query correctness
-- ✓ Stored procedure/function validation
-- ✓ Entity mapping validation
-- ✓ Repository query validation
-- ✓ Integration testing (full stack)
-- ✓ Performance testing
-- ✓ Load testing
-- ✓ Rollback testing
-
-### 1.2 Out-of-Scope Testing
-
-- ✗ Business logic validation (unchanged, already tested)
-- ✗ UI/UX testing (unchanged)
-- ✗ Security penetration testing (separate activity)
-- ✗ Infrastructure testing (separate activity)
+{{#if testing.pg_feature_scope}}
+| Component | PostgreSQL Feature | Test Priority | Source |
+|-----------|-------------------|---------------|--------|
+{{#each testing.pg_feature_scope}}
+| {{this.component}} | {{this.feature}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Feature-specific scope requires detailed analysis.
+{{/if}}
 
 ---
 
-## 2. Test Levels
+## 2. Schema Validation Testing
 
-### 2.1 Unit Testing (Database Layer)
+### 2.1 DDL Validation Test Cases
 
-#### 2.1.1 DDL Validation Tests
+**Source:** PostgreSQL DDL extraction
 
-**Objective:** Verify Oracle schema matches PostgreSQL schema structure
+{{#if testing.ddl_validation}}
+| Test ID | Object | Validation | Expected | Source |
+|---------|--------|------------|----------|--------|
+{{#each testing.ddl_validation}}
+| {{this.id}} | {{this.object}} | {{this.validation}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Test ID | Validation | Expected | Source |
+|---------|------------|----------|--------|
+| DDL-001 | Table count | {{metadata.source_analysis.database.tables}} tables | pg_tables |
+| DDL-002 | View count | {{metadata.source_analysis.database.views}} views | pg_views |
+| DDL-003 | Sequence count | {{metadata.source_analysis.database.sequences}} sequences | pg_sequences |
+| DDL-004 | Index count | {{metadata.source_analysis.database.indexes}} indexes | pg_indexes |
+| DDL-005 | Constraint count | All constraints migrated | pg_constraint |
+| DDL-006 | Column definitions | Types correctly mapped | information_schema |
+| DDL-007 | Primary keys | All PKs created | pg_constraint |
+| DDL-008 | Foreign keys | All FKs created | pg_constraint |
+{{/if}}
+
+### 2.2 Column Type Mapping Tests
+
+**Source:** Data type inventory
+
+{{#if testing.type_mapping_tests}}
+{{#each testing.type_mapping_tests}}
+#### Type: {{this.pgType}} → {{this.oracleType}}
+
+**Occurrences:** {{this.count}}
 
 **Test Cases:**
+| Test | Input | Expected | Source Table |
+|------|-------|----------|--------------|
+{{#each this.testCases}}
+| {{this.test}} | {{this.input}} | {{this.expected}} | {{this.table}} |
+{{/each}}
 
-| Test ID | Test Description | Expected Result |
-|---------|-----------------|-----------------|
-| DDL-001 | Verify table count | {{metadata.source_analysis.database.tables}} tables created |
-| DDL-002 | Verify column definitions for all tables | Column types, nullability, defaults match |
-| DDL-003 | Verify primary key constraints | All PKs created correctly |
-| DDL-004 | Verify foreign key constraints | All FKs with correct references |
-| DDL-005 | Verify unique constraints | All unique constraints created |
-| DDL-006 | Verify check constraints | All check constraints enforced |
-| DDL-007 | Verify sequence creation | {{metadata.source_analysis.database.sequences}} sequences + new SERIAL sequences |
-| DDL-008 | Verify trigger creation for SERIAL | Auto-increment works correctly |
-| DDL-009 | Verify index creation | All indexes created with correct type |
-| DDL-010 | Verify view definitions | {{metadata.source_analysis.database.views}} views work correctly |
+---
 
-**Test Script Example:**
+{{/each}}
+{{else}}
+| PostgreSQL Type | Oracle Type | Test Validation |
+|-----------------|-------------|-----------------|
+| BOOLEAN | NUMBER(1) | TRUE→1, FALSE→0 |
+| TEXT | CLOB | Large text preserved |
+| JSONB | CLOB/JSON | JSON structure intact |
+| UUID | VARCHAR2(36) | Format preserved |
+| ARRAY[] | VARCHAR2/CLOB | Values preserved |
+| SERIAL | NUMBER+SEQ | Auto-increment works |
+
+> Type mapping tests require DDL analysis.
+{{/if}}
+
+---
+
+## 3. Data Migration Validation
+
+### 3.1 Row Count Validation
+
+**Source:** Table inventory
+
+{{#if testing.row_count_validation}}
+| Table | PostgreSQL Count | Oracle Count | Status | Source |
+|-------|------------------|--------------|--------|--------|
+{{#each testing.row_count_validation}}
+| {{this.table}} | {{this.pgCount}} | {{this.oracleCount}} | {{this.status}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+**Validation Query Template:**
+
 ```sql
--- Test: Verify table structure
-SELECT table_name, column_name, data_type, nullable
-FROM user_tab_columns
-WHERE table_name = 'USERS'
-ORDER BY column_id;
+-- PostgreSQL
+SELECT 'table_name' as table_name, COUNT(*) as row_count FROM table_name;
 
--- Compare with PostgreSQL structure
+-- Oracle
+SELECT 'table_name' as table_name, COUNT(*) as row_count FROM table_name;
+
+-- All counts must match 100%
 ```
 
-#### 2.1.2 Stored Procedure/Function Tests
+> Row count validation requires data migration.
+{{/if}}
 
-**Total Functions to Test:** {{metadata.source_analysis.database.functions}}
-**Total Procedures to Test:** {{metadata.source_analysis.database.stored_procedures}}
+### 3.2 Data Integrity Validation
+
+**Source:** Data type and constraint analysis
+
+{{#if testing.data_integrity}}
+{{#each testing.data_integrity}}
+#### Table: {{this.table}}
+
+**Validation Tests:**
+| Test | Query | Expected | Source |
+|------|-------|----------|--------|
+{{#each this.tests}}
+| {{this.test}} | `{{this.query}}` | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+| Validation | Method | Criteria |
+|------------|--------|----------|
+| Row counts | COUNT(*) comparison | 100% match |
+| Checksum | MD5/SHA hash | Match |
+| NULL values | NULL count per column | Match |
+| Referential integrity | FK validation | No orphans |
+| Unique constraints | Duplicate check | No violations |
+| Sample data | Random 10% inspection | Match |
+{{/if}}
+
+### 3.3 Data Transformation Validation
+
+**Source:** Data type transformation analysis
+
+{{#if testing.transformation_validation}}
+| Table | Column | Transformation | Test Case | Expected | Source |
+|-------|--------|----------------|-----------|----------|--------|
+{{#each testing.transformation_validation}}
+| {{this.table}} | {{this.column}} | {{this.transformation}} | {{this.testCase}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Transformation | Test |
+|----------------|------|
+| BOOLEAN → NUMBER(1) | Verify TRUE→1, FALSE→0 |
+| ARRAY → VARCHAR2 | Verify all elements preserved |
+| JSONB → CLOB | Verify JSON structure valid |
+| SERIAL → SEQUENCE | Verify next value correct |
+
+> Transformation tests require data analysis.
+{{/if}}
+
+---
+
+## 4. SQL Query Validation
+
+### 4.1 Native Query Test Cases
+
+**Source:** @Query annotation extraction
+
+{{#if testing.native_query_tests}}
+{{#each testing.native_query_tests}}
+#### Repository: {{this.repository}}
+
+**File:** `{{this.file}}`
+
+| Method | PostgreSQL Result | Oracle Result | Match | Source |
+|--------|-------------------|---------------|-------|--------|
+{{#each this.methods}}
+| {{this.method}} | {{this.pgResult}} | {{this.oracleResult}} | {{this.match}} | `{{this.source}}` |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+**Test Approach:**
+1. Execute each @Query on PostgreSQL, capture results
+2. Execute converted query on Oracle
+3. Compare result sets (structure, values, ordering)
+4. Verify method signatures unchanged
+
+> Native query tests require code extraction.
+{{/if}}
+
+### 4.2 Pagination Query Tests
+
+**Source:** LIMIT/OFFSET usage detection
+
+{{#if testing.pagination_tests}}
+| Query Location | PostgreSQL | Oracle | Test Data | Source |
+|----------------|------------|--------|-----------|--------|
+{{#each testing.pagination_tests}}
+| `{{this.location}}` | {{this.pgQuery}} | {{this.oracleQuery}} | {{this.testData}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Test | PostgreSQL | Oracle | Validation |
+|------|------------|--------|------------|
+| LIMIT 10 | LIMIT 10 | FETCH FIRST 10 ROWS ONLY | Same 10 rows |
+| OFFSET 20 | OFFSET 20 | OFFSET 20 ROWS | Same starting point |
+| Combined | LIMIT 10 OFFSET 20 | OFFSET 20 ROWS FETCH FIRST 10 ROWS ONLY | Same result set |
+
+> Pagination tests require query extraction.
+{{/if}}
+
+### 4.3 JSON Query Tests
+
+**Source:** JSONB operator usage detection
+
+{{#if testing.json_tests}}
+| Query | PostgreSQL Operator | Oracle Function | Test | Source |
+|-------|---------------------|-----------------|------|--------|
+{{#each testing.json_tests}}
+| {{this.query}} | {{this.pgOperator}} | {{this.oracleFunc}} | {{this.test}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Operation | PostgreSQL | Oracle | Test |
+|-----------|------------|--------|------|
+| Get text value | data->>'key' | JSON_VALUE(data, '$.key') | Same value |
+| Get object | data->'key' | JSON_QUERY(data, '$.key') | Same JSON |
+| Filter by value | WHERE data->>'key'='x' | WHERE JSON_VALUE(data,'$.key')='x' | Same rows |
+
+> JSON tests require JSON usage analysis.
+{{/if}}
+
+---
+
+## 5. PL/pgSQL Function Validation
+
+### 5.1 Function Unit Tests
+
+**Source:** pg_proc function inventory
+
+{{#if testing.function_tests}}
+{{#each testing.function_tests}}
+#### Function: {{this.name}}
+
+**Source:** `{{this.source}}`
 
 **Test Cases:**
+| Test ID | Input | PostgreSQL Output | Oracle Output | Status |
+|---------|-------|-------------------|---------------|--------|
+{{#each this.testCases}}
+| {{this.id}} | {{this.input}} | {{this.pgOutput}} | {{this.oracleOutput}} | {{this.status}} |
+{{/each}}
 
-| Test ID | Function/Procedure | Test Scenario |
-|---------|-------------------|---------------|
-| FUNC-001 | [Function Name] | Call with valid inputs, verify output matches PostgreSQL |
-| FUNC-002 | [Function Name] | Call with null inputs, verify error handling |
-| FUNC-003 | [Function Name] | Call with boundary values |
-| FUNC-004 | [Function Name] | Verify performance (execution time) |
+---
 
-**Test Script Template:**
-```plsql
--- Test function
-DECLARE
-  v_result [TYPE];
-BEGIN
-  v_result := function_name(param1, param2);
+{{/each}}
+{{else}}
+**Test Template:**
 
-  -- Assert expected result
-  IF v_result != expected_value THEN
-    RAISE_APPLICATION_ERROR(-20001, 'Test Failed: Unexpected result');
-  END IF;
+```sql
+-- PostgreSQL
+SELECT function_name(param1, param2);
+-- Record result
 
-  DBMS_OUTPUT.PUT_LINE('Test Passed: ' || v_result);
-END;
-/
+-- Oracle
+SELECT function_name(param1, param2) FROM DUAL;
+-- Compare result
+
+-- Must match exactly
 ```
 
-### 2.2 Integration Testing (Java Application Layer)
+> Function tests require function extraction.
+{{/if}}
 
-#### 2.2.1 Entity Mapping Tests
+### 5.2 Trigger Tests
 
-**Files to Test:** {{metadata.javaChanges.acceptable.entityMappings.length}} entity classes
+**Source:** pg_trigger extraction
 
-**Test Strategy:** JUnit + Spring Boot Test
+{{#if testing.trigger_tests}}
+| Trigger | Table | Event | PostgreSQL Behavior | Oracle Behavior | Source |
+|---------|-------|-------|---------------------|-----------------|--------|
+{{#each testing.trigger_tests}}
+| {{this.name}} | {{this.table}} | {{this.event}} | {{this.pgBehavior}} | {{this.oracleBehavior}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Test | Validation |
+|------|------------|
+| INSERT trigger | Before/After behavior matches |
+| UPDATE trigger | Column values correctly modified |
+| DELETE trigger | Cascade/restrict behavior matches |
+
+> Trigger tests require trigger analysis.
+{{/if}}
+
+---
+
+## 6. Application Layer Testing
+
+### 6.1 Entity Mapping Tests
+
+**Source:** JPA Entity class scan
+
+{{#if testing.entity_tests}}
+{{#each testing.entity_tests}}
+#### Entity: {{this.entity}}
+
+**File:** `{{this.file}}`
 
 **Test Cases:**
+| Test | Operation | Expected | Source |
+|------|-----------|----------|--------|
+{{#each this.tests}}
+| {{this.test}} | {{this.operation}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+**JUnit Test Template:**
 
 ```java
 @SpringBootTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@AutoConfigureTestDatabase(replace = Replace.NONE)
 class EntityMappingTest {
 
-    @Autowired
-    private EntityManager entityManager;
-
     @Test
-    void testUserEntityMapping() {
-        // Create entity
-        User user = new User();
-        user.setName("Test User");
-        user.setEmail("test@example.com");
+    void testCRUDOperations() {
+        // Create
+        Entity entity = new Entity();
+        entity = repository.save(entity);
+        assertNotNull(entity.getId());
 
-        // Persist
-        entityManager.persist(user);
-        entityManager.flush();
+        // Read
+        Entity found = repository.findById(entity.getId()).orElseThrow();
+        assertEquals(entity, found);
 
-        // Verify
-        assertNotNull(user.getId()); // Auto-generated ID
+        // Update
+        found.setField("new value");
+        repository.save(found);
 
-        // Retrieve
-        User retrieved = entityManager.find(User.class, user.getId());
-        assertEquals("Test User", retrieved.getName());
-    }
-
-    @Test
-    void testJsonbFieldMapping() {
-        // Test JSONB → CLOB/JSON mapping
-        User user = new User();
-        user.setMetadata("{\"role\": \"admin\"}");
-
-        entityManager.persist(user);
-        entityManager.flush();
-
-        User retrieved = entityManager.find(User.class, user.getId());
-        assertEquals("{\"role\": \"admin\"}", retrieved.getMetadata());
+        // Delete
+        repository.delete(found);
+        assertFalse(repository.existsById(entity.getId()));
     }
 }
 ```
 
-#### 2.2.2 Repository Query Tests
+> Entity tests require code scan.
+{{/if}}
 
-**Files to Test:** {{metadata.javaChanges.acceptable.repositoryQueries.length}} repository classes
+### 6.2 Repository Integration Tests
 
-**Test Cases:**
+**Source:** Repository class scan
 
-```java
-@DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-class UserRepositoryTest {
+{{#if testing.repository_tests}}
+| Repository | Method | Test Type | Source |
+|------------|--------|-----------|--------|
+{{#each testing.repository_tests}}
+| {{this.repository}} | {{this.method}} | {{this.testType}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Test Category | Count | Priority |
+|---------------|-------|----------|
+| Native queries | {{metadata.source_analysis.nativeQueryCount}} | High |
+| JPQL queries | Auto-generated | Medium |
+| Derived queries | Auto-generated | Low |
 
-    @Autowired
-    private UserRepository userRepository;
+> Repository tests require code scan.
+{{/if}}
 
-    @Test
-    void testFindByNameQuery() {
-        // Setup
-        User user = new User("John Doe", "john@example.com");
-        userRepository.save(user);
+---
 
-        // Test custom @Query method
-        List<User> results = userRepository.findByNameContaining("John");
+## 7. Performance Testing
 
-        // Verify
-        assertEquals(1, results.size());
-        assertEquals("John Doe", results.get(0).getName());
-    }
+### 7.1 Performance Baseline
 
-    @Test
-    void testPaginationQuery() {
-        // Test LIMIT/OFFSET → FETCH FIRST conversion
-        PageRequest pageable = PageRequest.of(0, 10);
-        Page<User> page = userRepository.findAll(pageable);
+**Source:** Query execution analysis
 
-        assertNotNull(page);
-        assertTrue(page.getSize() <= 10);
-    }
+{{#if testing.performance.baseline}}
+| Query | PostgreSQL Time | Oracle Target | Priority | Source |
+|-------|-----------------|---------------|----------|--------|
+{{#each testing.performance.baseline}}
+| {{this.query}} | {{this.pgTime}} | {{this.oracleTarget}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Test Type | PostgreSQL Baseline | Oracle Target |
+|-----------|---------------------|---------------|
+| Simple SELECT | Record baseline | ≤ Baseline |
+| JOIN (2 tables) | Record baseline | ≤ 1.2x Baseline |
+| JOIN (5+ tables) | Record baseline | ≤ 1.5x Baseline |
+| Aggregation | Record baseline | ≤ Baseline |
+| Full-text search | Record baseline | ≤ 1.5x Baseline |
 
-    @Test
-    void testNativeQueryWithOracleFunction() {
-        // Test query using Oracle-specific function
-        List<User> results = userRepository.findUsersWithUpperCase("JOHN");
+> Performance baseline requires execution timing.
+{{/if}}
 
-        assertFalse(results.isEmpty());
-    }
-}
-```
+### 7.2 Load Testing
 
-#### 2.2.3 Service Layer Tests
+**Source:** Production traffic analysis
 
-**Test Strategy:** Verify no business logic changes
+{{#if testing.performance.load}}
+| Scenario | Concurrent Users | Duration | Success Criteria | Source |
+|----------|-----------------|----------|------------------|--------|
+{{#each testing.performance.load}}
+| {{this.scenario}} | {{this.users}} | {{this.duration}} | {{this.criteria}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Scenario | Users | Duration | Criteria |
+|----------|-------|----------|----------|
+| Normal | 100 | 30 min | 0% error, <200ms avg |
+| Peak | 500 | 15 min | <1% error, <500ms avg |
+| Stress | 1000 | 5 min | <5% error, system recovers |
+{{/if}}
 
-**Test Cases:**
+---
 
-```java
-@SpringBootTest
-class UserServiceTest {
+## 8. Rollback Testing
 
-    @Autowired
-    private UserService userService;
+### 8.1 Rollback Scenarios
 
-    @Test
-    void testBusinessLogicUnchanged() {
-        // Run existing business logic tests
-        // All should pass without modification
+**Source:** Deployment risk analysis
 
-        User user = userService.createUser("John", "john@example.com");
-        assertNotNull(user);
+{{#if testing.rollback.scenarios}}
+| Scenario | Trigger | Steps | Expected | Source |
+|----------|---------|-------|----------|--------|
+{{#each testing.rollback.scenarios}}
+| {{this.scenario}} | {{this.trigger}} | {{this.steps}} | {{this.expected}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Scenario | Trigger | Test |
+|----------|---------|------|
+| Immediate rollback | Critical error detected | System functional within 5 min |
+| Data sync rollback | After 1 hour operation | Data consistent |
+| Partial rollback | Module failure | Other modules unaffected |
+{{/if}}
 
-        // Verify business rules still enforced
-        assertThrows(ValidationException.class, () -> {
-            userService.createUser("", "invalid");
-        });
-    }
-}
-```
+### 8.2 Rollback Validation
 
-### 2.3 Data Migration Validation
+**Source:** Rollback procedure design
 
-#### 2.3.1 Data Completeness Tests
+| Test | Validation | Expected |
+|------|------------|----------|
+| Application startup | Health check | 200 OK |
+| Database connectivity | Query execution | Success |
+| Data integrity | Row counts | Match pre-migration |
+| Business operations | CRUD operations | All functional |
 
-**Test Cases:**
+---
 
-| Test ID | Test Description | Acceptance Criteria |
-|---------|-----------------|---------------------|
-| DATA-001 | Row count validation for all tables | 100% match with PostgreSQL |
-| DATA-002 | NULL value validation | NULL values preserved |
-| DATA-003 | Data type conversion validation | No data truncation or loss |
-| DATA-004 | Special character validation | Unicode, emojis preserved |
-| DATA-005 | JSONB data validation | JSON structure intact |
-| DATA-006 | Array data validation | Array values correctly converted |
-| DATA-007 | Boolean data validation | Boolean → NUMBER(1) conversion correct |
+## 9. Test Success Criteria
 
-**Test Script:**
+### 9.1 Success Criteria from Source Metrics
+
+**Source:** Migration scope inventory
+
+| Criteria | Target | Measurement | Source |
+|----------|--------|-------------|--------|
+| Schema validation | 100% | All {{metadata.source_analysis.database.tables}} tables created | DDL |
+| Data integrity | 100% | Row counts match | Data migration |
+| Query correctness | 100% | All {{metadata.source_analysis.nativeQueryCount}} queries pass | @Query |
+| Function parity | 100% | All {{metadata.source_analysis.database.functions}} functions work | pg_proc |
+| Performance | ≤ Baseline | Query times comparable | Performance tests |
+| Rollback | Validated | Procedure works | Rollback tests |
+
+### 9.2 Exit Criteria
+
+- [ ] All DDL validation tests pass
+- [ ] Data integrity validation 100%
+- [ ] All native queries produce correct results
+- [ ] All function unit tests pass
+- [ ] Performance targets met
+- [ ] Rollback procedure tested
+- [ ] Zero critical/high defects open
+
+---
+
+## Appendices
+
+### Appendix A: Test Case Matrix
+
+{{#if appendix.test_matrix}}
+| Component | Unit Tests | Integration | Performance | Total |
+|-----------|------------|-------------|-------------|-------|
+{{#each appendix.test_matrix}}
+| {{this.component}} | {{this.unit}} | {{this.integration}} | {{this.performance}} | {{this.total}} |
+{{/each}}
+{{/if}}
+
+### Appendix B: Data Validation Queries
+
+{{#if appendix.validation_queries}}
+{{#each appendix.validation_queries}}
+#### {{this.name}}
+
 ```sql
--- Row count comparison
-WITH pg_counts AS (
-  -- Run on PostgreSQL
-  SELECT 'users' as table_name, COUNT(*) as pg_count FROM users
-),
-oracle_counts AS (
-  -- Run on Oracle
-  SELECT 'users' as table_name, COUNT(*) as oracle_count FROM users
-)
-SELECT
-  p.table_name,
-  p.pg_count,
-  o.oracle_count,
-  CASE
-    WHEN p.pg_count = o.oracle_count THEN 'PASS'
-    ELSE 'FAIL'
-  END as status
-FROM pg_counts p
-JOIN oracle_counts o ON p.table_name = o.table_name;
-```
-
-#### 2.3.2 Data Integrity Tests
-
-**Test Cases:**
-
-```sql
--- Test: Verify referential integrity
-SELECT
-  c.constraint_name,
-  c.table_name,
-  c.constraint_type,
-  CASE
-    WHEN c.status = 'ENABLED' THEN 'PASS'
-    ELSE 'FAIL'
-  END as status
-FROM user_constraints c
-WHERE c.constraint_type IN ('P', 'R', 'U');
-
--- Test: Verify no orphaned records
-SELECT
-  'orders' as child_table,
-  COUNT(*) as orphaned_records
-FROM orders o
-WHERE NOT EXISTS (
-  SELECT 1 FROM users u WHERE u.id = o.user_id
-);
-```
-
-### 2.4 Performance Testing
-
-#### 2.4.1 Query Performance Baseline
-
-**Objective:** Ensure Oracle performance meets or exceeds PostgreSQL baseline
-
-**Test Approach:**
-1. Record PostgreSQL query execution times
-2. Execute same queries on Oracle
-3. Compare results
-4. Optimize Oracle queries if needed
-
-**Test Cases:**
-
-| Test ID | Query Description | PostgreSQL Baseline | Oracle Target | Status |
-|---------|------------------|---------------------|---------------|--------|
-| PERF-001 | Simple SELECT query | 10ms | ≤ 15ms | |
-| PERF-002 | JOIN query (2 tables) | 50ms | ≤ 60ms | |
-| PERF-003 | JOIN query (5+ tables) | 200ms | ≤ 250ms | |
-| PERF-004 | Aggregation query | 100ms | ≤ 120ms | |
-| PERF-005 | Full-text search | 80ms | ≤ 100ms | |
-| PERF-006 | Pagination query | 15ms | ≤ 20ms | |
-
-**Test Script:**
-```java
-@Test
-void testQueryPerformance() {
-    // Warm up
-    userRepository.findAll();
-
-    // Measure execution time
-    long startTime = System.currentTimeMillis();
-
-    List<User> results = userRepository.findComplexQuery();
-
-    long executionTime = System.currentTimeMillis() - startTime;
-
-    // Assert performance target
-    assertTrue(executionTime < 100,
-        "Query took " + executionTime + "ms, expected < 100ms");
-}
-```
-
-#### 2.4.2 Load Testing
-
-**Test Scenarios:**
-
-| Scenario | Concurrent Users | Duration | Success Criteria |
-|----------|-----------------|----------|-----------------|
-| Normal Load | 100 | 30 min | 0% error rate, avg response time ≤ 200ms |
-| Peak Load | 500 | 15 min | <1% error rate, avg response time ≤ 500ms |
-| Stress Test | 1000 | 5 min | <5% error rate, system recovers |
-
-**Tool:** Apache JMeter or Gatling
-
-**Test Plan:**
-```xml
-<!-- JMeter Test Plan -->
-<ThreadGroup>
-  <numThreads>100</numThreads>
-  <rampUp>60</rampUp>
-  <loops>-1</loops>
-  <duration>1800</duration>
-</ThreadGroup>
-```
-
-### 2.5 Rollback Testing
-
-**Objective:** Verify rollback procedures work correctly
-
-**Test Cases:**
-
-| Test ID | Rollback Scenario | Steps | Expected Result |
-|---------|------------------|-------|----------------|
-| RB-001 | Immediate rollback after cutover | Stop Oracle, restart PostgreSQL | Application functional within 5 minutes |
-| RB-002 | Rollback after 1 hour | Sync data changes, rollback | Data consistent, zero data loss |
-| RB-003 | Partial rollback (one module) | Rollback one module only | Other modules unaffected |
-
-**Test Script:**
-```bash
-#!/bin/bash
-# Rollback test script
-
-echo "Starting rollback test..."
-
-# 1. Document current state
-curl http://localhost:8080/api/users > before_rollback.json
-
-# 2. Execute rollback
-./scripts/rollback.sh
-
-# 3. Verify application is functional
-http_code=$(curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8080/health)
-
-if [ $http_code -eq 200 ]; then
-  echo "PASS: Application is functional after rollback"
-else
-  echo "FAIL: Application health check failed"
-  exit 1
-fi
-
-# 4. Verify data consistency
-curl http://localhost:8080/api/users > after_rollback.json
-diff before_rollback.json after_rollback.json
+{{{this.query}}}
 ```
 
 ---
 
-## 3. Test Environments
-
-### 3.1 Environment Setup
-
-| Environment | Purpose | Data | Oracle Version |
-|------------|---------|------|----------------|
-| DEV | Development and unit testing | Synthetic | Oracle 12c+ |
-| QA | Integration and functional testing | Sanitized production copy | Oracle 12c+ |
-| STAGING | Pre-production validation | Production clone | Oracle 12c+ (same as PROD) |
-| PRODUCTION | Live system | Real data | Oracle 12c+ |
-
-### 3.2 Test Data Strategy
-
-**Development Environment:**
-- Use synthetic test data
-- Cover all edge cases
-- Include special characters, NULL values
-
-**QA Environment:**
-- Use sanitized production data (anonymized)
-- Maintain referential integrity
-- Subset of production (10-20%)
-
-**Staging Environment:**
-- Full production data copy (anonymized)
-- Must be refreshed before each test cycle
+{{/each}}
+{{/if}}
 
 ---
 
-## 4. Test Execution Plan
+## Traceability Note
 
-### 4.1 Test Phases
-
-**Phase 1: Database Layer Testing (Week 1-2)**
-- DDL validation
-- Data migration validation
-- Stored procedure/function testing
-
-**Phase 2: Application Layer Testing (Week 3-4)**
-- Entity mapping tests
-- Repository query tests
-- Integration tests
-
-**Phase 3: End-to-End Testing (Week 5)**
-- Full stack testing
-- User acceptance testing
-- Performance testing
-
-**Phase 4: Load & Stress Testing (Week 6)**
-- Load testing
-- Stress testing
-- Endurance testing
-
-**Phase 5: Rollback Testing (Week 7)**
-- Rollback procedures
-- Recovery time validation
-
-### 4.2 Test Execution Schedule
-
-```mermaid
-gantt
-    title Test Execution Timeline
-    dateFormat  YYYY-MM-DD
-    section Phase 1
-    DDL Validation           :2024-01-01, 3d
-    Data Migration Tests     :2024-01-04, 4d
-    Stored Proc Tests        :2024-01-08, 5d
-    section Phase 2
-    Entity Mapping Tests     :2024-01-15, 5d
-    Repository Tests         :2024-01-20, 5d
-    Integration Tests        :2024-01-25, 4d
-    section Phase 3
-    E2E Testing              :2024-02-01, 7d
-    UAT                      :2024-02-08, 7d
-    section Phase 4
-    Performance Testing      :2024-02-15, 7d
-```
+All test cases in this document are derived from PostgreSQL source analysis. Each test includes source evidence. Items marked "Not found in source" require manual test design.
 
 ---
 
-## 5. Test Deliverables
+## Document History
 
-### 5.1 Test Artifacts
-
-1. **Test Plan** - This document
-2. **Test Cases** - Detailed test case specifications
-3. **Test Scripts** - Automated test scripts (JUnit, SQL)
-4. **Test Data** - Synthetic and sanitized test data
-5. **Test Results** - Execution results with pass/fail status
-6. **Defect Reports** - Bug tracking and resolution
-7. **Performance Report** - Performance benchmarks and analysis
-8. **Test Summary Report** - Final test completion report
-
-### 5.2 Test Metrics
-
-**Key Metrics to Track:**
-
-| Metric | Target |
-|--------|--------|
-| Test Case Coverage | 100% of critical paths |
-| Test Execution Rate | 95% automated, 5% manual |
-| Defect Detection Rate | >90% in QA environment |
-| Test Pass Rate | >95% |
-| Data Accuracy | 100% |
-| Performance Degradation | <10% from baseline |
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
 
 ---
 
-## 6. Defect Management
-
-### 6.1 Defect Severity Classification
-
-| Severity | Description | Response Time |
-|----------|-------------|--------------|
-| Critical | Data loss, system down | Immediate (1 hour) |
-| High | Major functionality broken | 4 hours |
-| Medium | Minor functionality issue | 24 hours |
-| Low | Cosmetic, documentation | 72 hours |
-
-### 6.2 Defect Workflow
-
-```
-[Defect Identified] → [Logged in JIRA] → [Triaged] → [Assigned] → [Fixed] → [Retested] → [Closed]
-```
-
----
-
-## 7. Entry and Exit Criteria
-
-### 7.1 Entry Criteria for Testing
-
-- ✓ Oracle database schema created and validated
-- ✓ Data migration completed
-- ✓ Application deployed to test environment
-- ✓ Test data prepared
-- ✓ Test scripts ready
-- ✓ Test environment stable
-
-### 7.2 Exit Criteria for Testing
-
-- ✓ All test cases executed
-- ✓ Test pass rate > 95%
-- ✓ All Critical and High severity defects resolved
-- ✓ Performance targets met
-- ✓ Data integrity validated
-- ✓ Rollback procedures tested
-- ✓ Sign-off from stakeholders
-
----
-
-## 8. Risks and Mitigation
-
-| Risk | Impact | Probability | Mitigation |
-|------|--------|------------|------------|
-| Test environment instability | High | Medium | Maintain dedicated stable environment |
-| Insufficient test data | Medium | Low | Prepare diverse test datasets |
-| Test automation delays | Medium | Medium | Start automation early |
-| Performance issues discovered late | High | Medium | Continuous performance testing |
-| Inadequate rollback testing | Critical | Low | Mandatory rollback testing before go-live |
-
----
-
-## 9. Test Sign-Off
-
-### 9.1 Sign-Off Checklist
-
-- [ ] All test cases executed
-- [ ] Defect resolution complete
-- [ ] Performance validated
-- [ ] Data integrity confirmed
-- [ ] Rollback procedures tested
-- [ ] Documentation complete
-- [ ] Stakeholder approval obtained
-
-### 9.2 Sign-Off Authorities
-
-| Role | Name | Signature | Date |
-|------|------|-----------|------|
-| Test Lead | | | |
-| Technical Lead | | | |
-| Project Manager | | | |
-| Business Owner | | | |
-
----
-
-**Document End**
+**End of Test Strategy Document**

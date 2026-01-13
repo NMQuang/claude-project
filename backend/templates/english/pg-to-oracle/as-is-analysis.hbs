@@ -1,338 +1,644 @@
-# As-Is Analysis Document
+# As-Is Analysis Document (PostgreSQL → Oracle)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | PostgreSQL → Oracle |
 | **Document Type** | As-Is Analysis |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Source Artifacts Inventory
 
-This document provides a comprehensive analysis of the current Java application using PostgreSQL database for the **{{project.name}}** migration project. The analysis covers the application architecture, database schema, PostgreSQL-specific features, ORM dependencies, and migration complexity assessment.
+### 1.1 Database Object Inventory
 
-### Key Findings
+**Source:** PostgreSQL catalog queries and DDL extraction
 
-- **Total Java Files:** {{metadata.source_analysis.total_files}}
-- **Total Lines of Code:** {{metadata.source_analysis.total_loc}}
-- **ORM Framework:** {{metadata.source_analysis.ormFramework}}
-- **Source Database:** {{source.database}}
-- **Target Database:** {{target.database}}
-- **Complexity Assessment:** {{metadata.complexity_summary}}
+| Object Type | Count | Source |
+|-------------|-------|--------|
+| Tables | {{metadata.source_analysis.database.tables}} | `pg_tables` catalog |
+| Views | {{metadata.source_analysis.database.views}} | `pg_views` catalog |
+| Materialized Views | {{metadata.source_analysis.database.materializedViews}} | `pg_matviews` catalog |
+| Functions | {{metadata.source_analysis.database.functions}} | `pg_proc` catalog |
+| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} | `pg_proc` catalog |
+| Triggers | {{metadata.source_analysis.database.triggers}} | `pg_trigger` catalog |
+| Indexes | {{metadata.source_analysis.database.indexes}} | `pg_indexes` catalog |
+| Sequences | {{metadata.source_analysis.database.sequences}} | `pg_sequences` catalog |
+| Constraints | {{metadata.source_analysis.database.constraints}} | `pg_constraint` catalog |
+| Partitioned Tables | {{metadata.source_analysis.database.partitionedTables}} | `pg_partitioned_table` |
 
-### Migration Complexity (6 Dimensions)
+### 1.2 Table Inventory
 
-| Dimension | Score | Level |
-|-----------|-------|-------|
-| Schema & Data Type Complexity | {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
-| SQL & Query Rewrite Complexity | {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
-| Stored Procedures/Functions/Triggers | {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
-| Data Volume & Migration Strategy | {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
-| Application & ORM Dependency | {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
-| Operational & Runtime Risk | {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100 | {{metadata.migrationComplexity.difficulty}} |
-| **Overall** | **{{metadata.migrationComplexity.overall}}/100** | **{{metadata.migrationComplexity.difficulty}}** |
+**Source:** DDL extraction from `pg_dump` or information_schema
 
----
-
-## 1. System Overview
-
-### 1.1 Application Architecture
-
-**Technology Stack:**
-- **Backend Framework:** Spring Boot / Java EE
-- **ORM Framework:** {{metadata.source_analysis.ormFramework}}
-- **Database:** PostgreSQL
-- **Application Server:** {{source.app_server}}
-
-### 1.2 Migration Principle
-
-**CRITICAL: Minimal Java Changes**
-
-This migration follows the principle of **keeping Java application logic unchanged**. Limited Java changes are restricted to:
-
-1. **Entity Mappings** - Update `@Entity`, `@Table`, `@Column` annotations if type mapping fails
-2. **Repository Queries** - Rewrite SQL in `@Query` annotations and MyBatis XML
-3. **Database Configurations** - Update JDBC driver, connection URL, datasource properties
-
-**NO business logic refactoring is expected or required.**
-
----
-
-## 2. Source Code Analysis
-
-### 2.1 Java Application Structure
-
-**Total Java Files:** {{metadata.source_analysis.total_files}}
-**Total Lines of Code:** {{metadata.source_analysis.total_loc}}
-
-#### File Distribution by Type
-
-{{#each metadata.source_analysis.javaFiles}}
-- **{{this.type}}:** `{{this.name}}` ({{this.loc}} LOC) - PostgreSQL Dependencies: {{#if this.hasPostgreSQLDependencies}}Yes{{else}}No{{/if}}
-{{/each}}
-
-### 2.2 Required Java Changes
-
-**Files Requiring Change:** {{metadata.javaChanges.summary.filesRequiringChange}}
-**Files Requiring Review:** {{metadata.javaChanges.summary.filesRequiringReview}}
-
-#### Acceptable Java Changes (Database Layer)
-
-**Entity Mappings ({{metadata.javaChanges.acceptable.entityMappings.length}} files):**
-{{#each metadata.javaChanges.acceptable.entityMappings}}
-- {{this}}
-{{/each}}
-
-**Repository Queries ({{metadata.javaChanges.acceptable.repositoryQueries.length}} files):**
-{{#each metadata.javaChanges.acceptable.repositoryQueries}}
-- {{this}}
-{{/each}}
-
-**Configurations ({{metadata.javaChanges.acceptable.configurations.length}} files):**
-{{#each metadata.javaChanges.acceptable.configurations}}
-- {{this}}
-{{/each}}
-
-#### Files Requiring Review
-
-{{#if metadata.javaChanges.requiresReview.length}}
-{{#each metadata.javaChanges.requiresReview}}
-- ⚠️ {{this}}
+{{#if metadata.tables}}
+| Table Name | Schema | Columns | Rows | Size | Has PG-Specific Types | Source Location |
+|------------|--------|---------|------|------|----------------------|-----------------|
+{{#each metadata.tables}}
+| {{this.name}} | {{this.schema}} | {{this.columns}} | {{this.rows}} | {{this.size}} | {{this.hasPgTypes}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-✓ No files requiring special review (good architecture - business logic separated from database layer)
+> **Not found in source:** Table inventory requires DDL or catalog extraction.
 {{/if}}
+
+### 1.3 Application Code Inventory
+
+**Source:** Application source code scan
+
+| Component | Count | PostgreSQL Dependencies | Source |
+|-----------|-------|------------------------|--------|
+| Java/Application Files | {{metadata.source_analysis.total_files}} | {{metadata.source_analysis.pgDependentFiles}} | Code scan |
+| Repository Classes | {{metadata.source_analysis.repositoryCount}} | {{metadata.source_analysis.nativeQueryRepos}} | Spring Data scan |
+| Entity Classes | {{metadata.source_analysis.entityCount}} | {{metadata.source_analysis.pgTypeEntities}} | JPA scan |
+| Native SQL Queries | {{metadata.source_analysis.nativeQueryCount}} | All require review | @Query extraction |
+| MyBatis Mappers | {{metadata.source_analysis.mybatisCount}} | All require review | XML scan |
 
 ---
 
-## 3. Database Analysis
+## 2. PostgreSQL Data Type Analysis
 
-### 3.1 Database Schema Summary
+### 2.1 Data Type Inventory
 
-| Component | Count |
-|-----------|-------|
-| Tables | {{metadata.source_analysis.database.tables}} |
-| Views | {{metadata.source_analysis.database.views}} |
-| Stored Procedures | {{metadata.source_analysis.database.stored_procedures}} |
-| Functions | {{metadata.source_analysis.database.functions}} |
-| Triggers | {{metadata.source_analysis.database.triggers}} |
-| Indexes | {{metadata.source_analysis.database.indexes}} |
-| Sequences | {{metadata.source_analysis.database.sequences}} |
-| Partitioned Tables | {{metadata.source_analysis.database.partitionedTables}} |
+**Source:** DDL analysis and column type extraction
 
-### 3.2 PostgreSQL-Specific Features Detected
-
-#### Data Types Usage
-
-{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
-**{{this.type}}** ({{this.count}} occurrences)
-- Tables: {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
-- Oracle Mapping Complexity: **{{this.oracleMappingComplexity}}**
-- Suggested Oracle Type: `{{this.suggestedOracleType}}`
-{{/each}}
-
-#### PostgreSQL Extensions
-
-{{#if metadata.source_analysis.postgresqlFeatures.extensions.length}}
-{{#each metadata.source_analysis.postgresqlFeatures.extensions}}
-- **{{this}}** - Requires Oracle equivalent or custom implementation
+{{#if metadata.dataTypes}}
+| PostgreSQL Type | Occurrences | Tables | Oracle Equivalent | Complexity | Source Evidence |
+|-----------------|-------------|--------|-------------------|------------|-----------------|
+{{#each metadata.dataTypes}}
+| `{{this.pgType}}` | {{this.count}} | {{this.tables}} | {{this.oracleType}} | {{this.complexity}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-No PostgreSQL extensions detected.
-{{/if}}
-
-#### Advanced Index Types
-
-{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
-- **{{this.type}}** ({{this.count}} indexes) - Oracle Support: {{#if this.oracleSupport}}Yes{{else}}No - Requires redesign{{/if}}
-{{/each}}
-
-#### Native Queries in Application
-
-**Total Native Queries:** {{metadata.source_analysis.postgresqlFeatures.nativeQueryCount}}
-
-Native queries will need SQL syntax rewrite for Oracle compatibility (LIMIT→FETCH, array_agg→LISTAGG, etc.)
-
----
-
-## 4. Migration Complexity Assessment
-
-### 4.1 Overall Complexity
-
-**Overall Score:** {{metadata.migrationComplexity.overall}}/100 ({{metadata.migrationComplexity.difficulty}})
-
-{{metadata.migrationComplexity.description}}
-
-### 4.2 Dimension 1: Schema & Data Type Complexity
-
-**Score:** {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.schemaDataType}}
-- {{this}}
-{{/each}}
-
-**Impact:** Complex PostgreSQL data types (JSONB, ARRAY, HSTORE) may require Entity annotation updates in Java code.
-
-**Mitigation:** Update DDL scripts with Oracle equivalents. Modify Entity class annotations ONLY if automatic type mapping fails.
-
-### 4.3 Dimension 2: SQL & Query Rewrite Complexity
-
-**Score:** {{metadata.migrationComplexity.sqlQueryRewriteComplexity}}/100
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.sqlQueryRewrite}}
-- {{this}}
-{{/each}}
-
-**Impact:** Extensive SQL query rewrites in @Query annotations and MyBatis XML required.
-
-**Mitigation:** Rewrite SQL with Oracle syntax. **CRITICAL: Keep repository method signatures, parameters, and return types unchanged.**
-
-### 4.4 Dimension 3: Stored Procedures, Functions & Triggers
-
-**Score:** {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.procedureFunctionTrigger}}
-- {{this}}
-{{/each}}
-
-**Impact:** PL/pgSQL to PL/SQL conversion requires careful review and testing.
-
-**Mitigation:** Convert PL/pgSQL to PL/SQL in database layer. If called from Java (@Procedure), update only procedure name/parameters in Repository interface.
-
-### 4.5 Dimension 4: Data Volume & Migration Strategy
-
-**Score:** {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.dataVolumeMigration}}
-- {{this}}
-{{/each}}
-
-**Impact:** Large data volumes require careful migration planning and potential downtime.
-
-**Mitigation:** Use Oracle Data Pump or AWS DMS. Recreate partitioning in Oracle DDL. Update Entity classes only if partition keys change.
-
-### 4.6 Dimension 5: Application & ORM Dependency
-
-**Score:** {{metadata.migrationComplexity.applicationORMDependencyComplexity}}/100
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.applicationORMDependency}}
-- {{this}}
-{{/each}}
-
-**Impact:** Database layer Java code requires targeted updates.
-
-**Mitigation:** Update JDBC driver in config files. Rewrite SQL in @Query and MyBatis XML. **Do NOT refactor repository methods or service layer logic.**
-
-### 4.7 Dimension 6: Operational & Runtime Risk
-
-**Score:** {{metadata.migrationComplexity.operationalRuntimeRiskComplexity}}/100
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.operationalRuntimeRisk}}
-- {{this}}
-{{/each}}
-
-**Impact:** PostgreSQL extensions and operational differences may affect application behavior.
-
-**Mitigation:** Replace extensions in DDL with Oracle equivalents. Recreate GIN/GIST indexes. Update DB config files only.
-
----
-
-## 5. Risk Assessment
-
-{{#each metadata.risks}}
-### Risk {{@index}}: {{this.id}} - {{this.category}}
-
-**Severity:** {{this.severity}}
-
-**Description:** {{this.description}}
-
-**Impact:** {{this.impact}}
-
-**Mitigation Strategy:** {{this.mitigation}}
-
----
-{{/each}}
-
-## 6. Recommendations
-
-### 6.1 Migration Approach Recommendations
-
-{{#each metadata.migrationComplexity.recommendations}}
-#### {{@index}}. {{this.dimension}} (Severity: {{this.severity}})
-
-**Issue:** {{this.issue}}
-
-**Mitigation:** {{this.mitigation}}
-
----
-{{/each}}
-
-### 6.2 Key Success Factors
-
-1. **Keep Java Logic Unchanged** - Focus migration efforts on database layer (DDL, SQL, procedures)
-2. **Automated Testing** - Implement comprehensive integration tests for all @Query annotations and repositories
-3. **Database Migration Tools** - Use Oracle Data Pump or AWS DMS for data migration
-4. **Phased Approach** - Migrate and test one module at a time
-5. **Performance Testing** - Validate Oracle query plans match or exceed PostgreSQL performance
-
----
-
-## 7. Appendix
-
-### 7.1 PostgreSQL to Oracle Data Type Mapping
-
 | PostgreSQL Type | Oracle Equivalent | Notes |
-|----------------|-------------------|-------|
-| SERIAL | NUMBER + SEQUENCE + TRIGGER | Requires trigger creation |
-| BIGSERIAL | NUMBER + SEQUENCE + TRIGGER | Requires trigger creation |
-| BOOLEAN | NUMBER(1) or CHAR(1) | 0/1 or 'Y'/'N' |
-| JSONB | JSON (12c+) or CLOB | May require application changes |
-| JSON | JSON (12c+) or CLOB | May require application changes |
-| ARRAY[] | VARRAY or Nested Table | Complex conversion |
-| HSTORE | Custom key-value table | Requires redesign |
-| UUID | RAW(16) or VARCHAR2(36) | Consider using SYS_GUID() |
+|-----------------|-------------------|-------|
+| SERIAL | NUMBER + SEQUENCE | Requires trigger for auto-increment |
+| BIGSERIAL | NUMBER(19) + SEQUENCE | Requires trigger |
+| BOOLEAN | NUMBER(1) | 0/1 mapping |
 | TEXT | CLOB | Direct mapping |
+| JSONB | JSON (21c+) / CLOB | Feature availability varies |
+| UUID | RAW(16) / VARCHAR2(36) | Consider SYS_GUID() |
 | BYTEA | BLOB | Direct mapping |
+| ARRAY[] | VARRAY / Nested Table | Requires redesign |
 
-### 7.2 PostgreSQL Function to Oracle Function Mapping
+> Data type inventory requires DDL analysis.
+{{/if}}
 
-| PostgreSQL Function | Oracle Equivalent |
-|-------------------|-------------------|
+### 2.2 PostgreSQL-Specific Types Detected
+
+**Source:** Column definition extraction
+
+{{#if metadata.pgSpecificTypes}}
+{{#each metadata.pgSpecificTypes}}
+#### Type: `{{this.type}}`
+
+**Occurrences:** {{this.count}}
+
+**Affected Tables:**
+| Table | Column | Source Location |
+|-------|--------|-----------------|
+{{#each this.columns}}
+| {{this.table}} | {{this.column}} | `{{this.source}}` |
+{{/each}}
+
+**Oracle Migration:**
+- **Suggested Type:** `{{this.oracleType}}`
+- **Complexity:** {{this.complexity}}
+- **Notes:** {{this.notes}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** PostgreSQL-specific type detection requires DDL parsing.
+{{/if}}
+
+### 2.3 ARRAY Type Usage
+
+**Source:** ARRAY column extraction
+
+{{#if metadata.arrayTypes}}
+| Table | Column | Array Type | Dimensions | Oracle Strategy | Source |
+|-------|--------|------------|------------|-----------------|--------|
+{{#each metadata.arrayTypes}}
+| {{this.table}} | {{this.column}} | {{this.elementType}}[] | {{this.dimensions}} | {{this.oracleStrategy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No ARRAY types detected or analysis not performed.
+{{/if}}
+
+### 2.4 JSON/JSONB Usage
+
+**Source:** JSON column and operator extraction
+
+{{#if metadata.jsonUsage}}
+| Table | Column | Type | JSON Operators Used | Oracle Strategy | Source |
+|-------|--------|------|---------------------|-----------------|--------|
+{{#each metadata.jsonUsage}}
+| {{this.table}} | {{this.column}} | {{this.type}} | {{this.operators}} | {{this.oracleStrategy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No JSON/JSONB usage detected.
+{{/if}}
+
+---
+
+## 3. SQL Statement Analysis
+
+### 3.1 PostgreSQL-Specific SQL Patterns
+
+**Source:** SQL script and application query extraction
+
+{{#if metadata.sqlPatterns}}
+| Pattern | Occurrences | Locations | Oracle Equivalent | Complexity |
+|---------|-------------|-----------|-------------------|------------|
+{{#each metadata.sqlPatterns}}
+| `{{this.pattern}}` | {{this.count}} | {{this.locations}} | {{this.oracleEquiv}} | {{this.complexity}} |
+{{/each}}
+{{else}}
+| Pattern | Oracle Equivalent |
+|---------|-------------------|
+| LIMIT n OFFSET m | FETCH FIRST n ROWS ONLY OFFSET m |
+| RETURNING | RETURNING INTO |
+| ON CONFLICT | MERGE |
+| ILIKE | UPPER() LIKE UPPER() |
 | array_agg() | LISTAGG() |
 | string_agg() | LISTAGG() |
-| generate_series() | CONNECT BY LEVEL |
-| unnest() | TABLE() function |
-| to_char() with PG format | to_char() with Oracle format |
-| GREATEST() | GREATEST() |
-| LEAST() | LEAST() |
-| regexp_replace() | REGEXP_REPLACE() |
-| COALESCE() | NVL() or COALESCE() |
+| :: cast | CAST() or TO_ functions |
+| NOW() | SYSDATE or SYSTIMESTAMP |
+| INTERVAL | INTERVAL or NUMTODSINTERVAL |
 
-### 7.3 SQL Syntax Differences
+> SQL pattern analysis requires query extraction.
+{{/if}}
 
-| PostgreSQL Syntax | Oracle Equivalent |
-|------------------|-------------------|
-| LIMIT n OFFSET m | FETCH FIRST n ROWS ONLY + OFFSET m |
-| RETURNING clause | RETURNING clause (different syntax) |
-| ON CONFLICT (upsert) | MERGE statement |
-| ILIKE | UPPER() + LIKE |
-| DISTINCT ON | ROW_NUMBER() OVER |
-| SELECT FOR UPDATE SKIP LOCKED | SELECT FOR UPDATE SKIP LOCKED (11g+) |
-| || (string concat) | || or CONCAT() |
-| BOOLEAN columns | NUMBER(1) or CHAR(1) |
+### 3.2 Application Native Queries
+
+**Source:** @Query annotation and SQL extraction from application code
+
+{{#if metadata.nativeQueries}}
+{{#each metadata.nativeQueries}}
+#### Query in: {{this.file}}
+
+**Source Location:** `{{this.location}}`
+
+**Original PostgreSQL Query:**
+```sql
+{{{this.query}}}
+```
+
+**PostgreSQL Features Used:**
+{{#each this.pgFeatures}}
+- {{this}}
+{{/each}}
+
+**Migration Complexity:** {{this.complexity}}
 
 ---
 
-**Document End**
+{{/each}}
+{{else}}
+> **Not found in source:** Native query extraction requires application code analysis.
+{{/if}}
+
+### 3.3 View Definitions
+
+**Source:** View DDL extraction
+
+{{#if metadata.views}}
+{{#each metadata.views}}
+#### View: {{this.name}}
+
+**Source:** `{{this.source}}`
+
+```sql
+{{{this.definition}}}
+```
+
+**PostgreSQL Features:**
+{{#each this.pgFeatures}}
+- {{this}}
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** View definitions require DDL extraction.
+{{/if}}
+
+---
+
+## 4. PL/pgSQL Analysis
+
+### 4.1 Function Inventory
+
+**Source:** pg_proc catalog and function definition extraction
+
+{{#if metadata.functions}}
+| Function Name | Parameters | Return Type | Language | LOC | PG-Specific Features | Source |
+|---------------|------------|-------------|----------|-----|---------------------|--------|
+{{#each metadata.functions}}
+| {{this.name}} | {{this.params}} | {{this.returnType}} | {{this.language}} | {{this.loc}} | {{this.pgFeatures}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Function inventory requires pg_proc extraction.
+{{/if}}
+
+### 4.2 Function Details with PL/pgSQL Code
+
+**Source:** Function body extraction
+
+{{#if metadata.functionDetails}}
+{{#each metadata.functionDetails}}
+#### Function: {{this.name}}
+
+**Source:** `{{this.source}}`
+
+**Signature:**
+```sql
+{{{this.signature}}}
+```
+
+**PL/pgSQL Body:**
+```sql
+{{{this.body}}}
+```
+
+**PostgreSQL-Specific Constructs:**
+| Construct | Line | Oracle Equivalent | Complexity |
+|-----------|------|-------------------|------------|
+{{#each this.constructs}}
+| {{this.construct}} | {{this.line}} | {{this.oracleEquiv}} | {{this.complexity}} |
+{{/each}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Function details require body extraction.
+{{/if}}
+
+### 4.3 Trigger Analysis
+
+**Source:** Trigger definition extraction
+
+{{#if metadata.triggers}}
+| Trigger Name | Table | Event | Timing | Function | Source |
+|--------------|-------|-------|--------|----------|--------|
+{{#each metadata.triggers}}
+| {{this.name}} | {{this.table}} | {{this.event}} | {{this.timing}} | {{this.function}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Trigger inventory requires pg_trigger extraction.
+{{/if}}
+
+---
+
+## 5. Index Analysis
+
+### 5.1 Index Inventory
+
+**Source:** pg_indexes catalog extraction
+
+{{#if metadata.indexes}}
+| Index Name | Table | Type | Columns | Unique | Source |
+|------------|-------|------|---------|--------|--------|
+{{#each metadata.indexes}}
+| {{this.name}} | {{this.table}} | {{this.type}} | {{this.columns}} | {{this.unique}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Index inventory requires catalog extraction.
+{{/if}}
+
+### 5.2 PostgreSQL-Specific Index Types
+
+**Source:** Advanced index type extraction
+
+{{#if metadata.advancedIndexes}}
+| Index Type | Count | Tables | Oracle Support | Migration Strategy |
+|------------|-------|--------|----------------|-------------------|
+{{#each metadata.advancedIndexes}}
+| {{this.type}} | {{this.count}} | {{this.tables}} | {{this.oracleSupport}} | {{this.strategy}} |
+{{/each}}
+{{else}}
+| Index Type | Oracle Equivalent | Notes |
+|------------|-------------------|-------|
+| GIN | Function-based / Domain Index | For JSONB, ARRAY |
+| GiST | R-Tree / Spatial | For geometry |
+| BRIN | None | Manual partitioning |
+| Hash | None / B-tree | Performance test needed |
+
+> Advanced index analysis requires DDL extraction.
+{{/if}}
+
+### 5.3 Partial Index Analysis
+
+**Source:** Partial index WHERE clause extraction
+
+{{#if metadata.partialIndexes}}
+| Index Name | Table | Condition | Oracle Strategy | Source |
+|------------|-------|-----------|-----------------|--------|
+{{#each metadata.partialIndexes}}
+| {{this.name}} | {{this.table}} | `{{this.condition}}` | {{this.strategy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No partial indexes detected or analysis not performed.
+{{/if}}
+
+---
+
+## 6. Constraint Analysis
+
+### 6.1 Constraint Inventory
+
+**Source:** pg_constraint catalog extraction
+
+{{#if metadata.constraints}}
+| Constraint Type | Count | Tables | Oracle Support | Source |
+|-----------------|-------|--------|----------------|--------|
+{{#each metadata.constraints}}
+| {{this.type}} | {{this.count}} | {{this.tables}} | {{this.oracleSupport}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Constraint Type | Oracle Support |
+|-----------------|----------------|
+| PRIMARY KEY | Full support |
+| FOREIGN KEY | Full support |
+| UNIQUE | Full support |
+| CHECK | Full support |
+| EXCLUDE | Not supported - requires trigger |
+| NOT NULL | Full support |
+
+> Constraint inventory requires catalog extraction.
+{{/if}}
+
+### 6.2 Check Constraints with PostgreSQL Functions
+
+**Source:** Check constraint definition extraction
+
+{{#if metadata.checkConstraints}}
+| Constraint Name | Table | Expression | Oracle Compatibility | Source |
+|-----------------|-------|------------|---------------------|--------|
+{{#each metadata.checkConstraints}}
+| {{this.name}} | {{this.table}} | `{{this.expression}}` | {{this.oracleCompat}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Check constraint analysis requires definition extraction.
+{{/if}}
+
+---
+
+## 7. Sequence Analysis
+
+### 7.1 Sequence Inventory
+
+**Source:** pg_sequences catalog extraction
+
+{{#if metadata.sequences}}
+| Sequence Name | Start | Increment | Min | Max | Used By | Source |
+|---------------|-------|-----------|-----|-----|---------|--------|
+{{#each metadata.sequences}}
+| {{this.name}} | {{this.start}} | {{this.increment}} | {{this.min}} | {{this.max}} | {{this.usedBy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Sequence inventory requires catalog extraction.
+{{/if}}
+
+### 7.2 Identity Columns (PostgreSQL 10+)
+
+**Source:** IDENTITY column extraction
+
+{{#if metadata.identityColumns}}
+| Table | Column | Generation | Strategy | Source |
+|-------|--------|------------|----------|--------|
+{{#each metadata.identityColumns}}
+| {{this.table}} | {{this.column}} | {{this.generation}} | {{this.strategy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Identity column analysis requires DDL extraction.
+{{/if}}
+
+---
+
+## 8. PostgreSQL Extensions Analysis
+
+### 8.1 Installed Extensions
+
+**Source:** pg_extension catalog
+
+{{#if metadata.extensions}}
+| Extension | Version | Used Objects | Oracle Alternative | Source |
+|-----------|---------|--------------|-------------------|--------|
+{{#each metadata.extensions}}
+| {{this.name}} | {{this.version}} | {{this.usedObjects}} | {{this.oracleAlternative}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Common Extension | Oracle Alternative |
+|------------------|-------------------|
+| uuid-ossp | SYS_GUID() |
+| pgcrypto | DBMS_CRYPTO |
+| postgis | Oracle Spatial |
+| pg_trgm | Oracle Text |
+| hstore | Custom table or JSON |
+
+> Extension detection requires pg_extension query.
+{{/if}}
+
+### 8.2 Extension Function Usage
+
+**Source:** Function call extraction from SQL
+
+{{#if metadata.extensionUsage}}
+| Extension | Function | Occurrences | Locations | Oracle Migration |
+|-----------|----------|-------------|-----------|------------------|
+{{#each metadata.extensionUsage}}
+| {{this.extension}} | {{this.function}} | {{this.count}} | {{this.locations}} | {{this.oracleMigration}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Extension usage analysis requires SQL parsing.
+{{/if}}
+
+---
+
+## 9. Partitioning Analysis
+
+### 9.1 Partitioned Table Inventory
+
+**Source:** pg_partitioned_table catalog
+
+{{#if metadata.partitioning}}
+| Table | Partition Type | Partition Key | Partitions | Size | Source |
+|-------|----------------|---------------|------------|------|--------|
+{{#each metadata.partitioning}}
+| {{this.table}} | {{this.type}} | {{this.key}} | {{this.count}} | {{this.size}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Partitioning analysis requires catalog extraction.
+{{/if}}
+
+### 9.2 Partition Details
+
+**Source:** Partition definition extraction
+
+{{#if metadata.partitionDetails}}
+{{#each metadata.partitionDetails}}
+#### Table: {{this.table}}
+
+**Partition Type:** {{this.type}}
+
+**Partition Key:** {{this.key}}
+
+**Partitions:**
+| Partition Name | Bounds | Rows | Size | Source |
+|----------------|--------|------|------|--------|
+{{#each this.partitions}}
+| {{this.name}} | {{this.bounds}} | {{this.rows}} | {{this.size}} | `{{this.source}}` |
+{{/each}}
+
+**Oracle Strategy:** {{this.oracleStrategy}}
+
+---
+
+{{/each}}
+{{else}}
+> **Not found in source:** Partition details require DDL extraction.
+{{/if}}
+
+---
+
+## 10. Application ORM Analysis
+
+### 10.1 JPA Entity Analysis
+
+**Source:** Entity class scanning
+
+{{#if metadata.entities}}
+| Entity Class | Table | PostgreSQL Annotations | Native Queries | Source |
+|--------------|-------|----------------------|----------------|--------|
+{{#each metadata.entities}}
+| {{this.class}} | {{this.table}} | {{this.pgAnnotations}} | {{this.nativeQueries}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Entity analysis requires application code scan.
+{{/if}}
+
+### 10.2 Repository Native Query Analysis
+
+**Source:** @Query annotation extraction
+
+{{#if metadata.repositoryQueries}}
+{{#each metadata.repositoryQueries}}
+#### Repository: {{this.class}}
+
+**Source:** `{{this.source}}`
+
+| Method | Query Type | PostgreSQL Features | Rewrite Required |
+|--------|------------|---------------------|------------------|
+{{#each this.methods}}
+| {{this.method}} | {{this.type}} | {{this.pgFeatures}} | {{this.rewriteRequired}} |
+{{/each}}
+
+{{/each}}
+{{else}}
+> **Not found in source:** Repository query analysis requires code scan.
+{{/if}}
+
+### 10.3 PostgreSQL-Specific Type Mappings in Entities
+
+**Source:** Entity field type extraction
+
+{{#if metadata.entityTypeMappings}}
+| Entity | Field | Java Type | Column Type | Oracle Mapping | Source |
+|--------|-------|-----------|-------------|----------------|--------|
+{{#each metadata.entityTypeMappings}}
+| {{this.entity}} | {{this.field}} | {{this.javaType}} | {{this.columnType}} | {{this.oracleMapping}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Entity type mapping analysis requires code scan.
+{{/if}}
+
+---
+
+## 11. Complexity Analysis
+
+### 11.1 Migration Complexity by Dimension
+
+**Source:** Multi-dimensional analysis of source artifacts
+
+| Dimension | Score | Level | Primary Source |
+|-----------|-------|-------|----------------|
+| Schema & Data Types | {{metadata.complexity.schemaDataType}}/100 | {{metadata.complexity.schemaDataTypeLevel}} | DDL analysis |
+| SQL & Query Rewrite | {{metadata.complexity.sqlQuery}}/100 | {{metadata.complexity.sqlQueryLevel}} | Query extraction |
+| PL/pgSQL to PL/SQL | {{metadata.complexity.plpgsql}}/100 | {{metadata.complexity.plpgsqlLevel}} | Function analysis |
+| Data Volume & Migration | {{metadata.complexity.dataVolume}}/100 | {{metadata.complexity.dataVolumeLevel}} | Statistics |
+| Application/ORM Dependency | {{metadata.complexity.application}}/100 | {{metadata.complexity.applicationLevel}} | Code analysis |
+| Extensions & Features | {{metadata.complexity.extensions}}/100 | {{metadata.complexity.extensionsLevel}} | Extension scan |
+| **Overall** | **{{metadata.complexity.overall}}/100** | **{{metadata.complexity.overallLevel}}** | Combined |
+
+### 11.2 High Complexity Components
+
+**Source:** Complexity scoring from analysis
+
+{{#if metadata.highComplexity}}
+| Component | Type | Complexity | Issues | Source |
+|-----------|------|------------|--------|--------|
+{{#each metadata.highComplexity}}
+| {{this.name}} | {{this.type}} | {{this.score}} | {{this.issues}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Complexity ranking requires complete analysis.
+{{/if}}
+
+---
+
+## Appendices
+
+### Appendix A: Complete Table List
+
+{{#if appendix.tables}}
+| Table | Schema | Columns | PG Types | Rows | Source |
+|-------|--------|---------|----------|------|--------|
+{{#each appendix.tables}}
+| {{this.name}} | {{this.schema}} | {{this.columns}} | {{this.pgTypes}} | {{this.rows}} | `{{this.source}}` |
+{{/each}}
+{{/if}}
+
+### Appendix B: Function/Procedure List
+
+{{#if appendix.functions}}
+| Name | Type | Parameters | Return | Language | Source |
+|------|------|------------|--------|----------|--------|
+{{#each appendix.functions}}
+| {{this.name}} | {{this.type}} | {{this.params}} | {{this.return}} | {{this.language}} | `{{this.source}}` |
+{{/each}}
+{{/if}}
+
+### Appendix C: PostgreSQL Feature Detection Summary
+
+{{#if appendix.featureSummary}}
+| Feature | Count | Oracle Support | Migration Impact |
+|---------|-------|----------------|------------------|
+{{#each appendix.featureSummary}}
+| {{this.feature}} | {{this.count}} | {{this.oracleSupport}} | {{this.impact}} |
+{{/each}}
+{{/if}}
+
+---
+
+## Traceability Note
+
+All data in this document is extracted directly from PostgreSQL database catalogs, DDL scripts, and application source code. Each item includes a source reference. Items marked "Not found in source" indicate that the analysis tools could not automatically extract this information.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
+
+---
+
+**End of As-Is Analysis Document**

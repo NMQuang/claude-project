@@ -1,450 +1,570 @@
-# Migration Strategy Document
+# Migration Strategy Document (PostgreSQL → Oracle)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | PostgreSQL → Oracle |
 | **Document Type** | Migration Strategy |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Source Analysis Summary
 
-This document outlines the comprehensive migration strategy for migrating the **{{project.name}}** application from PostgreSQL to Oracle database. The strategy emphasizes **minimal Java application changes**, focusing migration efforts on the database layer while preserving business logic.
+### 1.1 Scope from Source Inventory
 
-### Migration Principles
+**Source:** PostgreSQL catalog extraction and application code scan
 
-1. **Keep Java Application Logic Unchanged** - NO business logic refactoring
-2. **Database Layer Migration Only** - Focus on DDL, SQL queries, stored procedures
-3. **Acceptable Java Changes:** Entity mappings, Repository queries, DB configurations
-4. **Risk Mitigation** - Phased approach with comprehensive testing at each stage
+| Metric | Value | Source |
+|--------|-------|--------|
+| Database Tables | {{metadata.source_analysis.database.tables}} | `pg_tables` catalog |
+| Views | {{metadata.source_analysis.database.views}} | `pg_views` catalog |
+| Functions/Procedures | {{metadata.source_analysis.database.functions}} | `pg_proc` catalog |
+| Triggers | {{metadata.source_analysis.database.triggers}} | `pg_trigger` catalog |
+| Sequences | {{metadata.source_analysis.database.sequences}} | `pg_sequences` catalog |
+| Application Files | {{metadata.source_analysis.total_files}} | Code scan |
+| Native SQL Queries | {{metadata.source_analysis.nativeQueryCount}} | @Query extraction |
+| PostgreSQL Extensions | {{metadata.source_analysis.extensionCount}} | `pg_extension` catalog |
 
-### Migration Timeline Overview
+### 1.2 Complexity Assessment from Source
 
-- **Phase 1:** Database Schema Migration (DDL conversion)
-- **Phase 2:** Application Layer Updates (minimal Java changes)
-- **Phase 3:** Stored Procedures & Functions Conversion
-- **Phase 4:** Data Migration
-- **Phase 5:** Testing & Validation
-- **Phase 6:** Deployment & Cutover
+**Source:** Multi-dimensional analysis of source artifacts
 
----
-
-## 1. Migration Approach
-
-### 1.1 Overall Strategy
-
-**Migration Type:** Database Platform Migration with Minimal Application Changes
-
-**Approach:** Big Bang vs. Phased
-- **Recommended:** Phased migration by application module
-- **Rationale:** Reduces risk, allows for iterative testing, enables rollback per module
-
-### 1.2 Key Constraints
-
-1. **Business Continuity:** Minimize downtime during cutover
-2. **Data Integrity:** Zero data loss tolerance
-3. **Application Stability:** No changes to business logic
-4. **Performance:** Maintain or improve query performance
-5. **Timeline:** [Define project timeline]
+| Dimension | Score | Level | Key Factors (from Source) |
+|-----------|-------|-------|---------------------------|
+| Schema & Data Types | {{metadata.complexity.schemaDataType}}/100 | {{metadata.complexity.schemaDataTypeLevel}} | {{metadata.complexity.schemaFactors}} |
+| SQL Query Rewrite | {{metadata.complexity.sqlQuery}}/100 | {{metadata.complexity.sqlQueryLevel}} | {{metadata.complexity.sqlFactors}} |
+| PL/pgSQL Conversion | {{metadata.complexity.plpgsql}}/100 | {{metadata.complexity.plpgsqlLevel}} | {{metadata.complexity.plpgsqlFactors}} |
+| Data Volume | {{metadata.complexity.dataVolume}}/100 | {{metadata.complexity.dataVolumeLevel}} | {{metadata.complexity.dataFactors}} |
+| Application/ORM | {{metadata.complexity.application}}/100 | {{metadata.complexity.applicationLevel}} | {{metadata.complexity.appFactors}} |
+| Extensions | {{metadata.complexity.extensions}}/100 | {{metadata.complexity.extensionsLevel}} | {{metadata.complexity.extFactors}} |
+| **Overall** | **{{metadata.complexity.overall}}/100** | **{{metadata.complexity.overallLevel}}** | |
 
 ---
 
-## 2. Database Migration Strategy
+## 2. Migration Approach Selection
 
-### 2.1 Schema Migration Approach
+### 2.1 Approach Based on Source Metrics
 
-#### Phase 1: DDL Conversion
+**Source:** Complexity and feature analysis
 
-**Complexity Score:** {{metadata.migrationComplexity.schemaDataTypeComplexity}}/100
+{{#if strategy.approach_analysis}}
+| Factor | Source Value | Approach Implication | Source Evidence |
+|--------|--------------|----------------------|-----------------|
+{{#each strategy.approach_analysis}}
+| {{this.factor}} | {{this.value}} | {{this.implication}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Factor | Source Value | Impact |
+|--------|--------------|--------|
+| PostgreSQL-Specific Types | {{metadata.pgSpecificTypeCount}} | Type conversion required |
+| Native SQL Queries | {{metadata.source_analysis.nativeQueryCount}} | Query rewrite required |
+| PL/pgSQL Functions | {{metadata.source_analysis.database.functions}} | PL/SQL conversion required |
+| Extensions Used | {{metadata.source_analysis.extensionCount}} | Alternative solutions required |
+| Partitioned Tables | {{metadata.source_analysis.database.partitionedTables}} | Partitioning redesign needed |
 
-**Steps:**
-1. **Extract PostgreSQL DDL** - Use pg_dump to extract current schema
-2. **Convert Data Types** - Map PostgreSQL types to Oracle equivalents
-3. **Recreate Constraints** - Convert CHECK, FOREIGN KEY, UNIQUE constraints
-4. **Handle Sequences** - Convert SERIAL/BIGSERIAL to Oracle SEQUENCES with triggers
-5. **Recreate Indexes** - Convert GIN/GIST/BRIN to Oracle index types
+> Approach selection requires complete source analysis.
+{{/if}}
 
-**Tools:**
-- Oracle SQL Developer with PostgreSQL migration plugin
-- Ora2Pg (open-source migration tool)
-- Custom conversion scripts
+### 2.2 Recommended Strategy
 
-**Data Type Conversion Strategy:**
+**Source:** Based on complexity score {{metadata.complexity.overall}}/100
 
-{{#each metadata.source_analysis.postgresqlFeatures.dataTypes}}
-**{{this.type}}** → **{{this.suggestedOracleType}}**
-- Complexity: {{this.oracleMappingComplexity}}
-- Affected Tables: {{#each this.tables}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}
-- Required Actions: {{#if (eq this.oracleMappingComplexity "Complex")}}Custom conversion logic required{{else}}Direct mapping{{/if}}
+{{#if (gt metadata.complexity.overall 70)}}
+**Strategy:** Phased Migration
+- Migrate by module/schema
+- Lower risk, easier rollback per module
+- Longer overall duration
+
+**Rationale (from Source):**
+- High complexity PostgreSQL features detected
+- {{metadata.pgSpecificTypeCount}} PostgreSQL-specific type usages
+- {{metadata.source_analysis.database.functions}} PL/pgSQL functions to convert
+{{else if (gt metadata.complexity.overall 40)}}
+**Strategy:** Big Bang with Parallel Running
+- Single cutover event
+- Parallel systems during validation
+- Faster overall migration
+
+**Rationale (from Source):**
+- Moderate complexity
+- Manageable PostgreSQL feature usage
+{{else}}
+**Strategy:** Big Bang Cutover
+- Direct migration in maintenance window
+- Simplest approach
+- Fastest completion
+
+**Rationale (from Source):**
+- Low complexity
+- Minimal PostgreSQL-specific features
+{{/if}}
+
+---
+
+## 3. Data Type Mapping Strategy
+
+### 3.1 Type Mapping from Source Analysis
+
+**Source:** DDL extraction and column type inventory
+
+{{#if strategy.type_mapping}}
+| PostgreSQL Type | Occurrences | Tables Affected | Oracle Type | Complexity | Source |
+|-----------------|-------------|-----------------|-------------|------------|--------|
+{{#each strategy.type_mapping}}
+| `{{this.pgType}}` | {{this.count}} | {{this.tables}} | `{{this.oracleType}}` | {{this.complexity}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| PostgreSQL Type | Oracle Equivalent | Notes |
+|-----------------|-------------------|-------|
+| SERIAL | NUMBER + SEQUENCE + TRIGGER | Auto-increment requires trigger |
+| BIGSERIAL | NUMBER(19) + SEQUENCE + TRIGGER | Auto-increment requires trigger |
+| BOOLEAN | NUMBER(1) | 0/1 mapping |
+| TEXT | CLOB | Direct mapping |
+| JSONB | JSON (21c+) / CLOB | Version dependent |
+| UUID | RAW(16) / VARCHAR2(36) | SYS_GUID() alternative |
+| BYTEA | BLOB | Direct mapping |
+| ARRAY[] | VARRAY / Nested Table | Requires redesign |
+| INTERVAL | INTERVAL DAY TO SECOND | Different precision |
+| TIMESTAMP WITH TIME ZONE | TIMESTAMP WITH TIME ZONE | Direct mapping |
+
+> Detailed type mapping requires DDL analysis.
+{{/if}}
+
+### 3.2 PostgreSQL-Specific Type Handling
+
+**Source:** PostgreSQL-specific type detection
+
+{{#if strategy.pg_type_handling}}
+{{#each strategy.pg_type_handling}}
+#### Type: `{{this.type}}`
+
+**Occurrences:** {{this.count}} columns in {{this.tableCount}} tables
+
+**Affected Objects:**
+| Table | Column | Current Usage | Source |
+|-------|--------|---------------|--------|
+{{#each this.occurrences}}
+| {{this.table}} | {{this.column}} | {{this.usage}} | `{{this.source}}` |
 {{/each}}
 
-#### Phase 2: Index Strategy
-
-**Current Index Types:**
-{{#each metadata.source_analysis.postgresqlFeatures.advancedIndexes}}
-- **{{this.type}}** ({{this.count}} indexes) - Oracle Support: {{#if this.oracleSupport}}Native{{else}}Alternative approach needed{{/if}}
-{{/each}}
-
-**Conversion Plan:**
-- **GIN Indexes** → Oracle Text indexes or function-based indexes
-- **GIST Indexes** → Oracle Spatial indexes (for geometry) or B-tree
-- **BRIN Indexes** → Partitioned table with local indexes
-- **Partial Indexes (WHERE clause)** → Function-based indexes or partitioning
-
-#### Phase 3: Stored Procedures & Functions
-
-**Complexity Score:** {{metadata.migrationComplexity.procedureFunctionTriggerComplexity}}/100
-
-**Total Functions/Procedures:** {{metadata.source_analysis.database.functions}} functions + {{metadata.source_analysis.database.stored_procedures}} procedures
-
-**Conversion Strategy:**
-1. **Analyze PL/pgSQL Code** - Identify PostgreSQL-specific syntax
-2. **Convert to PL/SQL** - Rewrite using Oracle syntax
-3. **Handle Dynamic SQL** - Extra caution for SQL injection prevention
-4. **Convert RETURNS TABLE** - Use SYS_REFCURSOR or pipelined functions
-5. **Test Each Function** - Unit tests for all procedures
-
-**Key Challenges:**
-{{#each metadata.migrationComplexity.details.procedureFunctionTrigger}}
-- {{this}}
-{{/each}}
-
-### 2.2 Data Migration Strategy
-
-**Complexity Score:** {{metadata.migrationComplexity.dataVolumeMigrationComplexity}}/100
-
-**Total Tables:** {{metadata.source_analysis.database.tables}}
-**Partitioned Tables:** {{metadata.source_analysis.database.partitionedTables}}
-
-#### Data Migration Tools
-
-**Option 1: Oracle Data Pump (Recommended for Large Datasets)**
-- Extract data from PostgreSQL using pg_dump (CSV format)
-- Transform data to Oracle format
-- Load using Oracle Data Pump (impdp)
-- Fastest for large volumes (>100GB)
-
-**Option 2: AWS Database Migration Service (DMS)**
-- Supports continuous replication
-- Minimal downtime migration
-- Good for phased migration approach
-- Handles heterogeneous migrations
-
-**Option 3: Custom ETL Scripts**
-- Full control over transformation logic
-- Good for complex data transformations
-- Use for special cases (JSONB, ARRAY conversions)
-
-#### Data Migration Phases
-
-**Phase 1: Initial Data Load**
-1. Take application offline or set to read-only
-2. Export PostgreSQL data
-3. Transform data (handle type conversions)
-4. Load into Oracle
-5. Validate row counts and checksums
-
-**Phase 2: Delta Synchronization** (if using phased approach)
-1. Capture changes in PostgreSQL during initial load
-2. Apply delta changes to Oracle
-3. Repeat until cutover window
-
-**Phase 3: Final Cutover**
-1. Stop PostgreSQL writes
-2. Apply final delta
-3. Switch application to Oracle
-4. Validate
+**Migration Strategy:**
+- **Oracle Type:** `{{this.oracleType}}`
+- **Conversion Logic:** {{this.conversionLogic}}
+- **Application Impact:** {{this.appImpact}}
 
 ---
 
-## 3. Application Layer Migration Strategy
+{{/each}}
+{{else}}
+> **Not found in source:** PostgreSQL-specific type handling requires DDL parsing.
+{{/if}}
 
-### 3.1 Minimal Java Changes Principle
+---
 
-**CRITICAL RULE:** Keep Java application logic unchanged.
+## 4. SQL Query Migration Strategy
 
-**ORM Framework:** {{metadata.source_analysis.ormFramework}}
+### 4.1 Query Patterns Detected
 
-### 3.2 Required Java Changes (Database Layer Only)
+**Source:** SQL extraction from application code and stored procedures
 
-#### 3.2.1 Entity Mappings
+{{#if strategy.query_patterns}}
+| Pattern | Occurrences | Locations | Oracle Equivalent | Complexity |
+|---------|-------------|-----------|-------------------|------------|
+{{#each strategy.query_patterns}}
+| `{{this.pattern}}` | {{this.count}} | {{this.locations}} | {{this.oracleEquiv}} | {{this.complexity}} |
+{{/each}}
+{{else}}
+| Pattern | Oracle Equivalent |
+|---------|-------------------|
+| LIMIT n OFFSET m | FETCH FIRST n ROWS ONLY OFFSET m |
+| RETURNING clause | RETURNING INTO |
+| ON CONFLICT (upsert) | MERGE statement |
+| ILIKE | UPPER() LIKE UPPER() |
+| array_agg() | LISTAGG() |
+| string_agg() | LISTAGG() |
+| :: type cast | CAST() or TO_ functions |
+| NOW() | SYSDATE / SYSTIMESTAMP |
+| CURRENT_TIMESTAMP | SYSTIMESTAMP |
+| EXTRACT(epoch FROM) | Custom function |
 
-**Files Requiring Update:** {{metadata.javaChanges.acceptable.entityMappings.length}}
+> Query pattern analysis requires SQL extraction.
+{{/if}}
 
-**Changes:**
-- Update `@Column` annotations if data type mapping requires it
-- Add `@Type` annotations for custom type handlers (JSONB → JSON)
-- Update `@Table` annotations if table names change
-- **Keep entity business methods unchanged**
+### 4.2 Native Query Rewrite Plan
 
-**Example:**
-```java
-// Before (PostgreSQL)
-@Column(columnDefinition = "jsonb")
-private String metadata;
+**Source:** @Query annotation extraction
 
-// After (Oracle)
-@Column(columnDefinition = "CLOB")
-@Type(type = "json")
-private String metadata;
+{{#if strategy.native_query_plan}}
+{{#each strategy.native_query_plan}}
+#### Query: {{this.id}}
+
+**Location:** `{{this.location}}`
+
+**Original PostgreSQL:**
+```sql
+{{{this.originalSql}}}
 ```
 
-#### 3.2.2 Repository Queries
-
-**Files Requiring Update:** {{metadata.javaChanges.acceptable.repositoryQueries.length}}
-
-**Changes:**
-- Rewrite SQL in `@Query` annotations for Oracle syntax
-- Update MyBatis XML mapper files
-- Replace PostgreSQL functions with Oracle equivalents
-- **Keep method signatures, parameters, and return types unchanged**
-
-**Common SQL Rewrites:**
-- `LIMIT n` → `FETCH FIRST n ROWS ONLY`
-- `array_agg()` → `LISTAGG()`
-- `RETURNING` → `RETURNING` (different syntax)
-- `ON CONFLICT` → `MERGE` statement
-- `ILIKE` → `UPPER() LIKE UPPER()`
-
-#### 3.2.3 Database Configurations
-
-**Files Requiring Update:** {{metadata.javaChanges.acceptable.configurations.length}}
-
-**Changes:**
-1. **JDBC Driver:**
-   ```properties
-   # Before
-   spring.datasource.driver-class-name=org.postgresql.Driver
-   spring.datasource.url=jdbc:postgresql://localhost:5432/mydb
-
-   # After
-   spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
-   spring.datasource.url=jdbc:oracle:thin:@localhost:1521:ORCL
-   ```
-
-2. **Hibernate Dialect:**
-   ```properties
-   # Before
-   spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
-
-   # After
-   spring.jpa.database-platform=org.hibernate.dialect.Oracle12cDialect
-   ```
-
-3. **Connection Pool Settings:**
-   - Update for Oracle optimal settings
-   - Adjust max pool size based on Oracle licensing
-
-#### 3.2.4 Files Requiring Review
-
-{{#if metadata.javaChanges.requiresReview.length}}
-**⚠️ Warning: The following files have database dependencies in business logic:**
-
-{{#each metadata.javaChanges.requiresReview}}
+**PostgreSQL Features:**
+{{#each this.pgFeatures}}
 - {{this}}
 {{/each}}
 
-**Action Required:** Review these files carefully. Service/Controller layers should NOT have direct database dependencies.
-{{else}}
-✓ No files requiring special review - good separation of concerns.
-{{/if}}
+**Oracle Conversion:**
+```sql
+{{{this.oracleSql}}}
+```
 
-### 3.3 ORM Framework-Specific Strategy
-
-**Detected Framework:** {{metadata.source_analysis.ormFramework}}
-
-{{#if (eq metadata.source_analysis.ormFramework "Spring Data JPA")}}
-**Spring Data JPA Strategy:**
-- Update `@Query` annotations with Oracle SQL
-- Test all custom queries
-- Verify JPA entity mappings work with Oracle
-- No changes to repository method signatures
-{{else if (eq metadata.source_analysis.ormFramework "MyBatis")}}
-**MyBatis Strategy:**
-- Update all XML mapper files
-- Replace PostgreSQL-specific SQL syntax
-- Test all select/insert/update/delete statements
-- No changes to mapper interface methods
-{{else if (eq metadata.source_analysis.ormFramework "Hibernate")}}
-**Hibernate Strategy:**
-- Update Hibernate dialect configuration
-- Test all HQL and Criteria queries
-- Verify entity mappings
-- No changes to DAO/Repository classes
-{{/if}}
+**Complexity:** {{this.complexity}}
 
 ---
-
-## 4. PostgreSQL Extensions Migration
-
-{{#if metadata.source_analysis.postgresqlFeatures.extensions.length}}
-**Extensions Detected:** {{metadata.source_analysis.postgresqlFeatures.extensions.length}}
-
-{{#each metadata.source_analysis.postgresqlFeatures.extensions}}
-### Extension: {{this}}
-
-**Oracle Equivalent:**
-{{#if (eq this "uuid-ossp")}}
-- Use Oracle `SYS_GUID()` function
-- Or install Oracle UUID package
-{{else if (eq this "pg_trgm")}}
-- Use Oracle Text for full-text search
-- Configure CONTEXT indexes
-{{else if (eq this "PostGIS")}}
-- Use Oracle Spatial and Graph
-- Migrate geometry data to SDO_GEOMETRY
-{{else if (eq this "hstore")}}
-- Redesign as key-value table
-- Or use Oracle JSON_TABLE
-{{else}}
-- Custom research required for this extension
-{{/if}}
 
 {{/each}}
 {{else}}
-No PostgreSQL extensions detected - simplifies migration.
+> **Not found in source:** Native query plan requires @Query extraction.
 {{/if}}
 
 ---
 
-## 5. Testing Strategy Overview
+## 5. PL/pgSQL to PL/SQL Strategy
 
-### 5.1 Testing Phases
+### 5.1 Function/Procedure Conversion Plan
 
-**Phase 1: Unit Testing**
-- Test all Entity mappings
-- Test all Repository queries
-- Test all stored procedures/functions
+**Source:** pg_proc catalog and function body extraction
 
-**Phase 2: Integration Testing**
-- Test all service layer operations
-- Test transaction management
-- Test connection pooling
+{{#if strategy.plpgsql_plan}}
+| Function/Procedure | Type | Lines | PG-Specific Constructs | Conversion Complexity | Source |
+|--------------------|------|-------|------------------------|----------------------|--------|
+{{#each strategy.plpgsql_plan}}
+| {{this.name}} | {{this.type}} | {{this.lines}} | {{this.pgConstructs}} | {{this.complexity}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Construct | Count | Oracle Equivalent |
+|-----------|-------|-------------------|
+| Functions | {{metadata.source_analysis.database.functions}} | Oracle Functions |
+| Procedures | {{metadata.source_analysis.database.stored_procedures}} | Oracle Procedures |
+| Triggers | {{metadata.source_analysis.database.triggers}} | Oracle Triggers |
 
-**Phase 3: Performance Testing**
-- Compare query execution times
-- Validate Oracle execution plans
-- Load testing with production-like data
+> Function conversion plan requires body extraction.
+{{/if}}
 
-**Phase 4: Data Validation**
-- Row count verification
-- Data integrity checks
-- Referential integrity validation
+### 5.2 PL/pgSQL Construct Mapping
 
-See Test Strategy document for detailed test plan.
+**Source:** Function body analysis
 
----
+{{#if strategy.plpgsql_constructs}}
+| PL/pgSQL Construct | Occurrences | Oracle Equivalent | Conversion Notes | Source |
+|--------------------|-------------|-------------------|------------------|--------|
+{{#each strategy.plpgsql_constructs}}
+| `{{this.construct}}` | {{this.count}} | `{{this.oracleEquiv}}` | {{this.notes}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| PL/pgSQL Construct | Oracle PL/SQL |
+|--------------------|---------------|
+| RETURNS TABLE | SYS_REFCURSOR / Pipelined Function |
+| RETURN QUERY | OPEN cursor FOR / PIPE ROW |
+| PERFORM statement | EXECUTE IMMEDIATE (if needed) |
+| RAISE NOTICE | DBMS_OUTPUT.PUT_LINE |
+| RAISE EXCEPTION | RAISE_APPLICATION_ERROR |
+| $$ dollar quoting | Standard quote or q'[]' |
+| FOREACH .. IN ARRAY | FOR i IN 1..array.COUNT LOOP |
 
-## 6. Rollback Strategy
-
-### 6.1 Rollback Triggers
-
-**Rollback will be initiated if:**
-1. Critical data integrity issues detected
-2. Performance degradation >20% from baseline
-3. Application errors exceed threshold
-4. Business-critical functionality failure
-
-### 6.2 Rollback Process
-
-**Steps:**
-1. Stop Oracle database connections
-2. Switch application back to PostgreSQL
-3. Sync any data changes from Oracle back to PostgreSQL (if needed)
-4. Restart application
-5. Validate functionality
-
-**Rollback Time Estimate:** [Define based on deployment approach]
+> Construct mapping requires function body analysis.
+{{/if}}
 
 ---
 
-## 7. Risk Mitigation Strategies
+## 6. Index Migration Strategy
 
-{{#each metadata.risks}}
-### Risk: {{this.category}}
+### 6.1 Index Type Conversion
 
-**Severity:** {{this.severity}}
-**Description:** {{this.description}}
+**Source:** pg_indexes catalog extraction
 
-**Mitigation:**
-{{this.mitigation}}
+{{#if strategy.index_plan}}
+| Index Type | Count | Tables | Oracle Support | Migration Strategy | Source |
+|------------|-------|--------|----------------|-------------------|--------|
+{{#each strategy.index_plan}}
+| {{this.type}} | {{this.count}} | {{this.tables}} | {{this.oracleSupport}} | {{this.strategy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| PostgreSQL Index Type | Oracle Alternative | Notes |
+|-----------------------|-------------------|-------|
+| B-tree | B-tree | Direct conversion |
+| GIN | Function-based / Domain Index | For JSONB, ARRAY, Full-text |
+| GiST | R-tree / Spatial Index | For geometry, range types |
+| BRIN | Partitioning + Local Index | For large sequential data |
+| Hash | B-tree | Oracle hash partitioning alternative |
+| Partial Index (WHERE) | Function-based Index | May require redesign |
+
+> Index migration plan requires pg_indexes extraction.
+{{/if}}
+
+### 6.2 Partial Index Handling
+
+**Source:** Index WHERE clause extraction
+
+{{#if strategy.partial_indexes}}
+| Index Name | Table | Condition | Oracle Strategy | Source |
+|------------|-------|-----------|-----------------|--------|
+{{#each strategy.partial_indexes}}
+| {{this.name}} | {{this.table}} | `{{this.condition}}` | {{this.strategy}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No partial indexes detected or analysis not performed.
+{{/if}}
 
 ---
+
+## 7. Extension Migration Strategy
+
+### 7.1 Extension Handling Plan
+
+**Source:** pg_extension catalog and usage analysis
+
+{{#if strategy.extension_plan}}
+{{#each strategy.extension_plan}}
+#### Extension: {{this.name}}
+
+**Version:** {{this.version}}
+
+**Functions Used:**
+| Function | Occurrences | Locations | Source |
+|----------|-------------|-----------|--------|
+{{#each this.functions}}
+| {{this.function}} | {{this.count}} | {{this.locations}} | `{{this.source}}` |
 {{/each}}
 
----
+**Oracle Alternative:** {{this.oracleAlternative}}
 
-## 8. Resource Requirements
-
-### 8.1 Team Requirements
-
-| Role | Responsibilities | Estimated Effort |
-|------|-----------------|-----------------|
-| Database Architect | DDL conversion, stored procedure migration | [Estimate] |
-| Backend Developer | Java code updates (minimal), testing | [Estimate] |
-| DBA (PostgreSQL) | Data extraction, validation | [Estimate] |
-| DBA (Oracle) | Schema creation, optimization | [Estimate] |
-| QA Engineer | Testing, validation | [Estimate] |
-| DevOps Engineer | Deployment, monitoring | [Estimate] |
-
-### 8.2 Infrastructure Requirements
-
-| Component | Specification |
-|-----------|--------------|
-| Oracle Database | Version 12c+ (for JSON support) |
-| Server Hardware | [Define based on PostgreSQL usage] |
-| Storage | [Define based on data volume] |
-| Network | High-speed connection for data migration |
-| Backup Infrastructure | Oracle RMAN or equivalent |
-
-### 8.3 Tool Requirements
-
-- Oracle SQL Developer
-- Ora2Pg migration tool
-- AWS DMS (if using cloud migration)
-- Oracle Data Pump utilities
-- Git for version control
-- JIRA or equivalent for tracking
+**Migration Strategy:** {{this.strategy}}
 
 ---
 
-## 9. Success Criteria
+{{/each}}
+{{else}}
+| Extension | Oracle Alternative |
+|-----------|-------------------|
+| uuid-ossp | SYS_GUID() function |
+| pgcrypto | DBMS_CRYPTO package |
+| postgis | Oracle Spatial |
+| pg_trgm | Oracle Text |
+| hstore | JSON or custom table |
 
-### 9.1 Technical Success Criteria
-
-- ✓ All database tables migrated with 100% data integrity
-- ✓ All stored procedures/functions converted and tested
-- ✓ All application queries return correct results
-- ✓ Performance meets or exceeds PostgreSQL baseline
-- ✓ Zero business logic changes
-- ✓ All integration tests passing
-- ✓ Zero data loss during migration
-
-### 9.2 Business Success Criteria
-
-- ✓ Application downtime within acceptable window
-- ✓ No impact to end-user functionality
-- ✓ Business processes continue without interruption
-- ✓ Compliance and audit requirements met
+> Extension plan requires pg_extension analysis.
+{{/if}}
 
 ---
 
-## 10. Next Steps
+## 8. Application Layer Strategy
 
-1. **Review and Approve Strategy** - Stakeholder sign-off
-2. **Detailed Migration Design** - Create detailed technical design document
-3. **Set Up Environments** - Development, QA, Staging, Production
-4. **Create Test Plan** - Detailed test cases and scenarios
-5. **Begin Development** - DDL conversion and Java updates
-6. **Pilot Migration** - Test with non-critical module first
-7. **Full Migration** - Execute based on lessons learned
+### 8.1 Minimal Java Changes Principle
+
+**Strategy:** Keep Java application logic unchanged. Changes limited to:
+1. Database configuration (JDBC driver, URL, dialect)
+2. Entity annotations (only if type mapping fails)
+3. Repository queries (@Query rewrite for Oracle syntax)
+
+### 8.2 Required Configuration Changes
+
+**Source:** Application configuration file scan
+
+{{#if strategy.config_changes}}
+| File | Property | Current Value | New Value | Source |
+|------|----------|---------------|-----------|--------|
+{{#each strategy.config_changes}}
+| {{this.file}} | {{this.property}} | {{this.current}} | {{this.new}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Property | PostgreSQL Value | Oracle Value |
+|----------|------------------|--------------|
+| driver-class-name | org.postgresql.Driver | oracle.jdbc.OracleDriver |
+| url | jdbc:postgresql://host:5432/db | jdbc:oracle:thin:@host:1521:SID |
+| dialect | PostgreSQLDialect | Oracle12cDialect |
+
+> Configuration changes require application.properties scan.
+{{/if}}
+
+### 8.3 Entity Annotation Changes
+
+**Source:** JPA Entity class scan
+
+{{#if strategy.entity_changes}}
+| Entity Class | Field | Current Annotation | Required Change | Source |
+|--------------|-------|-------------------|-----------------|--------|
+{{#each strategy.entity_changes}}
+| {{this.entity}} | {{this.field}} | {{this.current}} | {{this.required}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Entity annotation analysis requires code scan.
+{{/if}}
+
+### 8.4 Repository Query Changes
+
+**Source:** @Query and native query extraction
+
+{{#if strategy.repository_changes}}
+| Repository | Method | Query Type | PostgreSQL Features | Change Required | Source |
+|------------|--------|------------|---------------------|-----------------|--------|
+{{#each strategy.repository_changes}}
+| {{this.repository}} | {{this.method}} | {{this.type}} | {{this.pgFeatures}} | {{this.changeRequired}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Repository analysis requires code scan.
+{{/if}}
 
 ---
 
-**Document End**
+## 9. Data Migration Strategy
+
+### 9.1 Migration Tool Selection
+
+**Source:** Data volume and complexity analysis
+
+{{#if (gt metadata.complexity.dataVolume 60)}}
+**Recommended Tool:** AWS DMS or Oracle GoldenGate
+- Continuous replication support
+- Minimal downtime migration
+- Handles heterogeneous migrations
+{{else}}
+**Recommended Tool:** Oracle SQL Developer + Ora2Pg
+- Simpler setup
+- Good for one-time migration
+- Full control over process
+{{/if}}
+
+### 9.2 Data Transformation Requirements
+
+**Source:** Data type and structure analysis
+
+{{#if strategy.data_transformation}}
+| Table | Column | Transformation | Reason | Source |
+|-------|--------|----------------|--------|--------|
+{{#each strategy.data_transformation}}
+| {{this.table}} | {{this.column}} | {{this.transformation}} | {{this.reason}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| Transformation Type | Source Type | Target Type | Logic |
+|---------------------|-------------|-------------|-------|
+| BOOLEAN → NUMBER | boolean | NUMBER(1) | TRUE→1, FALSE→0 |
+| ARRAY → VARCHAR | array[] | VARCHAR2/CLOB | array_to_string() |
+| JSONB → CLOB | jsonb | CLOB | Direct JSON text |
+| SERIAL → SEQUENCE | SERIAL | NUMBER | Create sequence + trigger |
+
+> Transformation requirements need data analysis.
+{{/if}}
+
+### 9.3 Migration Order
+
+**Source:** Foreign key dependency analysis
+
+{{#if strategy.migration_order}}
+| Phase | Tables | Dependencies | Rationale | Source |
+|-------|--------|--------------|-----------|--------|
+{{#each strategy.migration_order}}
+| {{this.phase}} | {{this.tables}} | {{this.dependencies}} | {{this.rationale}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Migration order requires FK dependency graph analysis.
+{{/if}}
+
+---
+
+## 10. Risk Assessment from Source
+
+### 10.1 Technical Risks
+
+**Source:** Feature and complexity analysis
+
+{{#if strategy.risks}}
+| Risk | Severity | Source Evidence | Mitigation |
+|------|----------|-----------------|------------|
+{{#each strategy.risks}}
+| {{this.risk}} | {{this.severity}} | `{{this.source}}` | {{this.mitigation}} |
+{{/each}}
+{{else}}
+| Risk Category | Count | Severity |
+|---------------|-------|----------|
+| PostgreSQL-specific types | {{metadata.pgSpecificTypeCount}} | {{metadata.pgTypeSeverity}} |
+| Native SQL queries | {{metadata.source_analysis.nativeQueryCount}} | Medium |
+| PL/pgSQL functions | {{metadata.source_analysis.database.functions}} | {{metadata.plpgsqlSeverity}} |
+| Extensions | {{metadata.source_analysis.extensionCount}} | {{metadata.extensionSeverity}} |
+
+> Risk assessment requires complete source analysis.
+{{/if}}
+
+### 10.2 High-Risk Components
+
+**Source:** Complexity scoring
+
+{{#if strategy.high_risk_components}}
+| Component | Type | Complexity | Risk Factors | Source |
+|-----------|------|------------|--------------|--------|
+{{#each strategy.high_risk_components}}
+| {{this.name}} | {{this.type}} | {{this.complexity}} | {{this.factors}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** High-risk component identification requires analysis.
+{{/if}}
+
+---
+
+## 11. Success Criteria
+
+### 11.1 Technical Success Criteria
+
+**Source:** Migration scope inventory
+
+| Criteria | Target | Measurement | Source Baseline |
+|----------|--------|-------------|-----------------|
+| Tables migrated | {{metadata.source_analysis.database.tables}} | Row count validation | pg_tables catalog |
+| Views migrated | {{metadata.source_analysis.database.views}} | Query result validation | pg_views catalog |
+| Functions converted | {{metadata.source_analysis.database.functions}} | Unit test pass rate | pg_proc catalog |
+| Queries rewritten | {{metadata.source_analysis.nativeQueryCount}} | Integration test pass | @Query extraction |
+| Data integrity | 100% | Checksum validation | Source data |
+| Performance | ≤ Baseline | Query timing comparison | Performance baseline |
+
+---
+
+## Appendices
+
+### Appendix A: Type Mapping Reference
+
+{{#if appendix.type_mapping}}
+| PostgreSQL Type | Oracle Type | Conversion Notes |
+|-----------------|-------------|------------------|
+{{#each appendix.type_mapping}}
+| {{this.pgType}} | {{this.oracleType}} | {{this.notes}} |
+{{/each}}
+{{/if}}
+
+### Appendix B: SQL Function Mapping
+
+{{#if appendix.function_mapping}}
+| PostgreSQL Function | Oracle Function | Notes |
+|---------------------|-----------------|-------|
+{{#each appendix.function_mapping}}
+| {{this.pgFunction}} | {{this.oracleFunction}} | {{this.notes}} |
+{{/each}}
+{{/if}}
+
+---
+
+## Traceability Note
+
+All strategy decisions in this document are derived from PostgreSQL source analysis (DDL, catalogs, application code). Each recommendation includes source evidence. Items marked "Not found in source" require manual analysis.
+
+---
+
+## Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
+
+---
+
+**End of Migration Strategy Document**

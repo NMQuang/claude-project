@@ -1,501 +1,420 @@
-# Migration Strategy Document
+# Migration Strategy Document (COBOL → Java)
 
 ## Document Information
 
 | Item | Details |
 |------|---------|
 | **Project Name** | {{project.name}} |
-| **Migration Type** | {{project.migration_type}} |
+| **Migration Type** | COBOL → Java |
 | **Document Type** | Migration Strategy |
 | **Generated Date** | {{generated_date}} |
 | **Version** | {{version}} |
-| **Author** | {{author}} |
 
 ---
 
-## Executive Summary
+## 1. Source Analysis Summary
 
-This document outlines the strategic approach for migrating **{{project.name}}** from **{{source.language}}** to **{{target.language}}** and from **{{source.database}}** to **{{target.database}}**.
+### 1.1 Scope from Source Inventory
 
-### Migration Objectives
+**Source:** As-Is Analysis extraction
 
-{{#if objectives}}
-{{#each objectives}}
-- {{this}}
+| Metric | Value | Source |
+|--------|-------|--------|
+| Total COBOL Programs | {{metadata.source_analysis.total_files}} | Directory scan |
+| Total LOC | {{metadata.source_analysis.total_loc}} | LOC analysis |
+| Total Copybooks | {{metadata.copybook_count}} | COPY extraction |
+| Total JCL Jobs | {{metadata.jcl_count}} | JCL scan |
+| Average Complexity | {{metadata.complexity.avg_cyclomatic}} | Complexity analysis |
+| High Complexity Programs | {{metadata.complexity.high_count}} | Complexity analysis |
+
+### 1.2 Component Classification
+
+**Source:** Program type analysis
+
+{{#if metadata.program_classification}}
+| Category | Count | Programs | Complexity Range |
+|----------|-------|----------|------------------|
+{{#each metadata.program_classification}}
+| {{this.category}} | {{this.count}} | {{this.programs}} | {{this.complexity_range}} |
 {{/each}}
 {{else}}
-- Modernize technology stack to improve maintainability
-- Reduce operational costs
-- Improve system performance and scalability
-- Enhance developer productivity
-{{/if}}
-
-### Success Criteria
-
-{{#if success_criteria}}
-{{#each success_criteria}}
-- {{this}}
-{{/each}}
-{{else}}
-- 100% functional parity with current system
-- Zero data loss during migration
-- Performance meets or exceeds current system
-- Successful UAT with <5% defect rate
-{{/if}}
-
----
-
-## 1. Migration Overview
-
-### 1.1 Current State
-
-| Aspect | Current |
-|--------|---------|
-| Programming Language | {{source.language}} |
-| Database | {{source.database}} |
-| Total Files | {{metadata.source_analysis.total_files}} |
-| Total LOC | {{metadata.source_analysis.total_loc}} |
-| Database Size | {{metadata.database.data_volume.total_size}} |
-
-### 1.2 Target State
-
-| Aspect | Target |
-|--------|--------|
-| Programming Language | {{target.language}} |
-| Framework | {{target.framework}} |
-| Database | {{target.database}} |
-| Architecture Pattern | {{target.architecture_pattern}} |
-| Deployment | {{target.deployment}} |
-
-### 1.3 Migration Scope
-
-#### In Scope
-
-{{#if scope.in_scope}}
-{{#each scope.in_scope}}
-- {{this}}
-{{/each}}
-{{else}}
-*[Define what will be migrated]*
-{{/if}}
-
-#### Out of Scope
-
-{{#if scope.out_scope}}
-{{#each scope.out_scope}}
-- {{this}}
-{{/each}}
-{{else}}
-*[Define what will NOT be migrated]*
+> **Not found in source:** Program classification not performed.
 {{/if}}
 
 ---
 
-## 2. Migration Approach
+## 2. Migration Approach Selection
 
-### 2.1 Overall Strategy
+### 2.1 Approach Based on Source Metrics
 
-{{#if strategy.approach}}
-**Selected Approach:** {{strategy.approach}}
+**Source:** Complexity and pattern analysis
 
-**Rationale:** {{strategy.rationale}}
+{{#if strategy.approach_analysis}}
+| Factor | Source Value | Approach Implication |
+|--------|--------------|----------------------|
+{{#each strategy.approach_analysis}}
+| {{this.factor}} | {{this.value}} | {{this.implication}} |
+{{/each}}
 {{else}}
-**Options Considered:**
-
-1. **Big Bang Migration**
-   - Migrate entire system at once
-   - Pros: Fast, clean cutover
-   - Cons: High risk, long testing phase
-
-2. **Phased Migration** (Recommended)
-   - Migrate in functional modules
-   - Pros: Reduced risk, incremental value delivery
-   - Cons: Requires integration between old/new systems
-
-3. **Strangler Fig Pattern**
-   - Gradually replace components
-   - Pros: Lowest risk, continuous delivery
-   - Cons: Longest timeline, complexity in maintaining both systems
+| Factor | Source Value | Source |
+|--------|--------------|--------|
+| Total LOC | {{metadata.source_analysis.total_loc}} | LOC analysis |
+| Avg Complexity | {{metadata.complexity.avg_cyclomatic}} | Complexity analysis |
+| CICS Programs | {{metadata.cics_program_count}} | EXEC CICS extraction |
+| DB2 Programs | {{metadata.db2_program_count}} | EXEC SQL extraction |
+| Batch Programs | {{metadata.batch_program_count}} | JCL analysis |
 {{/if}}
 
-### 2.2 Migration Phases
+### 2.2 Program-Level Migration Strategy
 
-{{#if strategy.phases}}
-{{#each strategy.phases}}
-#### Phase {{@index}}: {{this.name}}
+**Source:** Individual program analysis
 
-**Duration:** {{this.duration}}
-
-**Scope:**
-{{#each this.scope}}
-- {{this}}
+{{#if strategy.program_strategies}}
+| Program | LOC | Complexity | Strategy | Rationale (Source-based) |
+|---------|-----|------------|----------|--------------------------|
+{{#each strategy.program_strategies}}
+| {{this.program}} | {{this.loc}} | {{this.complexity}} | {{this.strategy}} | {{this.rationale}} |
 {{/each}}
-
-**Deliverables:**
-{{#each this.deliverables}}
-- {{this}}
-{{/each}}
-
-**Success Criteria:**
-{{#each this.success_criteria}}
-- {{this}}
-{{/each}}
+{{else}}
+> **Not found in source:** Program-level strategies require analysis completion.
+{{/if}}
 
 ---
 
+## 3. COBOL to Java Mapping Rules
+
+### 3.1 Data Type Mapping
+
+**Source:** PIC clause extraction from DATA DIVISION
+
+{{#if mappings.data_types}}
+| COBOL PIC Pattern | Occurrences | Java Type | Example Source |
+|-------------------|-------------|-----------|----------------|
+{{#each mappings.data_types}}
+| {{this.cobol_pic}} | {{this.count}} | {{this.java_type}} | `{{this.example_source}}` |
 {{/each}}
 {{else}}
-#### Phase 1: Preparation & Setup
-- Environment setup
-- Tool installation
-- Team training
+| COBOL Pattern | Java Type | Notes |
+|---------------|-----------|-------|
+| PIC 9(n) | int/long | Based on n value |
+| PIC 9(n)V9(m) | BigDecimal | Decimal precision |
+| PIC S9(n) | int/long | Signed |
+| PIC X(n) | String | Character |
+| PIC A(n) | String | Alphabetic |
 
-#### Phase 2: Code Migration
-- Automated code conversion
-- Manual refactoring
-- Code review
-
-#### Phase 3: Database Migration
-- Schema conversion
-- Data migration
-- Validation
-
-#### Phase 4: Testing
-- Unit testing
-- Integration testing
-- UAT
-
-#### Phase 5: Deployment
-- Production deployment
-- Monitoring
-- Hypercare
+> Source-specific mappings require DATA DIVISION analysis.
 {{/if}}
 
-### 2.3 Migration Timeline
+### 3.2 Program Structure Mapping
 
-```mermaid
-gantt
-    title Migration Timeline
-    dateFormat YYYY-MM-DD
+**Source:** COBOL structure analysis
 
-{{#if timeline.milestones}}
-    {{#each timeline.milestones}}
-    {{this.name}} :{{this.start}}, {{this.duration}}
-    {{/each}}
+{{#if mappings.structure}}
+| COBOL Construct | Java Equivalent | Occurrences | Example Locations |
+|-----------------|-----------------|-------------|-------------------|
+{{#each mappings.structure}}
+| {{this.cobol}} | {{this.java}} | {{this.count}} | {{this.locations}} |
+{{/each}}
 {{else}}
-    Preparation       :2024-01-01, 30d
-    Code Migration    :2024-02-01, 60d
-    DB Migration      :2024-03-01, 45d
-    Testing           :2024-04-01, 45d
-    Deployment        :2024-05-15, 15d
+| COBOL Construct | Java Equivalent |
+|-----------------|-----------------|
+| PROGRAM | Class |
+| PARAGRAPH | Method |
+| SECTION | Method group/Class |
+| WORKING-STORAGE | Instance fields |
+| COPYBOOK | DTO/Entity class |
+| PERFORM | Method call |
+| PERFORM VARYING | for loop |
+| EVALUATE | switch statement |
+
+> Source-specific mappings require structure analysis.
 {{/if}}
+
+### 3.3 File I/O Mapping
+
+**Source:** FILE SECTION and I/O statement extraction
+
+{{#if mappings.file_io}}
+| COBOL I/O | File Type | Java Equivalent | Occurrences | Source Locations |
+|-----------|-----------|-----------------|-------------|------------------|
+{{#each mappings.file_io}}
+| {{this.cobol_io}} | {{this.file_type}} | {{this.java_equiv}} | {{this.count}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **Not found in source:** File I/O mapping requires FILE SECTION analysis.
+{{/if}}
+
+### 3.4 DB2/SQL Mapping
+
+**Source:** EXEC SQL extraction
+
+{{#if mappings.sql}}
+| SQL Pattern | Occurrences | Java/JPA Equivalent | Example Source |
+|-------------|-------------|---------------------|----------------|
+{{#each mappings.sql}}
+| {{this.sql_pattern}} | {{this.count}} | {{this.java_equiv}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** No EXEC SQL statements detected for mapping.
+{{/if}}
+
+### 3.5 CICS Mapping
+
+**Source:** EXEC CICS extraction
+
+{{#if mappings.cics}}
+| CICS Command | Occurrences | Java/Spring Equivalent | Source Locations |
+|--------------|-------------|------------------------|------------------|
+{{#each mappings.cics}}
+| {{this.cics_cmd}} | {{this.count}} | {{this.java_equiv}} | {{this.locations}} |
+{{/each}}
+{{else}}
+> **Not found in source:** No EXEC CICS commands detected for mapping.
+{{/if}}
+
+---
+
+## 4. Migration Order
+
+### 4.1 Dependency-Based Order
+
+**Source:** CALL and COPY dependency analysis
+
+{{#if strategy.migration_order}}
+| Phase | Programs | Dependencies | Rationale |
+|-------|----------|--------------|-----------|
+{{#each strategy.migration_order}}
+| {{this.phase}} | {{this.programs}} | {{this.dependencies}} | {{this.rationale}} |
+{{/each}}
+{{else}}
+> **Not found in source:** Migration order requires dependency graph analysis.
+{{/if}}
+
+### 4.2 Copybook Migration Priority
+
+**Source:** Copybook usage analysis
+
+{{#if strategy.copybook_order}}
+| Priority | Copybook | Used By (Programs) | Field Count | Source Path |
+|----------|----------|-------------------|-------------|-------------|
+{{#each strategy.copybook_order}}
+| {{this.priority}} | {{this.name}} | {{this.used_by}} | {{this.fields}} | `{{this.path}}` |
+{{/each}}
+{{else}}
+> **Not found in source:** Copybook priority requires usage analysis.
+{{/if}}
+
+---
+
+## 5. Target Architecture
+
+### 5.1 Java Package Structure
+
+**Source:** Derived from COBOL program categories
+
+{{#if target.package_structure}}
+```
+{{target.package_structure}}
+```
+{{else}}
+```
+com.company.project/
+├── batch/           # From batch COBOL programs
+├── online/          # From CICS programs
+├── service/         # Business logic
+├── repository/      # Data access (from DB2)
+├── model/           # From copybooks
+└── util/            # Common utilities
 ```
 
----
-
-## 3. Code Migration Strategy
-
-### 3.1 Conversion Approach
-
-{{#if code_migration.approach}}
-{{code_migration.approach}}
-{{else}}
-**Automated Conversion:**
-- Use migration tools for initial conversion
-- Expected automation rate: 60-70%
-
-**Manual Refactoring:**
-- Complex business logic requires manual review
-- Optimize code structure during migration
-- Implement modern design patterns
+> Package structure based on program classification from source.
 {{/if}}
 
-### 3.2 Code Mapping Rules
+### 5.2 Program to Class Mapping
 
-{{#if mappings.code}}
-| Source Pattern | Target Pattern | Notes |
-|----------------|----------------|-------|
-{{#each mappings.code}}
-| {{this.source}} | {{this.target}} | {{this.notes}} |
+**Source:** Program analysis
+
+{{#if target.class_mapping}}
+| COBOL Program | Java Class | Package | Source Reference |
+|---------------|------------|---------|------------------|
+{{#each target.class_mapping}}
+| {{this.cobol}} | {{this.java_class}} | {{this.package}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-| COBOL Program | Java Class (Service Layer) | One-to-one mapping |
-| COBOL Paragraph | Java Method | Refactor as needed |
-| COPY Books | Java DTOs/Entities | Generate from data definitions |
-| File I/O | JPA Repository / JDBC | Use Spring Data JPA |
+> **Not found in source:** Class mapping requires program analysis completion.
 {{/if}}
 
-### 3.3 Framework & Libraries
+### 5.3 Copybook to DTO/Entity Mapping
 
-{{#if target.libraries}}
-| Purpose | Library/Framework |
-|---------|-------------------|
-{{#each target.libraries}}
-| {{this.purpose}} | {{this.library}} |
+**Source:** Copybook structure analysis
+
+{{#if target.dto_mapping}}
+| Copybook | Java Class | Type | Fields | Source Path |
+|----------|------------|------|--------|-------------|
+{{#each target.dto_mapping}}
+| {{this.copybook}} | {{this.java_class}} | {{this.type}} | {{this.field_count}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-| Purpose | Library/Framework |
-|---------|-------------------|
-| Web Framework | Spring Boot 3.x |
-| ORM | Hibernate / JPA |
-| Database Access | Spring Data JPA |
-| Testing | JUnit 5, Mockito |
-| Build Tool | Maven / Gradle |
-| Logging | SLF4J + Logback |
+> **Not found in source:** DTO mapping requires copybook analysis.
 {{/if}}
 
 ---
 
-## 4. Database Migration Strategy
+## 6. Risk Assessment from Source
 
-### 4.1 Schema Migration
+### 6.1 Complexity-Based Risks
 
-{{#if db_migration.schema_approach}}
-{{db_migration.schema_approach}}
-{{else}}
-**Approach:**
-1. Analyze source schema (Oracle)
-2. Generate equivalent PostgreSQL DDL
-3. Optimize schema for target database
-4. Handle vendor-specific features
-{{/if}}
+**Source:** Complexity analysis
 
-### 4.2 Data Type Mappings
-
-{{#if mappings.database}}
-| Source Type ({{source.database}}) | Target Type ({{target.database}}) | Notes |
-|-----------------------------------|-----------------------------------|-------|
-{{#each mappings.database}}
-| {{this.source}} | {{this.target}} | {{this.notes}} |
+{{#if risks.complexity}}
+| Program | Complexity | Risk Level | Specific Issues | Source Location |
+|---------|------------|------------|-----------------|-----------------|
+{{#each risks.complexity}}
+| {{this.program}} | {{this.complexity}} | {{this.risk}} | {{this.issues}} | `{{this.source}}` |
 {{/each}}
 {{else}}
-| Source Type (Oracle) | Target Type (PostgreSQL) | Notes |
-|----------------------|--------------------------|-------|
-| NUMBER(p,s) | NUMERIC(p,s) | Direct mapping |
-| VARCHAR2(n) | VARCHAR(n) | Direct mapping |
-| DATE | TIMESTAMP | PostgreSQL DATE stores only date |
-| CLOB | TEXT | Direct mapping |
-| BLOB | BYTEA | Direct mapping |
+> **Not found in source:** Complexity risks require analysis completion.
 {{/if}}
 
-### 4.3 Data Migration Strategy
+### 6.2 Construct-Based Risks
 
-{{#if db_migration.data_approach}}
-{{db_migration.data_approach}}
+**Source:** Unsupported construct detection
+
+{{#if risks.constructs}}
+| Construct | Count | Programs Affected | Migration Risk | Source Evidence |
+|-----------|-------|-------------------|----------------|-----------------|
+{{#each risks.constructs}}
+| {{this.construct}} | {{this.count}} | {{this.programs}} | {{this.risk}} | {{this.evidence}} |
+{{/each}}
 {{else}}
-**Approach:**
-1. **Initial Load:** Full data export/import during migration window
-2. **Validation:** Row counts, checksums, sample data verification
-3. **Rollback Plan:** Maintain source database until validation complete
-
-**Tools:**
-- ETL Tool: Apache NiFi / Talend / Custom scripts
-- Data validation: Custom SQL scripts
+> **Not found in source:** No problematic constructs detected.
 {{/if}}
 
-### 4.4 Stored Procedure Migration
+### 6.3 Dependency Risks
 
-{{#if db_migration.stored_procedures}}
-{{db_migration.stored_procedures}}
+**Source:** External call analysis
+
+{{#if risks.dependencies}}
+| Dependency Type | Count | Impact | Mitigation | Source Evidence |
+|-----------------|-------|--------|------------|-----------------|
+{{#each risks.dependencies}}
+| {{this.type}} | {{this.count}} | {{this.impact}} | {{this.mitigation}} | {{this.evidence}} |
+{{/each}}
 {{else}}
-**Strategy:**
-- Move business logic to application layer (Java services)
-- Convert remaining DB procedures to PostgreSQL PL/pgSQL
-- Eliminate unnecessary procedures during migration
+> **Not found in source:** No external dependencies detected.
 {{/if}}
 
 ---
 
-## 5. Testing Strategy
+## 7. Effort Estimation
 
-### 5.1 Testing Approach
+### 7.1 LOC-Based Estimation
 
-{{#if testing.approach}}
-{{testing.approach}}
-{{else}}
-*[See Test Strategy document for details]*
-{{/if}}
+**Source:** LOC and complexity metrics
 
-### 5.2 Testing Levels
-
-{{#if testing.levels}}
-{{#each testing.levels}}
-- **{{this.level}}:** {{this.description}} (Coverage: {{this.coverage}})
+| Category | LOC | Programs | Complexity Factor | Source |
+|----------|-----|----------|-------------------|--------|
+{{#if estimation.by_category}}
+{{#each estimation.by_category}}
+| {{this.category}} | {{this.loc}} | {{this.programs}} | {{this.factor}} | {{this.source}} |
 {{/each}}
 {{else}}
-- **Unit Testing:** 80%+ code coverage
-- **Integration Testing:** All API endpoints and database interactions
-- **System Testing:** End-to-end business processes
-- **Performance Testing:** Load, stress, scalability
-- **UAT:** Business user validation
+| All Programs | {{metadata.source_analysis.total_loc}} | {{metadata.source_analysis.total_files}} | {{metadata.complexity.avg_cyclomatic}} | Analysis |
+{{/if}}
+
+### 7.2 Component Effort Breakdown
+
+**Source:** Component analysis
+
+{{#if estimation.components}}
+| Component | Count | Base Effort | Complexity Adj. | Source |
+|-----------|-------|-------------|-----------------|--------|
+{{#each estimation.components}}
+| {{this.component}} | {{this.count}} | {{this.base}} | {{this.adjustment}} | {{this.source}} |
+{{/each}}
+{{else}}
+| Component | Count | Source |
+|-----------|-------|--------|
+| COBOL Programs | {{metadata.source_analysis.total_files}} | Program scan |
+| Copybooks | {{metadata.copybook_count}} | COPY extraction |
+| JCL Jobs | {{metadata.jcl_count}} | JCL scan |
+| SQL Statements | {{metadata.sql_count}} | EXEC SQL extraction |
+| CICS Transactions | {{metadata.cics_count}} | EXEC CICS extraction |
 {{/if}}
 
 ---
 
-## 6. Risk Management
+## 8. Testing Strategy Overview
 
-### 6.1 Migration Risks
+### 8.1 Test Scope from Source
 
-{{#if risks}}
-| Risk ID | Description | Probability | Impact | Mitigation |
-|---------|-------------|-------------|--------|------------|
-{{#each risks}}
-| {{this.id}} | {{this.description}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} |
+**Source:** Program and business logic analysis
+
+{{#if testing.scope}}
+| Test Area | Components | Source Reference |
+|-----------|------------|------------------|
+{{#each testing.scope}}
+| {{this.area}} | {{this.components}} | {{this.source}} |
 {{/each}}
 {{else}}
-| Risk ID | Description | Probability | Impact | Mitigation |
-|---------|-------------|-------------|--------|------------|
-| R-001 | Data loss during migration | Low | High | Multiple backups, validation checks |
-| R-002 | Performance degradation | Medium | High | Performance testing, optimization |
-| R-003 | Incomplete functional coverage | Medium | High | Comprehensive testing, UAT |
-| R-004 | Timeline overrun | Medium | Medium | Buffer time, agile approach |
+| Test Area | Count | Source |
+|-----------|-------|--------|
+| Unit Tests (per program) | {{metadata.source_analysis.total_files}} | Program count |
+| Integration Tests (per interface) | {{metadata.interface_count}} | Interface extraction |
+| Data Migration Tests | {{metadata.source_analysis.database.tables}} | Table count |
 {{/if}}
 
-### 6.2 Contingency Plans
+### 8.2 Critical Test Cases from Source
 
-{{#if contingency}}
-{{#each contingency}}
-**{{this.scenario}}:**
-{{this.plan}}
+**Source:** Business rule extraction
 
+{{#if testing.critical_cases}}
+| Business Rule | Source Program | Source Location | Test Priority |
+|---------------|----------------|-----------------|---------------|
+{{#each testing.critical_cases}}
+| {{this.rule}} | {{this.program}} | `{{this.source}}` | {{this.priority}} |
 {{/each}}
 {{else}}
-*[Define rollback and contingency procedures]*
+> **Not found in source:** Critical test cases require business rule extraction.
 {{/if}}
 
 ---
 
-## 7. Resource Planning
+## 9. Success Criteria
 
-### 7.1 Team Structure
+### 9.1 Source-Based Validation Criteria
 
-{{#if resources.team}}
-| Role | Count | Responsibility |
-|------|-------|----------------|
-{{#each resources.team}}
-| {{this.role}} | {{this.count}} | {{this.responsibility}} |
-{{/each}}
-{{else}}
-| Role | Count | Responsibility |
-|------|-------|----------------|
-| Project Manager | 1 | Overall coordination |
-| Solution Architect | 1 | Technical design |
-| Backend Developer | 3-4 | Code migration |
-| Database Engineer | 2 | DB migration |
-| QA Engineer | 2 | Testing |
-| BrSE | 2 | Requirements, communication |
-{{/if}}
-
-### 7.2 Training Requirements
-
-{{#if resources.training}}
-{{#each resources.training}}
-- **{{this.topic}}:** {{this.duration}} (Attendees: {{this.attendees}})
-{{/each}}
-{{else}}
-- Java/Spring Boot training for COBOL developers
-- PostgreSQL training for Oracle DBAs
-- New framework and tools training
-{{/if}}
-
----
-
-## 8. Success Metrics
-
-### 8.1 Key Performance Indicators
-
-{{#if kpis}}
-| KPI | Target | Measurement Method |
-|-----|--------|-------------------|
-{{#each kpis}}
-| {{this.name}} | {{this.target}} | {{this.method}} |
-{{/each}}
-{{else}}
-| KPI | Target | Measurement Method |
-|-----|--------|-------------------|
-| Functional Parity | 100% | Test case coverage |
-| Code Coverage | >80% | JaCoCo reports |
-| Performance | ≥ Current system | Load testing |
-| Defect Rate | <5% in UAT | Defect tracking system |
-| On-time Delivery | ±10% of timeline | Project schedule |
-{{/if}}
-
----
-
-## 9. Change Management
-
-### 9.1 Stakeholder Communication
-
-{{#if change_management.communication}}
-{{change_management.communication}}
-{{else}}
-- Weekly status reports to management
-- Bi-weekly demos to business stakeholders
-- Daily standups for development team
-{{/if}}
-
-### 9.2 Training & Documentation
-
-{{#if change_management.training}}
-{{change_management.training}}
-{{else}}
-- User documentation for new system
-- Administrator guides
-- Developer onboarding materials
-- Knowledge transfer sessions
-{{/if}}
-
----
-
-## 10. Post-Migration Support
-
-### 10.1 Hypercare Period
-
-{{#if post_migration.hypercare}}
-{{post_migration.hypercare}}
-{{else}}
-**Duration:** 4-8 weeks post go-live
-
-**Support Structure:**
-- 24/7 on-call support team
-- Daily monitoring and issue triage
-- Weekly status meetings
-- Rapid response to critical issues
-{{/if}}
-
-### 10.2 Decommissioning Plan
-
-{{#if post_migration.decommission}}
-{{post_migration.decommission}}
-{{else}}
-1. Run both systems in parallel for 2-4 weeks
-2. Validate all functionality in new system
-3. Archive old system data
-4. Decommission old infrastructure
-5. Update disaster recovery plans
-{{/if}}
+| Criteria | Source Baseline | Target | Measurement |
+|----------|-----------------|--------|-------------|
+| Functional Parity | {{metadata.source_analysis.total_files}} programs | 100% | Test coverage |
+| Data Integrity | {{metadata.source_analysis.database.tables}} tables | 100% | Row/checksum validation |
+| Performance | Source baseline | ≥ Source | Benchmark comparison |
 
 ---
 
 ## Appendices
 
-### Appendix A: Detailed Project Plan
+### Appendix A: Program Migration Matrix
 
-*[Link to project plan or attach Gantt chart]*
-
-### Appendix B: Cost Estimate
-
-{{#if appendix.cost_estimate}}
-{{appendix.cost_estimate}}
-{{else}}
-*[To be provided by project management]*
+{{#if appendix.migration_matrix}}
+| Program | Type | LOC | Complexity | Strategy | Priority | Dependencies |
+|---------|------|-----|------------|----------|----------|--------------|
+{{#each appendix.migration_matrix}}
+| {{this.program}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | {{this.strategy}} | {{this.priority}} | {{this.dependencies}} |
+{{/each}}
 {{/if}}
 
-### Appendix C: Vendor Evaluation
+### Appendix B: Mapping Rules Quick Reference
 
-{{#if appendix.vendors}}
-*[Details of migration tools and vendors considered]*
+{{#if appendix.mapping_summary}}
+{{appendix.mapping_summary}}
 {{/if}}
+
+---
+
+## Traceability Note
+
+All strategy decisions in this document are derived from source code analysis. Each recommendation includes source evidence. Items marked "Not found in source" require manual analysis or decision-making.
 
 ---
 
@@ -503,7 +422,7 @@ gantt
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| {{version}} | {{generated_date}} | {{author}} | Initial version (auto-generated) |
+| {{version}} | {{generated_date}} | {{author}} | Auto-generated from source analysis |
 
 ---
 

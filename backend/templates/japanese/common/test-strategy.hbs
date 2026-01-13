@@ -1,0 +1,399 @@
+# テスト戦略ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プロジェクト名** | {{project.name}} |
+| **マイグレーションタイプ** | {{project.migration_type}} |
+| **ソース技術** | {{source.language}}{{#if source.database}} / {{source.database}}{{/if}} |
+| **ターゲット技術** | {{target.language}}{{#if target.database}} / {{target.database}}{{/if}} |
+| **ドキュメントタイプ** | テスト戦略 |
+| **作成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+
+---
+
+## エグゼクティブサマリー
+
+**ソース:** ソース分析からテスト範囲を派生
+
+| メトリクス | 値 | ソース参照 |
+|------------|------|------------|
+| テスト対象コンポーネント | {{metadata.source_analysis.total_files}} | 現状分析 |
+| 総LOC | {{metadata.source_analysis.total_loc}} | 現状分析 |
+| 高複雑度コンポーネント | {{metadata.high_complexity_count}} | 複雑度分析 |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{metadata.source_analysis.database.tables}} | スキーマ分析 |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | スキーマ分析 |{{/if}}
+
+---
+
+## 1. テスト範囲
+
+### 1.1 テスト対象コンポーネント
+
+**ソース:** ソース分析から抽出
+
+{{#if test_scope.components}}
+| コンポーネント | タイプ | LOC | 複雑度 | 優先度 | ソース位置 |
+|----------------|--------|-----|--------|--------|------------|
+{{#each test_scope.components}}
+| {{this.name}} | {{this.type}} | {{this.loc}} | {{this.complexity}} | {{this.priority}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| コンポーネントタイプ | 件数 | ソース |
+|----------------------|------|--------|
+| ソースファイル | {{metadata.source_analysis.total_files}} | ディレクトリスキャン |
+{{#if metadata.source_analysis.database.tables}}| データベーステーブル | {{metadata.source_analysis.database.tables}} | スキーマ抽出 |{{/if}}
+{{#if metadata.source_analysis.database.stored_procedures}}| ストアドプロシージャ | {{metadata.source_analysis.database.stored_procedures}} | スキーマ抽出 |{{/if}}
+{{/if}}
+
+---
+
+## 2. テストレベル
+
+### 2.1 単体テスト
+
+**ソース:** ソースコードからのコンポーネント分析
+
+{{#if testing.unit}}
+
+#### 範囲
+
+| コンポーネント | 必要テストケース数 | 複雑度 | ソース参照 |
+|----------------|-------------------|--------|------------|
+{{#each testing.unit.scope}}
+| {{this.component}} | {{this.test_count}} | {{this.complexity}} | `{{this.source}}` |
+{{/each}}
+
+#### 単体テスト要件
+
+| ソース関数/メソッド | 期待テスト | ソース位置 |
+|---------------------|------------|------------|
+{{#each testing.unit.requirements}}
+| {{this.function}} | {{this.test_description}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+| メトリクス | 値 | ソース |
+|------------|------|--------|
+| 単体テスト対象コンポーネント | {{metadata.source_analysis.total_files}} | ファイル分析 |
+| 推定テストケース数 | コンポーネント数に基づく | 計算 |
+
+> **ソースに見つかりません:** 詳細な単体テスト範囲は関数抽出が必要です。
+{{/if}}
+
+### 2.2 結合テスト
+
+**ソース:** 依存関係とインターフェース分析
+
+{{#if testing.integration}}
+
+#### 結合ポイント
+
+| インターフェース | ソースコンポーネント | ターゲットコンポーネント | ソース参照 |
+|------------------|---------------------|-------------------------|------------|
+{{#each testing.integration.interfaces}}
+| {{this.name}} | {{this.source_components}} | {{this.target_components}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+> **ソースに見つかりません:** 結合テスト範囲はインターフェース抽出が必要です。
+{{/if}}
+
+### 2.3 システムテスト
+
+**ソース:** ビジネスプロセス分析
+
+{{#if testing.system}}
+
+#### システムテストシナリオ
+
+| シナリオ | 説明 | 関連コンポーネント | ソース参照 |
+|----------|------|-------------------|------------|
+{{#each testing.system.scenarios}}
+| {{this.name}} | {{this.description}} | {{this.components}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+> **ソースに見つかりません:** システムテストシナリオはビジネスプロセス抽出が必要です。
+{{/if}}
+
+### 2.4 マイグレーション検証テスト
+
+**ソース:** 現状分析とマイグレーション設計
+
+#### 2.4.1 機能パリティ検証
+
+{{#if testing.migration.functional}}
+| ソース機能 | ソース出力 | 期待ターゲット出力 | ソース参照 |
+|------------|------------|-------------------|------------|
+{{#each testing.migration.functional}}
+| {{this.function}} | {{this.source_output}} | {{this.target_output}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 機能パリティテストはソース出力抽出が必要です。
+{{/if}}
+
+#### 2.4.2 データ検証
+
+{{#if source.database}}
+
+**ソース:** データベーススキーマ分析
+
+{{#if testing.migration.data_validation}}
+| 検証タイプ | テーブル/オブジェクト | 期待結果 | 検証クエリ |
+|------------|----------------------|----------|------------|
+{{#each testing.migration.data_validation}}
+| {{this.type}} | {{this.object}} | {{this.expected}} | `{{this.query}}` |
+{{/each}}
+{{else}}
+| 検証タイプ | 説明 | ソース |
+|------------|------|--------|
+| 行数 | ソースとターゲット間の行数比較 | 全テーブル |
+| チェックサム | データチェックサム比較 | 重要テーブル |
+| サンプルデータ | サンプルレコードの手動検証 | ランダムサンプル |
+| 参照整合性 | すべての外部キー検証 | 全FK制約 |
+{{/if}}
+
+{{/if}}
+
+### 2.5 パフォーマンステスト
+
+**ソース:** ソースシステムメトリクス（利用可能な場合）
+
+{{#if testing.performance}}
+
+#### パフォーマンスベースライン
+
+| メトリクス | ソースシステム値 | ターゲット閾値 | ソース参照 |
+|------------|------------------|----------------|------------|
+{{#each testing.performance.baselines}}
+| {{this.metric}} | {{this.source_value}} | {{this.target_threshold}} | `{{this.source}}` |
+{{/each}}
+
+{{else}}
+| メトリクス | ターゲット | ソース |
+|------------|------------|--------|
+| 応答時間 | ≤ソースシステム | ソースシステムメトリクス |
+| スループット | ≥ソースシステム | ソースシステムメトリクス |
+| 同時ユーザー数 | ≥ソースシステム | ソースシステムキャパシティ |
+
+> **ソースに見つかりません:** パフォーマンスベースラインはソースシステムメトリクス抽出が必要です。
+{{/if}}
+
+---
+
+## 3. テストケース
+
+### 3.1 コンポーネント別テストケースサマリー
+
+**ソース:** コンポーネント分析
+
+{{#if test_cases.summary}}
+| コンポーネント | 単体テスト | 結合テスト | システムテスト | ソース参照 |
+|----------------|------------|------------|----------------|------------|
+{{#each test_cases.summary}}
+| {{this.component}} | {{this.unit}} | {{this.integration}} | {{this.system}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** テストケースサマリーはコンポーネント分析の完了が必要です。
+{{/if}}
+
+### 3.2 高優先度テストケース
+
+**ソース:** 複雑度とリスク分析
+
+{{#if test_cases.high_priority}}
+{{#each test_cases.high_priority}}
+#### TC-{{this.id}}: {{this.name}}
+
+**ソースコンポーネント:** `{{this.source_component}}`
+
+**テストタイプ:** {{this.type}}
+
+**優先度:** {{this.priority}}
+
+**事前条件:**
+{{#each this.preconditions}}
+- {{this}}
+{{/each}}
+
+**テストステップ:**
+{{#each this.steps}}
+{{@index}}. {{this}}
+{{/each}}
+
+**期待結果:** {{this.expected}}
+
+**ソース参照:** `{{this.source}}`
+
+---
+
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** 高優先度テストケースはリスク分析が必要です。
+{{/if}}
+
+---
+
+## 4. テストデータ
+
+### 4.1 テストデータ要件
+
+**ソース:** データ構造とボリューム分析
+
+{{#if test_data.requirements}}
+| データカテゴリ | ソース | ボリューム | 匿名化必要 | ソース参照 |
+|----------------|--------|------------|------------|------------|
+{{#each test_data.requirements}}
+| {{this.category}} | {{this.source}} | {{this.volume}} | {{this.anonymize}} | `{{this.source_ref}}` |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** テストデータ要件はデータ分析が必要です。
+{{/if}}
+
+---
+
+## 5. 開始・終了条件
+
+### 5.1 開始条件
+
+{{#if criteria.entry}}
+| 条件 | 検証方法 | ソース参照 |
+|------|----------|------------|
+{{#each criteria.entry}}
+| {{this.criterion}} | {{this.verification}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| 条件 | 検証方法 |
+|------|----------|
+| コードマイグレーション完了 | ビルド成功 |
+| テスト環境準備完了 | 環境ヘルスチェック |
+| テストデータ準備完了 | データロード検証 |
+| テストケースレビュー完了 | レビュー承認 |
+{{/if}}
+
+### 5.2 終了条件
+
+{{#if criteria.exit}}
+| 条件 | ターゲット | 測定方法 | ソース参照 |
+|------|------------|----------|------------|
+{{#each criteria.exit}}
+| {{this.criterion}} | {{this.target}} | {{this.measurement}} | `{{this.source}}` |
+{{/each}}
+{{else}}
+| 条件 | ターゲット | 測定方法 |
+|------|------------|----------|
+| テスト実行 | 計画テスト100%実行 | テスト管理レポート |
+| パス率 | ≥95% | テスト管理レポート |
+| クリティカル欠陥 | 0件オープン | 欠陥追跡 |
+| 機能パリティ | 100% | マイグレーション検証テスト |
+{{/if}}
+
+---
+
+## 6. 欠陥管理
+
+### 6.1 欠陥分類
+
+{{#if defects.classification}}
+| 重要度 | 定義 | 対応時間 | 例 |
+|--------|------|----------|------|
+{{#each defects.classification}}
+| {{this.severity}} | {{this.definition}} | {{this.response}} | {{this.example}} |
+{{/each}}
+{{else}}
+| 重要度 | 定義 | 対応時間 |
+|--------|------|----------|
+| クリティカル | システムクラッシュ、データ破損 | 4時間 |
+| 高 | 主要機能不具合、回避策なし | 1営業日 |
+| 中 | 機能障害、回避策あり | 3営業日 |
+| 低 | 軽微な問題、外観上 | 次リリース |
+{{/if}}
+
+---
+
+## 7. リスク評価
+
+### 7.1 テストリスク
+
+**ソース:** 複雑度と依存関係分析
+
+{{#if risks.testing}}
+| リスク | 確率 | 影響 | 軽減策 | ソースエビデンス |
+|--------|------|------|--------|------------------|
+{{#each risks.testing}}
+| {{this.risk}} | {{this.probability}} | {{this.impact}} | {{this.mitigation}} | {{this.evidence}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** テストリスクは分析完了が必要です。
+{{/if}}
+
+---
+
+## 8. トレーサビリティマトリクス
+
+### 8.1 ソースからテストへのトレーサビリティ
+
+**ソース:** ソースコンポーネントからテストケースへのマッピング
+
+{{#if traceability.source_to_test}}
+| ソースコンポーネント | ソース位置 | テストケース | カバレッジ |
+|----------------------|------------|--------------|------------|
+{{#each traceability.source_to_test}}
+| {{this.component}} | `{{this.source}}` | {{this.test_cases}} | {{this.coverage}} |
+{{/each}}
+{{else}}
+> **ソースに見つかりません:** トレーサビリティはテストケースマッピングが必要です。
+{{/if}}
+
+---
+
+## 付録
+
+### 付録A: テストケーステンプレート
+
+```
+テストケースID: [TC-XXX]
+テスト名: [名前]
+ソースコンポーネント: [path:line]
+テストタイプ: [単体/結合/システム/マイグレーション]
+優先度: [高/中/低]
+
+事前条件:
+1. [条件]
+
+テストステップ:
+1. [ステップ]
+
+期待結果:
+[期待される結果]
+
+実際の結果:
+[実行時に記入]
+
+ステータス: [パス/フェイル/ブロック]
+```
+
+---
+
+## トレーサビリティノート
+
+このドキュメントのすべてのテスト要件は、ソース分析から派生しています:
+- **ソース参照:** ソース要素が見つかったファイルパスと行番号
+- **ソースエビデンス:** テスト要件を正当化する分析結果
+
+「ソースに見つかりません」とマークされた項目は、自動派生できなかったため、ビジネス要件に基づく手動仕様が必要です。
+
+---
+
+## ドキュメント履歴
+
+| バージョン | 日付 | 作成者 | 変更内容 |
+|------------|------|--------|----------|
+| {{version}} | {{generated_date}} | {{author}} | 初版（ソース分析から自動生成） |
+
+---
+
+**テスト戦略ドキュメント終了**
