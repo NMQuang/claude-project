@@ -77,6 +77,7 @@ export class DocumentGenerator {
     // Normalize migration type names to folder names
     const typeMap: { [key: string]: string } = {
       'COBOL-to-Java': 'cobol-to-java',
+      'COBOL-Analysis': 'cobol-analysis',
       'PostgreSQL-to-Oracle': 'pg-to-oracle',
       'PL1-to-Java': 'pl1-to-java',
       'Oracle-to-PostgreSQL': 'oracle-to-pg',
@@ -148,6 +149,46 @@ export class DocumentGenerator {
     // Helper: Not equal comparison
     Handlebars.registerHelper('ne', (a: any, b: any) => {
       return a !== b;
+    });
+
+    // Helper: Group database access by table name
+    Handlebars.registerHelper('groupByTable', (databaseAccess: any[]) => {
+      if (!databaseAccess || !Array.isArray(databaseAccess)) {
+        return [];
+      }
+
+      const tableMap = new Map<string, { table: string; selectCount: number; insertCount: number; updateCount: number; deleteCount: number }>();
+
+      for (const access of databaseAccess) {
+        const tableName = access.tableName || 'UNKNOWN';
+        if (!tableMap.has(tableName)) {
+          tableMap.set(tableName, {
+            table: tableName,
+            selectCount: 0,
+            insertCount: 0,
+            updateCount: 0,
+            deleteCount: 0
+          });
+        }
+
+        const entry = tableMap.get(tableName)!;
+        switch (access.operation) {
+          case 'SELECT':
+            entry.selectCount++;
+            break;
+          case 'INSERT':
+            entry.insertCount++;
+            break;
+          case 'UPDATE':
+            entry.updateCount++;
+            break;
+          case 'DELETE':
+            entry.deleteCount++;
+            break;
+        }
+      }
+
+      return Array.from(tableMap.values());
     });
   }
 }

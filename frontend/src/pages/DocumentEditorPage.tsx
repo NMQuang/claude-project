@@ -8,7 +8,8 @@ const DOC_NAMES: { [key: string]: string } = {
   'migration-strategy': 'Migration Strategy',
   'migration-design': 'Migration Design',
   'test-strategy': 'Test Strategy',
-  'deployment-rollback': 'Deployment & Rollback'
+  'deployment-rollback': 'Deployment & Rollback',
+  'business-logic-analysis': 'Business Logic Analysis'
 }
 
 function DocumentEditorPage() {

@@ -20,6 +20,11 @@ const MIGRATION_TYPES: MigrationType[] = [
     targetLanguage: 'Java 17'
   },
   {
+    value: 'COBOL-Analysis',
+    label: 'COBOL Business Logic Analysis',
+    sourceLanguage: 'COBOL'
+  },
+  {
     value: 'PostgreSQL-to-Oracle',
     label: 'PostgreSQL to Oracle',
     sourceLanguage: 'PostgreSQL',

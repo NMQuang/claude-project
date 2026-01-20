@@ -1,0 +1,304 @@
+# Business Logic Analysis Document
+
+## Document Information
+
+| Item | Details |
+|------|---------|
+| **Program ID** | {{businessLogic.programId}} |
+| **File Name** | {{businessLogic.fileName}} |
+| **Source Path** | {{#if businessLogic.relativePath}}`{{businessLogic.relativePath}}`{{else}}{{businessLogic.fileName}}{{/if}} |
+| **Document Type** | Business Logic Analysis |
+| **Generated Date** | {{generated_date}} |
+| **Version** | {{version}} |
+
+---
+
+## Overview
+
+| Attribute | Value |
+|-----------|-------|
+| **Program Purpose** | {{businessLogic.overview.purpose}} |
+| **Business Responsibility** | {{businessLogic.overview.businessResponsibility}} |
+| **Processing Type** | {{businessLogic.overview.processingType}} |
+| **Trigger Condition** | {{businessLogic.overview.triggerCondition}} |
+| **Termination Condition** | {{businessLogic.overview.terminationCondition}} |
+
+### Program Structure
+
+| Division | Present |
+|----------|---------|
+{{#each businessLogic.divisions}}
+| {{this}} | Yes |
+{{/each}}
+
+---
+
+## Business Process Flow
+
+### Step-by-Step Business Process
+
+{{#if businessLogic.businessProcessSteps}}
+| Step | Paragraph | Business Action | Description |
+|------|-----------|-----------------|-------------|
+{{#each businessLogic.businessProcessSteps}}
+| {{this.stepNumber}} | `{{this.paragraphName}}` | {{this.businessAction}} | {{this.description}} |
+{{/each}}
+{{else}}
+*No business process steps identified*
+{{/if}}
+
+### Paragraph Details
+
+{{#each businessLogic.paragraphs}}
+#### {{this.name}}
+- **Lines:** {{this.lineStart}} - {{this.lineEnd}}
+- **Purpose:** {{this.purpose}}
+{{#if this.performs}}
+- **Calls:** {{#each this.performs}}`{{this}}` {{/each}}
+{{/if}}
+{{#if this.performedBy}}
+- **Called by:** {{#each this.performedBy}}`{{this}}` {{/each}}
+{{/if}}
+
+{{/each}}
+
+### Main Decision Points
+
+{{#if businessLogic.decisionPoints}}
+| Location | Type | Condition | Business Meaning |
+|----------|------|-----------|------------------|
+{{#each businessLogic.decisionPoints}}
+| `{{this.paragraphName}}` (line {{this.lineNumber}}) | {{this.conditionType}} | `{{this.condition}}` | {{this.businessMeaning}} |
+{{/each}}
+{{else}}
+*No major decision points identified*
+{{/if}}
+
+---
+
+## Business Flow Diagram
+
+```mermaid
+{{{businessLogic.mermaidFlowchart}}}
+```
+
+---
+
+## Data Perspective
+
+### Files
+
+{{#if businessLogic.files}}
+| File Variable | File Name | Access Type | Operations | Business Meaning |
+|---------------|-----------|-------------|------------|------------------|
+{{#each businessLogic.files}}
+| `{{this.variableName}}` | {{this.fileName}} | {{this.accessType}} | {{#each this.operations}}{{this}} {{/each}} | {{this.businessMeaning}} |
+{{/each}}
+{{else}}
+*No file I/O operations found in source*
+{{/if}}
+
+### Database Access
+
+{{#if businessLogic.databaseAccess}}
+| Table | Operation | Paragraph | Columns | Business Role |
+|-------|-----------|-----------|---------|---------------|
+{{#each businessLogic.databaseAccess}}
+| `{{this.tableName}}` | **{{this.operation}}** | `{{this.paragraphName}}` | {{#if this.columns}}{{#each this.columns}}{{this}}, {{/each}}{{else}}-{{/if}} | {{this.businessRole}} |
+{{/each}}
+
+#### SQL Access Summary
+
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|-------|--------|--------|--------|--------|
+{{#each (groupByTable businessLogic.databaseAccess)}}
+| `{{this.table}}` | {{this.selectCount}} | {{this.insertCount}} | {{this.updateCount}} | {{this.deleteCount}} |
+{{/each}}
+{{else}}
+*No database access found in source*
+{{/if}}
+
+### Key Data Items
+
+{{#if businessLogic.keyDataItems}}
+| Name | Level | Picture | Business Meaning |
+|------|-------|---------|------------------|
+{{#each businessLogic.keyDataItems}}
+| `{{this.name}}` | {{this.level}} | {{#if this.picture}}`{{this.picture}}`{{else}}-{{/if}} | {{this.businessMeaning}} |
+{{#if this.flagValues}}
+{{#each this.flagValues}}
+| &nbsp;&nbsp;&nbsp;&nbsp;88 `{{../name}}` | - | VALUE '{{this.value}}' | {{this.meaning}} |
+{{/each}}
+{{/if}}
+{{/each}}
+{{else}}
+*No significant data items identified*
+{{/if}}
+
+### Copybooks
+
+{{#if businessLogic.copybooks}}
+| Copybook Name | Business Data Represented |
+|---------------|--------------------------|
+{{#each businessLogic.copybooks}}
+| `{{this}}` | Shared data definition |
+{{/each}}
+{{else}}
+*No copybooks referenced*
+{{/if}}
+
+---
+
+## Business Rules
+
+{{#if businessLogic.businessRules}}
+### Rules Summary
+
+| Rule ID | Type | Description | Location |
+|---------|------|-------------|----------|
+{{#each businessLogic.businessRules}}
+| **{{this.ruleId}}** | {{this.ruleType}} | {{this.description}} | `{{this.paragraphName}}` (line {{this.lineNumber}}) |
+{{/each}}
+
+### Detailed Rules
+
+{{#each businessLogic.businessRules}}
+#### {{this.ruleId}}: {{this.ruleType}}
+
+- **Description:** {{this.description}}
+- **Implementation:** `{{this.implementation}}`
+- **Location:** `{{this.paragraphName}}` at line {{this.lineNumber}}
+
+{{/each}}
+{{else}}
+*No explicit business rules identified in source*
+{{/if}}
+
+---
+
+## External Interactions
+
+### Called Programs
+
+{{#if businessLogic.externalCalls}}
+| Program Name | Called From | Parameters | Assumed Role |
+|--------------|-------------|------------|--------------|
+{{#each businessLogic.externalCalls}}
+| `{{this.programName}}` | `{{this.paragraphName}}` | {{#if this.parameters}}{{#each this.parameters}}{{this}} {{/each}}{{else}}-{{/if}} | {{this.assumedRole}} |
+{{/each}}
+{{else}}
+*No external program calls found*
+{{/if}}
+
+### Shared Copybooks
+
+{{#if businessLogic.sharedCopybooks}}
+| Copybook | Purpose |
+|----------|---------|
+{{#each businessLogic.sharedCopybooks}}
+| `{{this}}` | Shared data definition |
+{{/each}}
+{{else}}
+*No shared copybooks identified*
+{{/if}}
+
+### Job/Schedule Dependency
+
+*Not found in provided source - Check JCL or scheduling system for execution context*
+
+---
+
+## Error & Exception Handling
+
+### Error Conditions
+
+{{#if businessLogic.errorConditions}}
+| Error Type | Detection | Handling | Behavior | Message |
+|------------|-----------|----------|----------|---------|
+{{#each businessLogic.errorConditions}}
+| {{this.errorType}} | `{{this.detection}}` | {{this.handling}} | **{{this.behavior}}** | {{#if this.userMessage}}"{{this.userMessage}}"{{else}}-{{/if}} |
+{{/each}}
+
+### Error Handling Patterns
+
+{{#each businessLogic.errorConditions}}
+#### {{this.errorType}} at `{{this.paragraphName}}`
+- **Line:** {{this.lineNumber}}
+- **Detection:** `{{this.detection}}`
+- **Response:** {{this.handling}}
+- **Behavior:** {{this.behavior}}
+{{#if this.userMessage}}
+- **User Message:** "{{this.userMessage}}"
+{{/if}}
+
+{{/each}}
+{{else}}
+*No explicit error handling found in source*
+{{/if}}
+
+---
+
+## Complexity Assessment
+
+### Logic Complexity: {{businessLogic.complexity.logicComplexity.score}}/5
+
+{{#each businessLogic.complexity.logicComplexity.factors}}
+- {{this}}
+{{/each}}
+
+### Data Complexity: {{businessLogic.complexity.dataComplexity.score}}/5
+
+{{#each businessLogic.complexity.dataComplexity.factors}}
+- {{this}}
+{{/each}}
+
+### Business Rule Density: {{businessLogic.complexity.businessRuleDensity.score}}/5
+
+{{#each businessLogic.complexity.businessRuleDensity.factors}}
+- {{this}}
+{{/each}}
+
+### Overall Understanding Difficulty: **{{businessLogic.complexity.overallDifficulty}}**
+
+{{businessLogic.complexity.justification}}
+
+### Complexity Summary
+
+| Dimension | Score | Weight |
+|-----------|-------|--------|
+| Logic Complexity | {{businessLogic.complexity.logicComplexity.score}}/5 | 33% |
+| Data Complexity | {{businessLogic.complexity.dataComplexity.score}}/5 | 33% |
+| Business Rule Density | {{businessLogic.complexity.businessRuleDensity.score}}/5 | 33% |
+
+---
+
+## Metrics Summary
+
+| Metric | Value |
+|--------|-------|
+| Total Lines | {{businessLogic.metrics.totalLines}} |
+| Code Lines | {{businessLogic.metrics.codeLines}} |
+| Comment Lines | {{businessLogic.metrics.commentLines}} |
+| Blank Lines | {{businessLogic.metrics.blankLines}} |
+| Paragraph Count | {{businessLogic.metrics.paragraphCount}} |
+| SQL Statement Count | {{businessLogic.metrics.sqlStatementCount}} |
+| File Operation Count | {{businessLogic.metrics.fileOperationCount}} |
+
+---
+
+## Appendix: Source Code Reference
+
+### Paragraph Index
+
+| Paragraph | Line Start | Line End | Purpose |
+|-----------|------------|----------|---------|
+{{#each businessLogic.paragraphs}}
+| `{{this.name}}` | {{this.lineStart}} | {{this.lineEnd}} | {{this.purpose}} |
+{{/each}}
+
+---
+
+*Document generated from source: `{{businessLogic.fileName}}`*
+*Analysis date: {{generated_date}}*
+
+**End of Business Logic Analysis Document**

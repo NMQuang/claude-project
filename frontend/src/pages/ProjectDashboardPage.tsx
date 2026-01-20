@@ -38,13 +38,23 @@ function ProjectDashboardPage() {
   const [uploadingFiles, setUploadingFiles] = useState(false)
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en')
 
-  const documents: DocumentStatus[] = [
-    { id: 'as-is-analysis', name: 'As-Is Analysis', generated: false },
-    { id: 'migration-strategy', name: 'Migration Strategy', generated: false },
-    { id: 'migration-design', name: 'Migration Design', generated: false },
-    { id: 'test-strategy', name: 'Test Strategy', generated: false },
-    { id: 'deployment-rollback', name: 'Deployment & Rollback', generated: false }
-  ]
+  const getDocumentsByMigrationType = (migrationType: string): DocumentStatus[] => {
+    if (migrationType === 'COBOL-Analysis') {
+      return [
+        { id: 'business-logic-analysis', name: 'Business Logic Analysis', generated: false }
+      ]
+    }
+    // Default documents for migration types (COBOL-to-Java, PostgreSQL-to-Oracle, etc.)
+    return [
+      { id: 'as-is-analysis', name: 'As-Is Analysis', generated: false },
+      { id: 'migration-strategy', name: 'Migration Strategy', generated: false },
+      { id: 'migration-design', name: 'Migration Design', generated: false },
+      { id: 'test-strategy', name: 'Test Strategy', generated: false },
+      { id: 'deployment-rollback', name: 'Deployment & Rollback', generated: false }
+    ]
+  }
+
+  const documents: DocumentStatus[] = getDocumentsByMigrationType(project?.migrationType || '')
 
   useEffect(() => {
     loadProject()
@@ -129,7 +139,7 @@ function ProjectDashboardPage() {
     if (!files || !id || !project) return
 
     // Filter files based on migration type
-    const { validFiles, skippedCount, skippedFiles } = filterFilesByMigrationType(files, project.migrationType)
+    const { validFiles, skippedCount } = filterFilesByMigrationType(files, project.migrationType)
 
     if (validFiles.length === 0) {
       alert('No valid files found in folder for this migration type')
@@ -384,7 +394,9 @@ function ProjectDashboardPage() {
                   <div className="metric-label">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? 'Database Tables'
-                      : 'Source Files'}
+                      : project.migrationType === 'COBOL-Analysis'
+                        ? 'COBOL Programs'
+                        : 'Source Files'}
                   </div>
                   <div className="metric-value">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
@@ -400,16 +412,22 @@ function ProjectDashboardPage() {
                   <div className="metric-label">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? 'Stored Procedures/Functions'
-                      : 'Database Tables'}
+                      : project.migrationType === 'COBOL-Analysis'
+                        ? 'Paragraphs'
+                        : 'Database Tables'}
                   </div>
                   <div className="metric-value">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? ((project.metadata.source_analysis?.database?.procedures || 0) + (project.metadata.source_analysis?.database?.functions || 0))
-                      : (project.metadata.source_analysis?.database?.tables || 0)}
+                      : project.migrationType === 'COBOL-Analysis'
+                        ? (project.metadata.source_analysis?.total_paragraphs || 0)
+                        : (project.metadata.source_analysis?.database?.tables || 0)}
                   </div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Migration Difficulty</div>
+                  <div className="metric-label">
+                    {project.migrationType === 'COBOL-Analysis' ? 'Complexity' : 'Migration Difficulty'}
+                  </div>
                   <div className={`metric-value complexity-${project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown'}`}>
                     {project.metadata.migrationComplexity?.difficulty || 'Unknown'}
                   </div>
