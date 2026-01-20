@@ -1,0 +1,296 @@
+# ビジネスロジック分析ドキュメント
+
+## ドキュメント情報
+
+| 項目 | 詳細 |
+|------|------|
+| **プログラムID** | {{businessLogic.programId}} |
+| **ファイル名** | {{businessLogic.fileName}} |
+| **ソースパス** | {{#if businessLogic.relativePath}}`{{businessLogic.relativePath}}`{{else}}{{businessLogic.fileName}}{{/if}} |
+| **ドキュメントタイプ** | ビジネスロジック分析 |
+| **作成日** | {{generated_date}} |
+| **バージョン** | {{version}} |
+
+---
+
+## 概要
+
+| 属性 | 値 |
+|------|-----|
+| **プログラム目的** | {{businessLogic.overview.purpose}} |
+| **業務責任** | {{businessLogic.overview.businessResponsibility}} |
+| **処理タイプ** | {{businessLogic.overview.processingType}} |
+| **起動条件** | {{businessLogic.overview.triggerCondition}} |
+| **終了条件** | {{businessLogic.overview.terminationCondition}} |
+
+### プログラム構造
+
+| ディビジョン | 有無 |
+|--------------|------|
+{{#each businessLogic.divisions}}
+| {{this}} | あり |
+{{/each}}
+
+---
+
+## 業務プロセスフロー
+
+### ステップバイステップ業務プロセス
+
+{{#if businessLogic.businessProcessSteps}}
+| ステップ | パラグラフ | 業務アクション | 説明 |
+|----------|-----------|----------------|------|
+{{#each businessLogic.businessProcessSteps}}
+| {{this.stepNumber}} | `{{this.paragraphName}}` | {{this.businessAction}} | {{this.description}} |
+{{/each}}
+{{else}}
+*業務プロセスステップは識別されませんでした*
+{{/if}}
+
+### パラグラフ詳細
+
+{{#each businessLogic.paragraphs}}
+#### {{this.name}}
+- **行番号:** {{this.lineStart}} - {{this.lineEnd}}
+- **目的:** {{this.purpose}}
+{{#if this.performs}}
+- **呼出先:** {{#each this.performs}}`{{this}}` {{/each}}
+{{/if}}
+{{#if this.performedBy}}
+- **呼出元:** {{#each this.performedBy}}`{{this}}` {{/each}}
+{{/if}}
+
+{{/each}}
+
+### 主要判断ポイント
+
+{{#if businessLogic.decisionPoints}}
+| 場所 | タイプ | 条件 | 業務的意味 |
+|------|--------|------|-----------|
+{{#each businessLogic.decisionPoints}}
+| `{{this.paragraphName}}` ({{this.lineNumber}}行目) | {{this.conditionType}} | `{{this.condition}}` | {{this.businessMeaning}} |
+{{/each}}
+{{else}}
+*主要な判断ポイントは識別されませんでした*
+{{/if}}
+
+---
+
+## 業務フロー図
+
+```mermaid
+{{{businessLogic.mermaidFlowchart}}}
+```
+
+---
+
+## データパースペクティブ
+
+### ファイル
+
+{{#if businessLogic.files}}
+| ファイル変数 | ファイル名 | アクセスタイプ | 操作 | 業務的意味 |
+|--------------|-----------|---------------|------|-----------|
+{{#each businessLogic.files}}
+| `{{this.variableName}}` | {{this.fileName}} | {{this.accessType}} | {{#each this.operations}}{{this}} {{/each}} | {{this.businessMeaning}} |
+{{/each}}
+{{else}}
+*ソースにファイルI/O操作は見つかりませんでした*
+{{/if}}
+
+### データベースアクセス
+
+{{#if businessLogic.databaseAccess}}
+| テーブル | 操作 | パラグラフ | カラム | 業務役割 |
+|----------|------|-----------|--------|---------|
+{{#each businessLogic.databaseAccess}}
+| `{{this.tableName}}` | **{{this.operation}}** | `{{this.paragraphName}}` | {{#if this.columns}}{{#each this.columns}}{{this}}, {{/each}}{{else}}-{{/if}} | {{this.businessRole}} |
+{{/each}}
+{{else}}
+*ソースにデータベースアクセスは見つかりませんでした*
+{{/if}}
+
+### 主要データ項目
+
+{{#if businessLogic.keyDataItems}}
+| 名前 | レベル | PICTURE | 業務的意味 |
+|------|--------|---------|-----------|
+{{#each businessLogic.keyDataItems}}
+| `{{this.name}}` | {{this.level}} | {{#if this.picture}}`{{this.picture}}`{{else}}-{{/if}} | {{this.businessMeaning}} |
+{{#if this.flagValues}}
+{{#each this.flagValues}}
+| &nbsp;&nbsp;&nbsp;&nbsp;88 `{{../name}}` | - | VALUE '{{this.value}}' | {{this.meaning}} |
+{{/each}}
+{{/if}}
+{{/each}}
+{{else}}
+*重要なデータ項目は識別されませんでした*
+{{/if}}
+
+### コピーブック
+
+{{#if businessLogic.copybooks}}
+| コピーブック名 | 業務データ |
+|---------------|-----------|
+{{#each businessLogic.copybooks}}
+| `{{this}}` | 共有データ定義 |
+{{/each}}
+{{else}}
+*参照されているコピーブックはありません*
+{{/if}}
+
+---
+
+## ビジネスルール
+
+{{#if businessLogic.businessRules}}
+### ルール一覧
+
+| ルールID | タイプ | 説明 | 場所 |
+|----------|--------|------|------|
+{{#each businessLogic.businessRules}}
+| **{{this.ruleId}}** | {{this.ruleType}} | {{this.description}} | `{{this.paragraphName}}` ({{this.lineNumber}}行目) |
+{{/each}}
+
+### 詳細ルール
+
+{{#each businessLogic.businessRules}}
+#### {{this.ruleId}}: {{this.ruleType}}
+
+- **説明:** {{this.description}}
+- **実装:** `{{this.implementation}}`
+- **場所:** `{{this.paragraphName}}` {{this.lineNumber}}行目
+
+{{/each}}
+{{else}}
+*ソースに明示的なビジネスルールは識別されませんでした*
+{{/if}}
+
+---
+
+## 外部連携
+
+### 呼出プログラム
+
+{{#if businessLogic.externalCalls}}
+| プログラム名 | 呼出元 | パラメータ | 想定役割 |
+|--------------|--------|-----------|---------|
+{{#each businessLogic.externalCalls}}
+| `{{this.programName}}` | `{{this.paragraphName}}` | {{#if this.parameters}}{{#each this.parameters}}{{this}} {{/each}}{{else}}-{{/if}} | {{this.assumedRole}} |
+{{/each}}
+{{else}}
+*外部プログラム呼出は見つかりませんでした*
+{{/if}}
+
+### 共有コピーブック
+
+{{#if businessLogic.sharedCopybooks}}
+| コピーブック | 目的 |
+|--------------|------|
+{{#each businessLogic.sharedCopybooks}}
+| `{{this}}` | 共有データ定義 |
+{{/each}}
+{{else}}
+*共有コピーブックは識別されませんでした*
+{{/if}}
+
+### ジョブ/スケジュール依存関係
+
+*ソースには見つかりませんでした - 実行コンテキストについてはJCLまたはスケジューリングシステムを確認してください*
+
+---
+
+## エラー・例外処理
+
+### エラー条件
+
+{{#if businessLogic.errorConditions}}
+| エラータイプ | 検出 | 処理 | 動作 | メッセージ |
+|--------------|------|------|------|-----------|
+{{#each businessLogic.errorConditions}}
+| {{this.errorType}} | `{{this.detection}}` | {{this.handling}} | **{{this.behavior}}** | {{#if this.userMessage}}"{{this.userMessage}}"{{else}}-{{/if}} |
+{{/each}}
+
+### エラー処理パターン
+
+{{#each businessLogic.errorConditions}}
+#### {{this.errorType}} at `{{this.paragraphName}}`
+- **行番号:** {{this.lineNumber}}
+- **検出:** `{{this.detection}}`
+- **対応:** {{this.handling}}
+- **動作:** {{this.behavior}}
+{{#if this.userMessage}}
+- **ユーザーメッセージ:** "{{this.userMessage}}"
+{{/if}}
+
+{{/each}}
+{{else}}
+*ソースに明示的なエラー処理は見つかりませんでした*
+{{/if}}
+
+---
+
+## 複雑度評価
+
+### ロジック複雑度: {{businessLogic.complexity.logicComplexity.score}}/5
+
+{{#each businessLogic.complexity.logicComplexity.factors}}
+- {{this}}
+{{/each}}
+
+### データ複雑度: {{businessLogic.complexity.dataComplexity.score}}/5
+
+{{#each businessLogic.complexity.dataComplexity.factors}}
+- {{this}}
+{{/each}}
+
+### ビジネスルール密度: {{businessLogic.complexity.businessRuleDensity.score}}/5
+
+{{#each businessLogic.complexity.businessRuleDensity.factors}}
+- {{this}}
+{{/each}}
+
+### 総合理解難易度: **{{businessLogic.complexity.overallDifficulty}}**
+
+{{businessLogic.complexity.justification}}
+
+### 複雑度サマリー
+
+| 次元 | スコア | 重み |
+|------|--------|------|
+| ロジック複雑度 | {{businessLogic.complexity.logicComplexity.score}}/5 | 33% |
+| データ複雑度 | {{businessLogic.complexity.dataComplexity.score}}/5 | 33% |
+| ビジネスルール密度 | {{businessLogic.complexity.businessRuleDensity.score}}/5 | 33% |
+
+---
+
+## メトリクスサマリー
+
+| メトリック | 値 |
+|-----------|-----|
+| 総行数 | {{businessLogic.metrics.totalLines}} |
+| コード行数 | {{businessLogic.metrics.codeLines}} |
+| コメント行数 | {{businessLogic.metrics.commentLines}} |
+| 空行数 | {{businessLogic.metrics.blankLines}} |
+| パラグラフ数 | {{businessLogic.metrics.paragraphCount}} |
+| SQLステートメント数 | {{businessLogic.metrics.sqlStatementCount}} |
+| ファイル操作数 | {{businessLogic.metrics.fileOperationCount}} |
+
+---
+
+## 付録: ソースコード参照
+
+### パラグラフインデックス
+
+| パラグラフ | 開始行 | 終了行 | 目的 |
+|-----------|--------|--------|------|
+{{#each businessLogic.paragraphs}}
+| `{{this.name}}` | {{this.lineStart}} | {{this.lineEnd}} | {{this.purpose}} |
+{{/each}}
+
+---
+
+*ソースから生成: `{{businessLogic.fileName}}`*
+*分析日: {{generated_date}}*
+
+**ビジネスロジック分析ドキュメント 終了**

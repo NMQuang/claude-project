@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 
 // Import analyzers and generators
 import { CobolAnalyzer } from './analyzers/CobolAnalyzer.js';
+import { CobolBusinessLogicAnalyzer } from './analyzers/CobolBusinessLogicAnalyzer.js';
 import { DDLAnalyzer } from './analyzers/DDLAnalyzer.js';
 import { JavaAnalyzer } from './analyzers/JavaAnalyzer.js';
 import { PostgreSQLDDLAnalyzer } from './analyzers/PostgreSQLDDLAnalyzer.js';
@@ -149,7 +150,7 @@ app.post('/api/projects', (req, res) => {
 
 // Upload files to project
 app.post('/api/projects/:id/upload', (req, res) => {
-  upload.array('files')(req, res, (err) => {
+  upload.array('files')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ error: `Upload error: ${err.message}` });
     } else if (err) {
@@ -163,14 +164,46 @@ app.post('/api/projects/:id/upload', (req, res) => {
     }
 
     const files = req.files as Express.Multer.File[];
+    const filePaths = req.body.filePaths; // Array of relative paths from folder upload
+    const uploadDir = path.join(__dirname, '../uploads', project.id);
+
+    // Process files to preserve folder structure
+    const processedFiles = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      let relativePath = file.filename; // Default to filename
+
+      // If filePaths provided (folder upload), use relative path
+      if (filePaths) {
+        const pathArray = Array.isArray(filePaths) ? filePaths : [filePaths];
+        if (pathArray[i]) {
+          relativePath = pathArray[i];
+
+          // Create subdirectory if needed
+          const targetDir = path.join(uploadDir, path.dirname(relativePath));
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+
+          // Move file to correct location with folder structure
+          const targetPath = path.join(uploadDir, relativePath);
+          if (file.path !== targetPath) {
+            fs.renameSync(file.path, targetPath);
+          }
+        }
+      }
+
+      processedFiles.push({
+        filename: path.basename(relativePath),
+        relativePath: relativePath,
+        size: file.size,
+        path: path.join(uploadDir, relativePath)
+      });
+    }
 
     res.json({
       message: 'Files uploaded successfully',
-      files: files.map(f => ({
-        filename: f.filename,
-        size: f.size,
-        path: f.path
-      }))
+      files: processedFiles
     });
   });
 });
@@ -225,6 +258,82 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
         message: 'Analysis complete',
         metadata,
         ddlMetadata: ddlResults
+      });
+
+    } else if (project.migrationType === 'COBOL-Analysis') {
+      // COBOL Business Logic Analysis
+      const businessLogicAnalyzer = new CobolBusinessLogicAnalyzer();
+      const cobolFiles = getAllFiles(uploadDir, ['.cbl', '.cob']);
+
+      const businessLogicResults = [];
+      for (const file of cobolFiles) {
+        const result = await businessLogicAnalyzer.analyze(file);
+        // Add relative path (from upload directory)
+        const relativePath = path.relative(uploadDir, file).replace(/\\/g, '/');
+        result.relativePath = relativePath;
+        businessLogicResults.push(result);
+      }
+
+      // Calculate metrics from analysis results
+      let totalLoc = 0;
+      let totalParagraphs = 0;
+      let totalSqlStatements = 0;
+      let highComplexityCount = 0;
+      let mediumComplexityCount = 0;
+
+      for (const result of businessLogicResults) {
+        totalLoc += result.metrics?.totalLines || 0;
+        totalParagraphs += result.paragraphs?.length || 0;
+        totalSqlStatements += result.metrics?.sqlStatementCount || 0;
+
+        const difficulty = result.complexity?.overallDifficulty;
+        if (difficulty === 'High') highComplexityCount++;
+        else if (difficulty === 'Medium') mediumComplexityCount++;
+      }
+
+      // Determine overall difficulty
+      let overallDifficulty = 'Low';
+      if (highComplexityCount > 0 || (mediumComplexityCount > cobolFiles.length / 2)) {
+        overallDifficulty = 'High';
+      } else if (mediumComplexityCount > 0) {
+        overallDifficulty = 'Medium';
+      }
+
+      // Store results in project metadata with source_analysis for frontend compatibility
+      project.metadata = {
+        type: 'COBOL-Analysis',
+        businessLogicResults,
+        totalFiles: cobolFiles.length,
+        analyzedAt: new Date().toISOString(),
+        // Add source_analysis for frontend metrics display
+        source_analysis: {
+          total_files: cobolFiles.length,
+          total_loc: totalLoc,
+          total_paragraphs: totalParagraphs,
+          database: {
+            tables: totalSqlStatements > 0 ? totalSqlStatements : 0
+          }
+        },
+        // Add migrationComplexity for frontend display
+        migrationComplexity: {
+          difficulty: overallDifficulty,
+          overall: overallDifficulty === 'High' ? 75 : (overallDifficulty === 'Medium' ? 50 : 25),
+          description: `COBOL Business Logic Analysis - ${cobolFiles.length} program(s) analyzed with ${overallDifficulty.toLowerCase()} complexity`
+        }
+      };
+      project.status = 'Analyzed';
+
+      res.json({
+        message: 'COBOL Business Logic analysis complete',
+        totalFiles: cobolFiles.length,
+        results: businessLogicResults.map(r => ({
+          programId: r.programId,
+          fileName: r.fileName,
+          relativePath: r.relativePath,
+          processingType: r.overview.processingType,
+          paragraphCount: r.paragraphs.length,
+          complexityLevel: r.complexity.overallDifficulty
+        }))
       });
 
     } else if (project.migrationType === 'PostgreSQL-to-Oracle') {
@@ -324,34 +433,66 @@ app.post('/api/projects/:id/generate', async (req, res) => {
   }
 
   try {
-    // Prepare document data
-    const data = {
-      project: {
-        name: project.name,
-        migration_type: project.migrationType
-      },
-      source: {
-        language: project.sourceLanguage || 'COBOL',
-        database: project.sourceDatabase || 'Oracle 11g',
-        app_server: 'IBM WebSphere',
-        os: 'z/OS'
-      },
-      target: {
-        language: project.targetLanguage || 'Java 17',
-        framework: 'Spring Boot 3.x',
-        database: project.targetDatabase || 'PostgreSQL 15',
-        deployment: 'Docker/Kubernetes'
-      },
-      metadata: project.metadata,
-      ddl_metadata: project.ddlMetadata,
-      generated_date: new Date().toISOString().split('T')[0],
-      version: '1.0',
-      author: 'Auto-generated'
-    };
+    // Prepare document data based on migration type
+    let data: any;
+
+    if (project.migrationType === 'COBOL-Analysis') {
+      // Special handling for COBOL Business Logic Analysis
+      const { programIndex = 0 } = req.body;
+      const businessLogicResults = project.metadata.businessLogicResults || [];
+
+      if (businessLogicResults.length === 0) {
+        return res.status(400).json({ error: 'No COBOL files analyzed' });
+      }
+
+      // Get specific program or first one
+      const businessLogic = businessLogicResults[programIndex] || businessLogicResults[0];
+
+      data = {
+        project: {
+          name: project.name,
+          migration_type: project.migrationType
+        },
+        businessLogic,
+        allPrograms: businessLogicResults.map((r: any, idx: number) => ({
+          index: idx,
+          programId: r.programId,
+          fileName: r.fileName
+        })),
+        generated_date: new Date().toISOString().split('T')[0],
+        version: '1.0',
+        author: 'Auto-generated'
+      };
+    } else {
+      // Standard migration document data
+      data = {
+        project: {
+          name: project.name,
+          migration_type: project.migrationType
+        },
+        source: {
+          language: project.sourceLanguage || 'COBOL',
+          database: project.sourceDatabase || 'Oracle 11g',
+          app_server: 'IBM WebSphere',
+          os: 'z/OS'
+        },
+        target: {
+          language: project.targetLanguage || 'Java 17',
+          framework: 'Spring Boot 3.x',
+          database: project.targetDatabase || 'PostgreSQL 15',
+          deployment: 'Docker/Kubernetes'
+        },
+        metadata: project.metadata,
+        ddl_metadata: project.ddlMetadata,
+        generated_date: new Date().toISOString().split('T')[0],
+        version: '1.0',
+        author: 'Auto-generated'
+      };
+    }
 
     // Generate document
     const generator = new DocumentGenerator();
-    const markdown = await generator.generate(documentType, data, language);
+    const markdown = await generator.generate(documentType, data, language, project.migrationType);
 
     // Save document
     const docsDir = path.join(__dirname, '../../outputs', project.id, 'documents');
