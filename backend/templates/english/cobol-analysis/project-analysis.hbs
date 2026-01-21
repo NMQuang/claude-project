@@ -1,0 +1,454 @@
+# COBOL Project-Level Business Logic Analysis
+
+**Project:** {{projectAnalysis.projectName}}
+**System ID:** {{projectAnalysis.systemId}}
+**Analysis Date:** {{projectAnalysis.analyzedAt}}
+
+---
+
+## 0. Business Overview
+
+{{projectAnalysis.businessOverview.systemDescription}}
+
+### Primary Business Domain
+
+**{{projectAnalysis.businessOverview.primaryBusinessDomain}}**
+
+### Key Business Functions
+
+{{#each projectAnalysis.businessOverview.keyBusinessFunctions}}
+- {{this}}
+{{/each}}
+
+### Data Stores
+
+{{#each projectAnalysis.businessOverview.dataStores}}
+- {{this}}
+{{/each}}
+
+### Processing Modes
+
+{{#each projectAnalysis.businessOverview.processingModes}}
+- **{{this}}** Processing
+{{/each}}
+
+### Platform Summary
+
+{{projectAnalysis.businessOverview.platformSummary}}
+
+---
+
+## 1. System Inventory
+
+### Summary
+
+| Category | Count |
+|----------|-------|
+| COBOL Programs | {{projectAnalysis.inventory.programs}} |
+| Copybooks | {{projectAnalysis.inventory.copybooks}} |
+| JCL Jobs | {{projectAnalysis.inventory.jclJobs}} |
+| Total Files | {{projectAnalysis.inventory.totalFiles}} |
+| Total Lines of Code | {{projectAnalysis.inventory.totalLinesOfCode}} |
+
+### Program Inventory
+
+| Program ID | File | Lines | Type | Complexity |
+|------------|------|-------|------|------------|
+{{#each projectAnalysis.inventory.programList}}
+| {{this.programId}} | {{this.relativePath}} | {{this.linesOfCode}} | {{this.processingType}} | {{this.complexity}} |
+{{/each}}
+
+### Copybook Inventory
+
+| Name | File | Records | Fields |
+|------|------|---------|--------|
+{{#each projectAnalysis.inventory.copybookList}}
+| {{this.name}} | {{this.relativePath}} | {{this.recordCount}} | {{this.totalFields}} |
+{{/each}}
+
+{{#if projectAnalysis.inventory.jclList.length}}
+### JCL Job Inventory
+
+| Job Name | File | Steps | Programs Executed |
+|----------|------|-------|-------------------|
+{{#each projectAnalysis.inventory.jclList}}
+| {{this.jobName}} | {{this.relativePath}} | {{this.stepCount}} | {{join this.programsExecuted ", "}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 2. Business Entities & Data Model
+
+> **Note:** Only persistent business data is listed here. Working-storage structures and technical artifacts are excluded.
+
+{{#each projectAnalysis.businessEntities}}
+### {{this.businessName}}
+
+| Property | Value |
+|----------|-------|
+| Entity ID | `{{this.entityId}}` |
+| Type | **{{this.type}}** |
+| Source | {{this.source}}{{#if this.sourceFile}} (`{{this.sourceFile}}`){{/if}} |
+
+**Business Description:**
+{{this.businessDescription}}
+
+**Used By Programs:** {{join this.usedByPrograms ", "}}
+
+{{#if this.keys.length}}
+**Keys:**
+{{#each this.keys}}
+- `{{this.keyName}}` ({{this.keyType}}): {{join this.fields ", "}}
+{{/each}}
+{{/if}}
+
+{{#if this.accessPatterns.length}}
+**Access Patterns:**
+| Program | Access Type | Business Purpose |
+|---------|-------------|------------------|
+{{#each this.accessPatterns}}
+| {{this.programId}} | {{this.accessType}} | {{this.businessPurpose}} |
+{{/each}}
+{{/if}}
+
+{{#if this.fields.length}}
+**Field Details:**
+| Field Name | Type | Length | Business Meaning |
+|------------|------|--------|------------------|
+{{#each this.fields}}
+| {{this.name}} | {{this.dataType}} | {{this.length}} | {{this.businessMeaning}} |
+{{/each}}
+{{/if}}
+
+---
+{{/each}}
+
+---
+
+## 3. Business Processes
+
+> **Note:** Business processes are grouped by BUSINESS PURPOSE, not by individual COBOL programs. Multiple programs may collaborate to implement one business process.
+
+### Online Processes
+
+{{#each projectAnalysis.businessProcesses}}
+{{#if (eq this.processType "ONLINE")}}
+#### {{this.processName}}
+
+**Process ID:** {{this.processId}}
+
+**Description:**
+{{this.businessDescription}}
+
+**Business Outcome:**
+{{this.businessOutcome}}
+
+| Property | Value |
+|----------|-------|
+| Entry Points | {{join this.entryPoints ", "}} |
+| Programs Involved | {{this.programsInvolved.length}} programs |
+| Entities Accessed | {{this.entitiesAccessed.length}} entities |
+| Trigger | {{this.triggerType}} |
+| Complexity | {{this.estimatedComplexity}} |
+| Data Access Paradigm | {{this.dataAccessParadigm}} |
+
+**Data Flow Summary:**
+{{this.dataFlowSummary}}
+
+{{#if this.implementationNote}}
+**Implementation Note:**
+{{this.implementationNote}}
+{{/if}}
+
+**Programs:** {{join this.programsInvolved ", "}}
+
+---
+{{/if}}
+{{/each}}
+
+### Batch Processes
+
+{{#each projectAnalysis.businessProcesses}}
+{{#if (eq this.processType "BATCH")}}
+#### {{this.processName}}
+
+**Process ID:** {{this.processId}}
+
+**Description:**
+{{this.businessDescription}}
+
+**Business Outcome:**
+{{this.businessOutcome}}
+
+| Property | Value |
+|----------|-------|
+| Entry Points | {{join this.entryPoints ", "}} |
+| Programs Involved | {{this.programsInvolved.length}} programs |
+| Entities Accessed | {{this.entitiesAccessed.length}} entities |
+| Frequency | {{this.frequency}} |
+| Complexity | {{this.estimatedComplexity}} |
+| Data Access Paradigm | {{this.dataAccessParadigm}} |
+
+**Data Flow Summary:**
+{{this.dataFlowSummary}}
+
+{{#if this.implementationNote}}
+**Implementation Note:**
+{{this.implementationNote}}
+{{/if}}
+
+**Programs:** {{join this.programsInvolved ", "}}
+
+---
+{{/if}}
+{{/each}}
+
+### Hybrid Processes
+
+{{#each projectAnalysis.businessProcesses}}
+{{#if (eq this.processType "HYBRID")}}
+#### {{this.processName}}
+
+**Process ID:** {{this.processId}}
+
+**Description:**
+{{this.businessDescription}}
+
+**Business Outcome:**
+{{this.businessOutcome}}
+
+| Property | Value |
+|----------|-------|
+| Programs Involved | {{this.programsInvolved.length}} programs |
+| Entities Accessed | {{this.entitiesAccessed.length}} entities |
+| Complexity | {{this.estimatedComplexity}} |
+| Data Access Paradigm | {{this.dataAccessParadigm}} |
+
+**Data Flow Summary:**
+{{this.dataFlowSummary}}
+
+{{#if this.implementationNote}}
+**Implementation Note:**
+{{this.implementationNote}}
+{{/if}}
+
+---
+{{/if}}
+{{/each}}
+
+---
+
+## 4. Program Responsibility Matrix
+
+| Program | Role | Confidence | Entities Managed |
+|---------|------|------------|------------------|
+{{#each projectAnalysis.programRoles}}
+| {{this.programId}} | {{this.role}} | {{this.confidence}} | {{join this.entitiesManaged ", "}} |
+{{/each}}
+
+### Role Distribution
+
+{{#with (countRoles projectAnalysis.programRoles)}}
+| Role | Count |
+|------|-------|
+| Master Maintenance | {{this.MASTER_MAINTENANCE}} |
+| Transaction Processing | {{this.TRANSACTION_PROCESSING}} |
+| Batch Update | {{this.BATCH_UPDATE}} |
+| Batch Aggregation | {{this.BATCH_AGGREGATION}} |
+| Batch Reporting | {{this.BATCH_REPORTING}} |
+| Reporting | {{this.REPORTING}} |
+| Utility | {{this.UTILITY}} |
+| Interface | {{this.INTERFACE}} |
+| Validation | {{this.VALIDATION}} |
+| Calculation | {{this.CALCULATION}} |
+| Data Extraction | {{this.DATA_EXTRACTION}} |
+| Unknown | {{this.UNKNOWN}} |
+{{/with}}
+
+---
+
+## 5. Data Flow Analysis
+
+> **Note:** Data flows include BUSINESS INTENT - the reason WHY data is accessed, not just technical operations.
+
+### Data Flow Summary
+
+| Total Flows | READ | WRITE | UPDATE | TRANSFER |
+|-------------|------|-------|--------|----------|
+| {{projectAnalysis.dataFlows.flows.length}} | {{countFlowType projectAnalysis.dataFlows.flows "READ"}} | {{countFlowType projectAnalysis.dataFlows.flows "WRITE"}} | {{countFlowType projectAnalysis.dataFlows.flows "UPDATE"}} | {{countFlowType projectAnalysis.dataFlows.flows "TRANSFER"}} |
+
+### Key Data Flows with Business Intent
+
+| Flow | Source | Target | Type | Business Intent |
+|------|--------|--------|------|-----------------|
+{{#each projectAnalysis.dataFlows.flows}}
+{{#if (lt @index 20)}}
+| {{this.flowId}} | {{this.sourceEntity}} | {{this.targetEntity}} | {{this.flowType}} | {{this.businessIntent}} |
+{{/if}}
+{{/each}}
+
+### Data Flow Diagram (Text)
+
+```
+{{#each projectAnalysis.dataFlows.flows}}
+{{#if (lt @index 15)}}
+[{{this.sourceEntity}}] --{{this.flowType}}--> [{{this.targetEntity}}]
+  via: {{this.throughProgram}}
+  why: {{this.businessIntent}}
+
+{{/if}}
+{{/each}}
+```
+
+{{#if projectAnalysis.dataFlows.fileToFile.length}}
+### File-to-File Flows
+
+| Source | Target | Program | Step | Business Intent |
+|--------|--------|---------|------|-----------------|
+{{#each projectAnalysis.dataFlows.fileToFile}}
+{{#if (lt @index 10)}}
+| {{this.sourceEntity}} | {{this.targetEntity}} | {{this.throughProgram}} | {{this.throughStep}} | {{this.businessIntent}} |
+{{/if}}
+{{/each}}
+{{/if}}
+
+---
+
+## 6. Batch Execution Flow
+
+{{#each projectAnalysis.batchExecutionFlows}}
+### Job: {{this.jobName}}
+
+**Description:** {{this.description}}
+**Total Programs:** {{this.totalPrograms}}
+
+| Step | Program | Purpose | Input Datasets | Output Datasets | Conditional |
+|------|---------|---------|----------------|-----------------|-------------|
+{{#each this.steps}}
+| {{this.stepNumber}} | {{this.programName}} | {{this.purpose}} | {{join this.inputDatasets ", "}} | {{join this.outputDatasets ", "}} | {{#if this.isConditional}}Yes{{else}}No{{/if}} |
+{{/each}}
+
+---
+{{/each}}
+
+---
+
+## 7. Platform Dependency Analysis
+
+### Platform Detection
+
+**Detected Platform:** {{projectAnalysis.platformDependencies.platform}}
+**Portability Score:** {{projectAnalysis.platformDependencies.portabilityScore}}% (higher = more portable)
+
+{{#if projectAnalysis.platformDependencies.vendorNeutral.length}}
+### Vendor-Neutral COBOL Features (Portable)
+
+> These features are standard COBOL and can be migrated with minimal changes.
+
+| Feature | Usage Count | Programs | Description |
+|---------|-------------|----------|-------------|
+{{#each projectAnalysis.platformDependencies.vendorNeutral}}
+| {{this.feature}} | {{this.usageCount}} | {{join this.programs ", "}} | {{this.description}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.ibmSpecific.length}}
+### IBM-Specific Features
+
+| Feature | Usage Count | Programs | Description | Migration Difficulty |
+|---------|-------------|----------|-------------|---------------------|
+{{#each projectAnalysis.platformDependencies.ibmSpecific}}
+| {{this.feature}} | {{this.usageCount}} | {{join this.programs ", "}} | {{this.description}} | {{this.migrationDifficulty}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.fujitsuSpecific.length}}
+### Fujitsu-Specific Features
+
+| Feature | Usage Count | Programs | Description | Migration Difficulty |
+|---------|-------------|----------|-------------|---------------------|
+{{#each projectAnalysis.platformDependencies.fujitsuSpecific}}
+| {{this.feature}} | {{this.usageCount}} | {{join this.programs ", "}} | {{this.description}} | {{this.migrationDifficulty}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.migrationRisks.length}}
+### Platform Migration Risks
+
+| Risk ID | Level | Description | Affected Programs | Mitigation |
+|---------|-------|-------------|-------------------|------------|
+{{#each projectAnalysis.platformDependencies.migrationRisks}}
+| {{this.riskId}} | {{this.riskLevel}} | {{this.description}} | {{join this.affectedPrograms ", "}} | {{this.mitigationStrategy}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.recommendations.length}}
+### Platform Recommendations
+
+{{#each projectAnalysis.platformDependencies.recommendations}}
+- {{this}}
+{{/each}}
+{{/if}}
+
+---
+
+## 8. Migration Impact Summary
+
+### Overall Assessment
+
+**Overall Complexity:** {{projectAnalysis.migrationImpact.overallComplexity}}
+
+### Effort Estimation
+
+| Metric | Value |
+|--------|-------|
+| Total Programs | {{projectAnalysis.migrationImpact.estimatedEffort.totalPrograms}} |
+| Low Complexity | {{projectAnalysis.migrationImpact.estimatedEffort.lowComplexity}} |
+| Medium Complexity | {{projectAnalysis.migrationImpact.estimatedEffort.mediumComplexity}} |
+| High Complexity | {{projectAnalysis.migrationImpact.estimatedEffort.highComplexity}} |
+{{#if projectAnalysis.migrationImpact.estimatedEffort.estimatedProgramDays}}
+| Estimated Effort (Program-Days) | {{projectAnalysis.migrationImpact.estimatedEffort.estimatedProgramDays}} |
+{{/if}}
+
+{{#if projectAnalysis.migrationImpact.criticalPaths.length}}
+### Critical Paths
+
+| Path | Programs | Reason | Priority |
+|------|----------|--------|----------|
+{{#each projectAnalysis.migrationImpact.criticalPaths}}
+| {{this.pathName}} | {{join this.programs ", "}} | {{this.reason}} | {{this.priority}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.migrationImpact.risks.length}}
+### Migration Risks
+
+| Risk ID | Category | Severity | Description | Mitigation |
+|---------|----------|----------|-------------|------------|
+{{#each projectAnalysis.migrationImpact.risks}}
+| {{this.riskId}} | {{this.category}} | {{this.severity}} | {{this.description}} | {{this.mitigation}} |
+{{/each}}
+{{/if}}
+
+### Recommendations
+
+{{#each projectAnalysis.migrationImpact.recommendations}}
+{{add @index 1}}. {{this}}
+{{/each}}
+
+### Suggested Migration Priority Order
+
+{{#each projectAnalysis.migrationImpact.priorityOrder}}
+{{#if (lt @index 15)}}
+{{add @index 1}}. {{this}}
+{{/if}}
+{{/each}}
+{{#if (gt projectAnalysis.migrationImpact.priorityOrder.length 15)}}
+... and {{subtract projectAnalysis.migrationImpact.priorityOrder.length 15}} more programs
+{{/if}}
+
+---
+
+*Document generated automatically by COBOL Project Analysis Tool*
+*Generated: {{generated_date}}*

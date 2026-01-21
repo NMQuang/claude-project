@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 // Import analyzers and generators
 import { CobolAnalyzer } from './analyzers/CobolAnalyzer.js';
 import { CobolBusinessLogicAnalyzer } from './analyzers/CobolBusinessLogicAnalyzer.js';
+import { CobolProjectAnalyzer } from './analyzers/CobolProjectAnalyzer.js';
 import { DDLAnalyzer } from './analyzers/DDLAnalyzer.js';
 import { JavaAnalyzer } from './analyzers/JavaAnalyzer.js';
 import { PostgreSQLDDLAnalyzer } from './analyzers/PostgreSQLDDLAnalyzer.js';
@@ -336,6 +337,60 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
         }))
       });
 
+    } else if (project.migrationType === 'COBOL-Project-Analysis') {
+      // COBOL Project-Level Analysis
+      const projectAnalyzer = new CobolProjectAnalyzer();
+      const projectAnalysisResult = await projectAnalyzer.analyzeProject(uploadDir, project.name);
+
+      // Calculate metrics summary
+      const totalLoc = projectAnalysisResult.inventory.totalLinesOfCode;
+      const totalPrograms = projectAnalysisResult.inventory.programs;
+      const totalCopybooks = projectAnalysisResult.inventory.copybooks;
+      const totalJclJobs = projectAnalysisResult.inventory.jclJobs;
+
+      // Determine overall difficulty
+      const effort = projectAnalysisResult.migrationImpact.estimatedEffort;
+      let overallDifficulty = 'Low';
+      if (effort.highComplexity > totalPrograms * 0.3) {
+        overallDifficulty = 'High';
+      } else if (effort.mediumComplexity > totalPrograms * 0.5) {
+        overallDifficulty = 'Medium';
+      }
+
+      // Store results in project metadata
+      project.metadata = {
+        type: 'COBOL-Project-Analysis',
+        projectAnalysis: projectAnalysisResult,
+        analyzedAt: new Date().toISOString(),
+        source_analysis: {
+          total_files: totalPrograms,
+          total_loc: totalLoc,
+          total_paragraphs: projectAnalysisResult.programResults.reduce(
+            (sum, p) => sum + (p.paragraphs?.length || 0), 0
+          ),
+          copybooks: totalCopybooks,
+          jcl_jobs: totalJclJobs,
+          entities: projectAnalysisResult.businessEntities.length,
+          database: {
+            tables: projectAnalysisResult.businessEntities.filter(e => e.source === 'DATABASE').length
+          }
+        },
+        migrationComplexity: {
+          difficulty: overallDifficulty,
+          overall: overallDifficulty === 'High' ? 75 : (overallDifficulty === 'Medium' ? 50 : 25),
+          description: `Project-level analysis: ${totalPrograms} programs, ${totalCopybooks} copybooks, ${totalJclJobs} JCL jobs`
+        }
+      };
+      project.status = 'Analyzed';
+
+      res.json({
+        message: 'COBOL Project-Level analysis complete',
+        inventory: projectAnalysisResult.inventory,
+        businessEntities: projectAnalysisResult.businessEntities.length,
+        businessProcesses: projectAnalysisResult.businessProcesses.length,
+        migrationImpact: projectAnalysisResult.migrationImpact.overallComplexity
+      });
+
     } else if (project.migrationType === 'PostgreSQL-to-Oracle') {
       // NEW: PostgreSQL-to-Oracle analysis
 
@@ -459,6 +514,24 @@ app.post('/api/projects/:id/generate', async (req, res) => {
           programId: r.programId,
           fileName: r.fileName
         })),
+        generated_date: new Date().toISOString().split('T')[0],
+        version: '1.0',
+        author: 'Auto-generated'
+      };
+    } else if (project.migrationType === 'COBOL-Project-Analysis') {
+      // Special handling for COBOL Project-Level Analysis
+      const projectAnalysis = project.metadata.projectAnalysis;
+
+      if (!projectAnalysis) {
+        return res.status(400).json({ error: 'No project analysis data found' });
+      }
+
+      data = {
+        project: {
+          name: project.name,
+          migration_type: project.migrationType
+        },
+        projectAnalysis,
         generated_date: new Date().toISOString().split('T')[0],
         version: '1.0',
         author: 'Auto-generated'
