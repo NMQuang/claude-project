@@ -821,12 +821,23 @@ export class CobolProjectAnalyzer {
 
   /**
    * Identify business processes - GROUPED BY BUSINESS PURPOSE
-   * BUSINESS-FIRST RULES:
-   * - DO NOT create one process per COBOL program
-   * - Group programs by their BUSINESS FUNCTION
-   * - Multiple programs can collaborate on ONE business process
-   * - Programs executed by JCL MUST be classified as BATCH (Rule 6)
-   * - Detect VSAM vs RDB implementations of same business logic (Rule 10)
+   *
+   * PROMPT v2.2 RULES:
+   * - Business Process ≠ COBOL Program ≠ JCL Job (FUNDAMENTAL)
+   * - Business Process = BUSINESS PURPOSE (e.g., Company Master Maintenance)
+   * - JCL Jobs are NOT Business Processes (CRITICAL FIX)
+   * - JCL Jobs control execution order only - document separately
+   * - Programs executed by JCL are BATCH type
+   *
+   * CORRECT Business Process examples:
+   * - Company Master Maintenance (ONLINE)
+   * - Employee Master Maintenance (ONLINE)
+   * - Company Master Summary Reporting (BATCH)
+   *
+   * INCORRECT (DO NOT USE):
+   * - RUNALL Processing
+   * - DEFVSAM Processing
+   * - One process per program
    */
   private identifyBusinessProcesses(
     programResults: CobolBusinessLogicResult[],
@@ -843,46 +854,49 @@ export class CobolProjectAnalyzer {
       }
     }
 
+    // Group programs by BUSINESS PURPOSE, not by JCL job names
     const processGroups = new Map<string, {
       programs: CobolBusinessLogicResult[];
-      jobs: any[];
       entities: Set<string>;
-      type: 'ONLINE' | 'BATCH' | 'HYBRID';
+      type: 'ONLINE' | 'BATCH';
       vsamPrograms: string[];
       rdbPrograms: string[];
       filePrograms: string[];
+      programTypes: Map<string, 'ONLINE' | 'BATCH'>;
     }>();
 
-    // Step 1: Categorize programs by business domain
+    // Step 1: Categorize programs by BUSINESS DOMAIN (not JCL job names)
     for (const program of programResults) {
-      const domain = this.inferBusinessDomain(program.programId, program);
+      // Determine program type using rule table
+      const programType = this.classifyProgramType(program, jclExecutedPrograms);
 
-      // RULE 6: Programs executed by JCL are ALWAYS BATCH, never Interactive/Online
-      const isJclExecuted = jclExecutedPrograms.has(program.programId.toUpperCase());
-      let processingType: 'ONLINE' | 'BATCH' = 'BATCH';
-
-      if (!isJclExecuted) {
-        // Only non-JCL programs can be Online
-        if (program.overview?.processingType === 'Online' ||
-            program.overview?.processingType === 'Interactive') {
-          processingType = 'ONLINE';
-        }
-      }
+      // Infer BUSINESS domain from program behavior, not from JCL
+      const domain = this.inferBusinessProcessName(program, programType);
 
       if (!processGroups.has(domain)) {
         processGroups.set(domain, {
           programs: [],
-          jobs: [],
           entities: new Set(),
-          type: processingType,
+          type: programType,
           vsamPrograms: [],
           rdbPrograms: [],
-          filePrograms: []
+          filePrograms: [],
+          programTypes: new Map()
         });
       }
 
       const group = processGroups.get(domain)!;
       group.programs.push(program);
+      group.programTypes.set(program.programId, programType);
+
+      // If any program is ONLINE, the process type should reflect that
+      if (programType === 'ONLINE' && group.type === 'BATCH') {
+        // Check if this is truly an online process
+        const onlineCount = Array.from(group.programTypes.values()).filter(t => t === 'ONLINE').length;
+        if (onlineCount > group.programs.length / 2) {
+          group.type = 'ONLINE';
+        }
+      }
 
       // Determine data access paradigm for this program
       const hasDbAccess = (program.databaseAccess || []).length > 0;
@@ -903,84 +917,52 @@ export class CobolProjectAnalyzer {
       for (const dbAccess of program.databaseAccess || []) {
         group.entities.add(dbAccess.tableName);
       }
-    }
-
-    // Step 2: Add JCL jobs to appropriate groups (ALWAYS BATCH)
-    for (const jcl of jclResults) {
-      for (const job of jcl.jobs) {
-        const domain = this.inferBusinessDomain(job.jobName, null);
-
-        if (!processGroups.has(domain)) {
-          processGroups.set(domain, {
-            programs: [],
-            jobs: [],
-            entities: new Set(),
-            type: 'BATCH',  // JCL jobs are ALWAYS BATCH
-            vsamPrograms: [],
-            rdbPrograms: [],
-            filePrograms: []
-          });
-        }
-
-        const group = processGroups.get(domain)!;
-        group.jobs.push(job);
-
-        // If group was ONLINE and now has JCL, it becomes HYBRID
-        if (group.type === 'ONLINE') group.type = 'HYBRID';
-
-        // Collect entities from DD statements
-        for (const step of job.steps) {
-          for (const dd of step.ddStatements) {
-            if (dd.datasetName && !dd.isTemporary) {
-              group.entities.add(dd.datasetName);
-              // Detect VSAM from DD statement
-              if (dd.datasetType === 'VSAM') {
-                const programInStep = step.programName;
-                if (!group.vsamPrograms.includes(programInStep)) {
-                  group.vsamPrograms.push(programInStep);
-                }
-              }
-            }
-          }
+      // Collect VSAM file entities
+      for (const file of program.files || []) {
+        if (this.isBusinessDataFile(file.fileName)) {
+          group.entities.add(file.fileName);
         }
       }
     }
 
-    // Step 3: Convert groups to BusinessProcess objects
+    // Step 2: Convert groups to BusinessProcess objects
+    // NOTE: JCL jobs are NOT included as business processes (CRITICAL v2.2 FIX)
+    // JCL jobs are documented separately in Batch Execution Flow
     const processes: BusinessProcess[] = [];
     let processId = 1;
 
     for (const [domain, group] of processGroups) {
+      // Skip empty groups or utility-only groups
+      if (group.programs.length === 0) continue;
+
       const programIds = group.programs.map(p => p.programId);
-      const jobNames = group.jobs.map(j => j.jobName);
-      const allPrograms = [
-        ...programIds,
-        ...group.jobs.flatMap(j => j.steps.map((s: any) => s.programName))
-      ];
-      const uniquePrograms = [...new Set(allPrograms)];
 
       // Determine complexity based on number of programs and entities
       let complexity: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-      if (uniquePrograms.length > 5 || group.entities.size > 5) complexity = 'HIGH';
-      else if (uniquePrograms.length > 2 || group.entities.size > 2) complexity = 'MEDIUM';
+      if (programIds.length > 5 || group.entities.size > 5) complexity = 'HIGH';
+      else if (programIds.length > 2 || group.entities.size > 2) complexity = 'MEDIUM';
 
-      // RULE 10: Determine data access paradigm and detect dual implementations
+      // Determine data access paradigm
       const dataAccessParadigm = this.determineDataAccessParadigm(group);
       const implementationNote = this.generateImplementationNote(group);
 
+      // Generate proper business process name (not JCL job name)
+      const processName = this.formatBusinessProcessName(domain, group.type);
+
       processes.push({
         processId: `BP${String(processId++).padStart(3, '0')}`,
-        processName: domain,
+        processName,
         processType: group.type,
-        businessDescription: this.generateProcessDescription(domain, group.type),
-        businessOutcome: this.generateBusinessOutcome(domain, group.type),
-        entryPoints: group.type === 'BATCH' ? jobNames : programIds.slice(0, 3),
-        programsInvolved: uniquePrograms,
+        businessDescription: this.generateProcessDescription(processName, group.type),
+        businessOutcome: this.generateBusinessOutcome(processName, group.type),
+        // Entry points are PROGRAMS, not JCL jobs
+        entryPoints: programIds.slice(0, 3),
+        programsInvolved: programIds,
         entitiesAccessed: Array.from(group.entities),
         triggerType: group.type === 'BATCH' ? 'SCHEDULED' : 'USER_INITIATED',
         frequency: group.type === 'BATCH' ? this.inferBatchFrequency(domain) : undefined,
         estimatedComplexity: complexity,
-        dataFlowSummary: this.generateDataFlowSummary(domain, group.entities),
+        dataFlowSummary: this.generateDataFlowSummary(processName, group.entities),
         // VSAM vs RDB awareness
         dataAccessParadigm,
         vsamPrograms: group.vsamPrograms.length > 0 ? group.vsamPrograms : undefined,
@@ -990,6 +972,238 @@ export class CobolProjectAnalyzer {
     }
 
     return processes;
+  }
+
+  /**
+   * Classify program type using RULE TABLE from Prompt v2.2
+   *
+   * | IF (Condition)                             | THEN Program Type |
+   * |--------------------------------------------|-------------------|
+   * | Program executed by JCL                    | BATCH             |
+   * | Program has no ACCEPT / DISPLAY            | BATCH             |
+   * | Program uses sequential READ NEXT          | BATCH             |
+   * | Program is user-invoked CRUD               | ONLINE            |
+   * | Program contains ACCEPT/DISPLAY            | ONLINE            |
+   * | Program modifies master data interactively | ONLINE            |
+   *
+   * ❌ Never classify JCL-executed programs as Interactive.
+   */
+  private classifyProgramType(
+    program: CobolBusinessLogicResult,
+    jclExecutedPrograms: Set<string>
+  ): 'ONLINE' | 'BATCH' {
+    const programId = program.programId.toUpperCase();
+
+    // RULE 1: Program executed by JCL → BATCH (ABSOLUTE)
+    if (jclExecutedPrograms.has(programId)) {
+      return 'BATCH';
+    }
+
+    // Check for ACCEPT/DISPLAY (indicates user interaction)
+    const hasAcceptDisplay = this.hasAcceptDisplayStatements(program);
+
+    // Check for sequential READ NEXT pattern
+    const hasSequentialRead = this.hasSequentialReadPattern(program);
+
+    // RULE 2: Program has no ACCEPT/DISPLAY → BATCH
+    // RULE 3: Program uses sequential READ NEXT → BATCH
+    if (!hasAcceptDisplay || hasSequentialRead) {
+      // But check if it's user-invoked CRUD
+      if (this.isUserInvokedCrud(program)) {
+        return 'ONLINE';
+      }
+      return 'BATCH';
+    }
+
+    // RULE 4-6: User-invoked CRUD, ACCEPT/DISPLAY, interactive master modification → ONLINE
+    if (hasAcceptDisplay) {
+      return 'ONLINE';
+    }
+
+    // Default based on overview
+    if (program.overview?.processingType === 'Online' ||
+        program.overview?.processingType === 'Interactive') {
+      return 'ONLINE';
+    }
+
+    return 'BATCH';
+  }
+
+  /**
+   * Check if program has ACCEPT/DISPLAY statements (indicates ONLINE)
+   */
+  private hasAcceptDisplayStatements(program: CobolBusinessLogicResult): boolean {
+    const paragraphs = program.paragraphs || [];
+    for (const para of paragraphs) {
+      const upper = para.name.toUpperCase();
+      if (upper.includes('ACCEPT') || upper.includes('DISPLAY') ||
+          upper.includes('SCREEN') || upper.includes('INPUT') ||
+          upper.includes('USER') || upper.includes('MENU')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if program has sequential READ NEXT pattern (indicates BATCH)
+   */
+  private hasSequentialReadPattern(program: CobolBusinessLogicResult): boolean {
+    const paragraphs = program.paragraphs || [];
+    for (const para of paragraphs) {
+      const upper = para.name.toUpperCase();
+      if (upper.includes('READ-NEXT') || upper.includes('READ-LOOP') ||
+          upper.includes('PROCESS-LOOP') || upper.includes('SEQUENTIAL')) {
+        return true;
+      }
+    }
+
+    // Check file access patterns
+    const files = program.files || [];
+    for (const file of files) {
+      if (file.accessType === 'INPUT' && file.operations?.includes('READ')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if program is user-invoked CRUD
+   */
+  private isUserInvokedCrud(program: CobolBusinessLogicResult): boolean {
+    const dbAccess = program.databaseAccess || [];
+    const hasInsert = dbAccess.some(d => d.operation === 'INSERT');
+    const hasUpdate = dbAccess.some(d => d.operation === 'UPDATE');
+    const hasDelete = dbAccess.some(d => d.operation === 'DELETE');
+    const hasSelect = dbAccess.some(d => d.operation === 'SELECT');
+
+    // CRUD pattern on master data
+    if ((hasInsert || hasUpdate || hasDelete) && hasSelect) {
+      // Check if it accesses master tables
+      const accessesMaster = dbAccess.some(d =>
+        d.tableName.toUpperCase().includes('MST') ||
+        d.tableName.toUpperCase().includes('MASTER')
+      );
+      if (accessesMaster) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Infer BUSINESS PROCESS NAME from program behavior
+   * NOT from JCL job names (CRITICAL v2.2 FIX)
+   */
+  private inferBusinessProcessName(program: CobolBusinessLogicResult, programType: 'ONLINE' | 'BATCH'): string {
+    // Get entities accessed to determine business domain
+    const dbAccess = program.databaseAccess || [];
+    const files = program.files || [];
+
+    // Find the main entity being processed
+    let mainEntity = '';
+    for (const access of dbAccess) {
+      const tableName = access.tableName.toUpperCase();
+      if (tableName.includes('COMPANY') || tableName.includes('CORP')) {
+        mainEntity = 'Company Master';
+        break;
+      }
+      if (tableName.includes('EMPLOYEE') || tableName.includes('EMP') || tableName.includes('SHAIN')) {
+        mainEntity = 'Employee Master';
+        break;
+      }
+      if (tableName.includes('CUSTOMER') || tableName.includes('CUST')) {
+        mainEntity = 'Customer Master';
+        break;
+      }
+      if (tableName.includes('MST') || tableName.includes('MASTER')) {
+        mainEntity = this.generateBusinessName(access.tableName);
+        break;
+      }
+    }
+
+    // Check files for entity hints
+    if (!mainEntity) {
+      for (const file of files) {
+        const fileName = file.fileName.toUpperCase();
+        if (fileName.includes('COMPANY') || fileName.includes('CORP')) {
+          mainEntity = 'Company Master';
+          break;
+        }
+        if (fileName.includes('EMPLOYEE') || fileName.includes('EMP')) {
+          mainEntity = 'Employee Master';
+          break;
+        }
+        if (fileName.includes('MST') || fileName.includes('MASTER')) {
+          mainEntity = this.generateBusinessName(file.fileName);
+          break;
+        }
+      }
+    }
+
+    // Determine business function based on program type and behavior
+    if (programType === 'ONLINE') {
+      if (this.isUserInvokedCrud(program)) {
+        return mainEntity ? `${mainEntity} Maintenance` : 'Master Data Maintenance';
+      }
+      return mainEntity ? `${mainEntity} Inquiry` : 'Data Inquiry';
+    } else {
+      // BATCH
+      if (this.hasBatchAggregationPattern(program)) {
+        return mainEntity ? `${mainEntity} Summary Reporting` : 'Summary Reporting';
+      }
+      const hasReportOutput = program.paragraphs?.some(p =>
+        p.name.toUpperCase().includes('REPORT') || p.name.toUpperCase().includes('PRINT')
+      );
+      if (hasReportOutput) {
+        return mainEntity ? `${mainEntity} Reporting` : 'Batch Reporting';
+      }
+      return mainEntity ? `${mainEntity} Batch Processing` : 'Batch Data Processing';
+    }
+  }
+
+  /**
+   * Format business process name properly
+   * AVOID JCL job names like RUNALL, DEFVSAM
+   */
+  private formatBusinessProcessName(domain: string, processType: 'ONLINE' | 'BATCH'): string {
+    // Filter out JCL-like names
+    const jclPatterns = ['RUNALL', 'DEFVSAM', 'IDCAMS', 'IEFBR14', 'SORT', 'DFSORT'];
+    for (const pattern of jclPatterns) {
+      if (domain.toUpperCase().includes(pattern)) {
+        // This is a JCL utility, not a business process
+        return processType === 'ONLINE' ? 'Online Data Processing' : 'Batch Data Processing';
+      }
+    }
+
+    // Ensure proper suffix
+    if (processType === 'ONLINE' && !domain.includes('Maintenance') && !domain.includes('Inquiry')) {
+      if (domain.includes('Master')) {
+        return `${domain} Maintenance`;
+      }
+    }
+
+    if (processType === 'BATCH' && !domain.includes('Reporting') && !domain.includes('Processing')) {
+      return `${domain} Processing`;
+    }
+
+    return domain;
+  }
+
+  /**
+   * Check if file name represents business data (not utility)
+   */
+  private isBusinessDataFile(fileName: string): boolean {
+    const upper = fileName.toUpperCase();
+    // Exclude utility/temporary files
+    if (upper.includes('WORK') || upper.includes('TEMP') || upper.includes('SORT') ||
+        upper.includes('SYSUT') || upper.includes('SYSPRINT')) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -1460,9 +1674,19 @@ export class CobolProjectAnalyzer {
   }
 
   /**
-   * Classify program roles
-   * RULE 7: Assign program roles based on observable behavior
-   * AVOID using UNKNOWN when behavior is inferable
+   * Classify program roles using RULE TABLE from Prompt v2.2
+   *
+   * | IF (Observed Behavior)              | THEN Role              |
+   * |-------------------------------------|------------------------|
+   * | Online CRUD on master data          | MASTER_MAINTENANCE     |
+   * | Sequential read + counters          | BATCH_AGGREGATION      |
+   * | Sequential read + report output     | BATCH_REPORTING        |
+   * | SQL/VSAM access only for inquiry    | TRANSACTION_PROCESSING |
+   * | Data transfer between systems/files | INTERFACE              |
+   * | Dataset creation / cleanup          | UTILITY                |
+   *
+   * AVOID UNKNOWN unless behavior cannot be inferred.
+   * ❌ Do NOT use INTERFACE for simple aggregation jobs.
    */
   private classifyProgramRoles(
     programResults: CobolBusinessLogicResult[],
@@ -1486,99 +1710,70 @@ export class CobolProjectAnalyzer {
       // Check for VSAM file operations
       const hasVsamAccess = this.detectVsamAccess(program);
 
-      // RULE: Master Maintenance - Full CRUD operations
-      if (dbOps.has('INSERT') && dbOps.has('UPDATE') && dbOps.has('DELETE')) {
+      // v2.2 RULE: Online CRUD on master data → MASTER_MAINTENANCE
+      if (isInteractive && (dbOps.has('INSERT') || dbOps.has('UPDATE') || dbOps.has('DELETE'))) {
         role = 'MASTER_MAINTENANCE';
         confidence = 0.85;
-        evidence.push('Full CRUD operations on database');
+        evidence.push('Online CRUD operations on master data');
       }
-      // RULE: Master Maintenance - VSAM CRUD
-      else if (hasVsamAccess && this.hasVsamCrudPattern(program)) {
+      // v2.2 RULE: VSAM CRUD (Online) → MASTER_MAINTENANCE
+      else if (isInteractive && hasVsamAccess && this.hasVsamCrudPattern(program)) {
         role = 'MASTER_MAINTENANCE';
         confidence = 0.80;
-        evidence.push('Full CRUD operations on VSAM files (READ/WRITE/REWRITE/DELETE)');
+        evidence.push('Online CRUD operations on VSAM master files');
       }
-      // RULE: Transaction Processing - Interactive INSERT
-      else if (dbOps.has('INSERT') && isInteractive) {
-        role = 'TRANSACTION_PROCESSING';
-        confidence = 0.8;
-        evidence.push('INSERT operations in interactive program');
-      }
-      // RULE: Transaction Processing - Interactive with WRITE
-      else if (isInteractive && hasVsamAccess) {
+      // v2.2 RULE: SQL/VSAM access only for inquiry → TRANSACTION_PROCESSING
+      else if (isInteractive && dbOps.has('SELECT') && !dbOps.has('INSERT') && !dbOps.has('UPDATE')) {
         role = 'TRANSACTION_PROCESSING';
         confidence = 0.75;
-        evidence.push('Interactive program with VSAM write access');
+        evidence.push('SQL/VSAM access for inquiry only');
       }
-      // RULE: Batch Update - File processing with DB updates
-      else if (hasFiles && (dbOps.has('UPDATE') || dbOps.has('INSERT'))) {
-        role = 'BATCH_UPDATE';
-        confidence = 0.75;
-        evidence.push('File processing with database updates');
-      }
-      // RULE: Batch Aggregation - Sequential read with counters
+      // v2.2 RULE: Sequential read + counters → BATCH_AGGREGATION
       else if (isBatch && this.hasBatchAggregationPattern(program)) {
         role = 'BATCH_AGGREGATION';
-        confidence = 0.70;
-        evidence.push('Sequential read with accumulator/counter patterns');
+        confidence = 0.80;
+        evidence.push('Sequential read with counters/accumulators');
       }
-      // RULE: Batch Reporting - Batch with WRITE/DISPLAY and SELECT only
+      // v2.2 RULE: Sequential read + report output → BATCH_REPORTING
+      else if (isBatch && this.hasReportOutputPattern(program)) {
+        role = 'BATCH_REPORTING';
+        confidence = 0.80;
+        evidence.push('Sequential read with report output');
+      }
+      // v2.2 RULE: Batch read-only access → BATCH_REPORTING
       else if (isBatch && dbOps.has('SELECT') && !dbOps.has('INSERT') && !dbOps.has('UPDATE')) {
         role = 'BATCH_REPORTING';
         confidence = 0.70;
         evidence.push('Batch program with read-only data access');
       }
-      // RULE: Reporting - Read-only database access
-      else if (dbOps.has('SELECT') && !dbOps.has('INSERT') && !dbOps.has('UPDATE')) {
-        role = 'REPORTING';
-        confidence = 0.7;
-        evidence.push('Read-only database access');
-      }
-      // RULE: Data Extraction - Extract/Export naming pattern
-      else if (programName.includes('EXTRACT') || programName.includes('EXT') ||
-               programName.includes('EXPORT') || programName.includes('UNLOAD')) {
-        role = 'DATA_EXTRACTION';
-        confidence = 0.70;
-        evidence.push('Data extraction naming pattern');
-      }
-      // RULE: Interface - Import/Interface naming pattern
-      else if (programName.includes('INTERFACE') || programName.includes('IMPORT') ||
-               programName.includes('LOAD') || programName.includes('RECV')) {
+      // v2.2 RULE: Data transfer between systems/files → INTERFACE
+      else if (this.isDataTransferProgram(program, programName)) {
         role = 'INTERFACE';
-        confidence = 0.70;
-        evidence.push('Interface/import naming pattern');
+        confidence = 0.75;
+        evidence.push('Data transfer between systems/files');
       }
-      // RULE: Utility
-      else if (programName.includes('UTIL') || programName.includes('COMMON') ||
-               programName.includes('COPY') || programName.includes('INIT')) {
+      // v2.2 RULE: Dataset creation / cleanup → UTILITY
+      else if (this.isUtilityProgram(program, programName)) {
         role = 'UTILITY';
-        confidence = 0.6;
-        evidence.push('Utility naming pattern');
+        confidence = 0.70;
+        evidence.push('Dataset creation/cleanup/utility operations');
       }
-      // RULE: Validation
-      else if (programName.includes('VALID') || programName.includes('CHECK') ||
-               programName.includes('VERIFY') || programName.includes('EDIT')) {
-        role = 'VALIDATION';
-        confidence = 0.65;
-        evidence.push('Validation naming pattern');
+      // Fallback: Batch with file writes → BATCH_AGGREGATION (not INTERFACE for simple jobs)
+      else if (isBatch && hasFiles && (dbOps.has('UPDATE') || dbOps.has('INSERT'))) {
+        role = 'BATCH_AGGREGATION';
+        confidence = 0.60;
+        evidence.push('Batch processing with data updates');
       }
-      // RULE: Calculation
-      else if (programName.includes('CALC') || programName.includes('COMPUTE') ||
-               programName.includes('PROC') || programName.includes('PROCESS')) {
-        role = 'CALCULATION';
-        confidence = 0.65;
-        evidence.push('Calculation/processing naming pattern');
-      }
-      // RULE: Master Maintenance - Naming pattern as fallback
+      // Fallback: Master Maintenance naming pattern
       else if (programName.includes('MAINT') || programName.includes('MASTER') ||
-               programName.includes('MST') || programName.includes('UPDATE')) {
+               programName.includes('MST')) {
         role = 'MASTER_MAINTENANCE';
         confidence = 0.55;
         evidence.push('Master maintenance naming pattern');
       }
-      // RULE: Batch Processing - Generic batch with file operations
+      // Fallback: Generic batch with file operations → BATCH_AGGREGATION
       else if (isBatch && hasFiles) {
-        role = 'BATCH_UPDATE';
+        role = 'BATCH_AGGREGATION';
         confidence = 0.50;
         evidence.push('Batch program with file operations');
       }
@@ -1669,6 +1864,124 @@ export class CobolProjectAnalyzer {
     }
 
     return false;
+  }
+
+  /**
+   * Check if program has report output pattern (sequential read + report writing)
+   * v2.2 RULE: Sequential read + report output → BATCH_REPORTING
+   */
+  private hasReportOutputPattern(program: CobolBusinessLogicResult): boolean {
+    const files = program.files || [];
+    const paragraphs = program.paragraphs || [];
+    const keyDataItems = program.keyDataItems || [];
+
+    // Check for report-related file names
+    const hasReportFile = files.some(f => {
+      const name = (f.fileName || '').toUpperCase();
+      return name.includes('REPORT') || name.includes('RPT') || name.includes('PRINT') ||
+             name.includes('LIST') || name.includes('OUTPUT');
+    });
+
+    // Check for report-related paragraph names
+    const hasReportParagraph = paragraphs.some(p => {
+      const name = p.name.toUpperCase();
+      return name.includes('PRINT') || name.includes('REPORT') || name.includes('WRITE-LINE') ||
+             name.includes('FORMAT') || name.includes('HEADER') || name.includes('FOOTER') ||
+             name.includes('DETAIL') || name.includes('PAGE');
+    });
+
+    // Check for report-related data items (line counts, page counts, etc.)
+    const hasReportDataItems = keyDataItems.some(item => {
+      const name = (item.name || '').toUpperCase();
+      return name.includes('LINE') || name.includes('PAGE') || name.includes('COLUMN') ||
+             name.includes('HEADER') || name.includes('FOOTER') || name.includes('REPORT');
+    });
+
+    // Check program name for report indicators
+    const programName = program.programId.toUpperCase();
+    const hasReportName = programName.includes('RPT') || programName.includes('REPORT') ||
+                          programName.includes('PRINT') || programName.includes('LIST');
+
+    return hasReportFile || hasReportParagraph || hasReportDataItems || hasReportName;
+  }
+
+  /**
+   * Check if program is a data transfer program (INTERFACE role)
+   * v2.2 RULE: Data transfer between systems/files → INTERFACE
+   * ❌ Do NOT use INTERFACE for simple aggregation jobs
+   */
+  private isDataTransferProgram(program: CobolBusinessLogicResult, programName: string): boolean {
+    const files = program.files || [];
+    const upperName = programName.toUpperCase();
+
+    // Check naming patterns suggesting data transfer
+    const hasTransferName = upperName.includes('TRANSFER') || upperName.includes('XFER') ||
+                           upperName.includes('SEND') || upperName.includes('RECV') ||
+                           upperName.includes('EXPORT') || upperName.includes('IMPORT') ||
+                           upperName.includes('EXTRACT') || upperName.includes('LOAD') ||
+                           upperName.includes('INTERFACE') || upperName.includes('GATEWAY');
+
+    // Check for multiple files with input/output pattern (transfer between systems)
+    const inputFiles = files.filter(f =>
+      (f.accessType || '').toUpperCase() === 'INPUT' ||
+      (f.operations || []).some(op => op.toUpperCase() === 'READ')
+    );
+    const outputFiles = files.filter(f =>
+      (f.accessType || '').toUpperCase() === 'OUTPUT' ||
+      (f.operations || []).some(op => op.toUpperCase() === 'WRITE')
+    );
+
+    // Data transfer: reads from one and writes to another distinct file
+    const hasTransferPattern = inputFiles.length >= 1 && outputFiles.length >= 1 &&
+                               inputFiles.some(i => outputFiles.every(o => o.fileName !== i.fileName));
+
+    // Check for external system indicators in file names
+    const hasExternalFiles = files.some(f => {
+      const name = (f.fileName || '').toUpperCase();
+      return name.includes('EXT') || name.includes('EXTERNAL') ||
+             name.includes('SEND') || name.includes('RECV') ||
+             name.includes('INBOUND') || name.includes('OUTBOUND');
+    });
+
+    // Only consider as INTERFACE if there's clear transfer/external system indication
+    // NOT just simple file processing
+    return hasTransferName || hasExternalFiles || (hasTransferPattern && (hasTransferName || hasExternalFiles));
+  }
+
+  /**
+   * Check if program is a utility program (dataset creation/cleanup)
+   * v2.2 RULE: Dataset creation / cleanup → UTILITY
+   */
+  private isUtilityProgram(program: CobolBusinessLogicResult, programName: string): boolean {
+    const upperName = programName.toUpperCase();
+
+    // Utility program naming patterns
+    const utilityPatterns = [
+      'UTIL', 'UTILITY',
+      'INIT', 'INITIALIZE',
+      'DELETE', 'PURGE', 'CLEANUP', 'CLEAN',
+      'CREATE', 'DEFINE', 'ALLOC',
+      'COPY', 'MOVE', 'RENAME',
+      'BACKUP', 'RESTORE', 'ARCHIVE',
+      'CONVERT', 'CONV',
+      'SORT', 'MERGE',
+      'REORG', 'REBUILD',
+      'VALIDATE', 'VERIFY', 'CHECK',
+      'IDCAMS', 'IEBCOPY', 'IEBGENER', 'DFSORT'  // Common IBM utilities
+    ];
+
+    const hasUtilityName = utilityPatterns.some(p => upperName.includes(p));
+
+    // Check paragraphs for utility-like operations
+    const paragraphs = program.paragraphs || [];
+    const hasUtilityParagraph = paragraphs.some(p => {
+      const name = p.name.toUpperCase();
+      return name.includes('INIT') || name.includes('CLEANUP') ||
+             name.includes('DELETE') || name.includes('CREATE') ||
+             name.includes('HOUSEKEEP');
+    });
+
+    return hasUtilityName || hasUtilityParagraph;
   }
 
   /**
@@ -2068,16 +2381,24 @@ export class CobolProjectAnalyzer {
     }
 
     // Determine platform
+    // v2.2 RULE: If VSAM or JCL is present → Platform MUST be identified as Mainframe
     const hasIbm = ibmFeatures.size > 0;
     const hasFujitsu = fujitsuFeatures.size > 0;
+    const hasVsam = ibmFeatures.has('VSAM KSDS Access') ||
+                   ibmFeatures.has('VSAM ESDS Access') ||
+                   ibmFeatures.has('VSAM RRDS Access');
+    const hasJclDependency = ibmFeatures.has('JCL DD Interaction');
+
     let platform: PlatformDependencyAnalysis['platform'] = 'UNKNOWN';
+    const isMainframe = hasIbm || hasFujitsu || hasVsam || hasJclDependency;
 
     if (hasIbm && hasFujitsu) platform = 'MIXED';
-    else if (hasIbm) platform = 'IBM';
+    else if (hasIbm || hasVsam || hasJclDependency) platform = 'IBM';
     else if (hasFujitsu) platform = 'FUJITSU';
 
     // Calculate portability score (0-100)
     // Higher score = more portable (more vendor-neutral, less platform-specific)
+    // v2.2 RULE: NEVER report 100% portability for mainframe systems
     const totalFeatures = vendorNeutralCount + platformSpecificCount;
     let portabilityScore = 100;
     if (totalFeatures > 0) {
@@ -2088,6 +2409,24 @@ export class CobolProjectAnalyzer {
     const highDifficultyCount = [...ibmFeatures.values(), ...fujitsuFeatures.values()]
       .filter(f => f.migrationDifficulty === 'HIGH').length;
     portabilityScore = Math.max(0, portabilityScore - (highDifficultyCount * 15));
+
+    // v2.2 CRITICAL: Mainframe systems NEVER have 100% portability
+    // VSAM usage, JCL dependency, and DB2/Symfoware all reduce portability
+    if (isMainframe) {
+      // Cap at 85% max for mainframe - there are always platform-specific considerations
+      portabilityScore = Math.min(portabilityScore, 85);
+
+      // Additional penalties for specific mainframe dependencies
+      if (hasVsam) {
+        portabilityScore = Math.max(0, portabilityScore - 10); // VSAM requires file migration
+      }
+      if (hasJclDependency) {
+        portabilityScore = Math.max(0, portabilityScore - 5); // JCL requires job scheduling migration
+      }
+      if (ibmFeatures.has('EXEC SQL (DB2)') || fujitsuFeatures.has('Symfoware SQL')) {
+        portabilityScore = Math.max(0, portabilityScore - 10); // DB needs SQL dialect adjustment
+      }
+    }
 
     // Generate risks
     let riskId = 1;
@@ -2138,9 +2477,14 @@ export class CobolProjectAnalyzer {
     }
 
     // Portability-based recommendations
+    if (isMainframe) {
+      recommendations.push('Mainframe system identified: migration requires platform-specific considerations for JCL, VSAM, and transaction processing');
+    }
     if (portabilityScore < 50) {
       recommendations.push('Low portability score indicates heavy platform dependencies; consider phased migration approach');
-    } else if (portabilityScore >= 80) {
+    } else if (portabilityScore >= 70 && isMainframe) {
+      recommendations.push('Moderate portability score for mainframe system; focus on VSAM-to-RDB migration and JCL-to-scheduler conversion');
+    } else if (portabilityScore >= 80 && !isMainframe) {
       recommendations.push('High portability score indicates mostly standard COBOL; migration should be relatively straightforward');
     }
 
