@@ -390,7 +390,8 @@ export class CobolProjectAnalyzer {
     const batchExecutionFlows = this.extractBatchFlows(jclResults);
 
     // 10. Analyze platform dependencies
-    const platformDependencies = this.analyzePlatformDependencies(programResults);
+    // v2.3: Pass JCL results to detect mainframe platform
+    const platformDependencies = this.analyzePlatformDependencies(programResults, jclResults);
 
     // 11. Generate migration impact summary (SYSTEM-LEVEL evaluation)
     const migrationImpact = this.generateMigrationImpact(
@@ -2337,12 +2338,54 @@ export class CobolProjectAnalyzer {
    * - Vendor-neutral COBOL logic
    * - IBM-specific (VSAM, DB2, JCL, CICS)
    * - Fujitsu-specific (Symfoware, TP monitor, extensions)
+   *
+   * v2.3 NON-OVERRIDABLE:
+   * - Presence of VSAM / JCL / IDCAMS → Platform = MAINFRAME
+   * - Mainframe systems can NEVER be 100% portable
    */
-  private analyzePlatformDependencies(programResults: CobolBusinessLogicResult[]): PlatformDependencyAnalysis {
+  private analyzePlatformDependencies(
+    programResults: CobolBusinessLogicResult[],
+    jclResults?: JclAnalysisResult[]
+  ): PlatformDependencyAnalysis {
     const vendorNeutralFeatures: Map<string, PlatformFeature> = new Map();
     const ibmFeatures: Map<string, PlatformFeature> = new Map();
     const fujitsuFeatures: Map<string, PlatformFeature> = new Map();
     const risks: PlatformRisk[] = [];
+
+    // v2.3: Detect JCL presence for platform identification
+    const hasJcl = jclResults && jclResults.length > 0;
+    const jclJobCount = jclResults?.reduce((sum, jcl) => sum + jcl.jobs.length, 0) || 0;
+
+    // If JCL exists, add it as an IBM-specific feature
+    if (hasJcl && jclJobCount > 0) {
+      ibmFeatures.set('JCL Job Control', {
+        feature: 'JCL Job Control',
+        usageCount: jclJobCount,
+        programs: jclResults?.flatMap(jcl =>
+          jcl.jobs.flatMap(job =>
+            job.steps.map(step => step.programName)
+          )
+        ).filter((p, i, arr) => arr.indexOf(p) === i) || [],
+        description: 'JCL job control language for batch scheduling (IBM z/OS)',
+        migrationDifficulty: 'MEDIUM'
+      });
+
+      // Check for IDCAMS utility in JCL
+      const hasIdcams = jclResults?.some(jcl =>
+        jcl.jobs.some(job =>
+          job.steps.some(step => step.programName.toUpperCase() === 'IDCAMS')
+        )
+      );
+      if (hasIdcams) {
+        ibmFeatures.set('IDCAMS Utility', {
+          feature: 'IDCAMS Utility',
+          usageCount: 1,
+          programs: ['IDCAMS'],
+          description: 'VSAM dataset management utility (IBM z/OS)',
+          migrationDifficulty: 'MEDIUM'
+        });
+      }
+    }
 
     // Vendor-neutral COBOL patterns (portable across platforms)
     const vendorNeutralPatterns: [string, RegExp, string][] = [
