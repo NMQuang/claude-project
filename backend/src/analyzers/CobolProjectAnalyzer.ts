@@ -382,7 +382,9 @@ export class CobolProjectAnalyzer {
     const dataFlows = this.buildDataFlowMap(programResults, jclResults, businessEntities);
 
     // 8. Classify program roles
-    const programRoles = this.classifyProgramRoles(programResults, crossRefResult);
+    // v2.3: Extract JCL-executed programs for NON-OVERRIDABLE BATCH classification
+    const jclExecutedPrograms = this.extractJclExecutedPrograms(jclResults);
+    const programRoles = this.classifyProgramRoles(programResults, crossRefResult, jclExecutedPrograms);
 
     // 9. Extract batch execution flows
     const batchExecutionFlows = this.extractBatchFlows(jclResults);
@@ -1682,17 +1684,21 @@ export class CobolProjectAnalyzer {
    * | Sequential read + counters          | BATCH_AGGREGATION      |
    * | Sequential read + report output     | BATCH_REPORTING        |
    * | SQL/VSAM access only for inquiry    | TRANSACTION_PROCESSING |
-   * | Data transfer between systems/files | INTERFACE              |
+   * | Data crosses system boundaries      | INTERFACE              |
    * | Dataset creation / cleanup          | UTILITY                |
    *
-   * AVOID UNKNOWN unless behavior cannot be inferred.
-   * ❌ Do NOT use INTERFACE for simple aggregation jobs.
+   * v2.3 NON-OVERRIDABLE RULES:
+   * ❌ BATCH programs can NEVER be MASTER_MAINTENANCE
+   * ❌ INTERFACE ONLY if data crosses system boundaries
+   * ❌ Internal VSAM/RDB access ≠ INTERFACE
    */
   private classifyProgramRoles(
     programResults: CobolBusinessLogicResult[],
-    crossRefResult: CrossReferenceResult
+    crossRefResult: CrossReferenceResult,
+    jclExecutedPrograms?: Set<string>
   ): ProgramRoleAssignment[] {
     const roles: ProgramRoleAssignment[] = [];
+    const jclPrograms = jclExecutedPrograms || new Set<string>();
 
     for (const program of programResults) {
       const evidence: string[] = [];
@@ -1703,84 +1709,118 @@ export class CobolProjectAnalyzer {
       const hasDB = (program.databaseAccess || []).length > 0;
       const hasFiles = (program.files || []).length > 0;
       const dbOps = new Set((program.databaseAccess || []).map(d => d.operation));
-      const isInteractive = program.overview?.processingType === 'Interactive' ||
-                           program.overview?.processingType === 'Online';
-      const isBatch = program.overview?.processingType === 'Batch';
+
+      // v2.3 NON-OVERRIDABLE: JCL-executed programs are ALWAYS BATCH
+      const isJclExecuted = jclPrograms.has(programName) || jclPrograms.has(program.programId);
+      const isInteractive = !isJclExecuted && (
+        program.overview?.processingType === 'Interactive' ||
+        program.overview?.processingType === 'Online'
+      );
+      const isBatch = isJclExecuted || program.overview?.processingType === 'Batch';
 
       // Check for VSAM file operations
       const hasVsamAccess = this.detectVsamAccess(program);
+      const hasVsamCrud = this.hasVsamCrudPattern(program);
 
-      // v2.2 RULE: Online CRUD on master data → MASTER_MAINTENANCE
+      // ========================================
+      // v2.3 NON-OVERRIDABLE CLASSIFICATION RULES
+      // ========================================
+
+      // RULE: ONLINE programs that WRITE/REWRITE/DELETE persistent data → MASTER_MAINTENANCE (FORCED)
+      // ❌ BATCH programs can NEVER be MASTER_MAINTENANCE
       if (isInteractive && (dbOps.has('INSERT') || dbOps.has('UPDATE') || dbOps.has('DELETE'))) {
         role = 'MASTER_MAINTENANCE';
-        confidence = 0.85;
-        evidence.push('Online CRUD operations on master data');
+        confidence = 0.90;
+        evidence.push('ONLINE program with WRITE/UPDATE/DELETE on persistent data (FORCED)');
       }
-      // v2.2 RULE: VSAM CRUD (Online) → MASTER_MAINTENANCE
-      else if (isInteractive && hasVsamAccess && this.hasVsamCrudPattern(program)) {
+      else if (isInteractive && hasVsamAccess && hasVsamCrud) {
         role = 'MASTER_MAINTENANCE';
-        confidence = 0.80;
-        evidence.push('Online CRUD operations on VSAM master files');
+        confidence = 0.90;
+        evidence.push('ONLINE program with VSAM WRITE/REWRITE/DELETE (FORCED)');
       }
-      // v2.2 RULE: SQL/VSAM access only for inquiry → TRANSACTION_PROCESSING
+      // RULE: ONLINE read-only → TRANSACTION_PROCESSING
       else if (isInteractive && dbOps.has('SELECT') && !dbOps.has('INSERT') && !dbOps.has('UPDATE')) {
         role = 'TRANSACTION_PROCESSING';
-        confidence = 0.75;
-        evidence.push('SQL/VSAM access for inquiry only');
+        confidence = 0.80;
+        evidence.push('ONLINE program with read-only data access');
       }
-      // v2.2 RULE: Sequential read + counters → BATCH_AGGREGATION
+      else if (isInteractive && hasVsamAccess && !hasVsamCrud) {
+        role = 'TRANSACTION_PROCESSING';
+        confidence = 0.75;
+        evidence.push('ONLINE program with VSAM read-only access');
+      }
+      // RULE: Sequential read + counters → BATCH_AGGREGATION
       else if (isBatch && this.hasBatchAggregationPattern(program)) {
         role = 'BATCH_AGGREGATION';
-        confidence = 0.80;
-        evidence.push('Sequential read with counters/accumulators');
+        confidence = 0.85;
+        evidence.push('BATCH: Sequential read with counters/accumulators');
       }
-      // v2.2 RULE: Sequential read + report output → BATCH_REPORTING
+      // RULE: Sequential read + formatted output → BATCH_REPORTING
       else if (isBatch && this.hasReportOutputPattern(program)) {
         role = 'BATCH_REPORTING';
-        confidence = 0.80;
-        evidence.push('Sequential read with report output');
+        confidence = 0.85;
+        evidence.push('BATCH: Sequential read with formatted report output');
       }
-      // v2.2 RULE: Batch read-only access → BATCH_REPORTING
+      // RULE: Batch read-only access → BATCH_REPORTING
       else if (isBatch && dbOps.has('SELECT') && !dbOps.has('INSERT') && !dbOps.has('UPDATE')) {
         role = 'BATCH_REPORTING';
-        confidence = 0.70;
-        evidence.push('Batch program with read-only data access');
-      }
-      // v2.2 RULE: Data transfer between systems/files → INTERFACE
-      else if (this.isDataTransferProgram(program, programName)) {
-        role = 'INTERFACE';
         confidence = 0.75;
-        evidence.push('Data transfer between systems/files');
+        evidence.push('BATCH program with read-only data access');
       }
-      // v2.2 RULE: Dataset creation / cleanup → UTILITY
+      // RULE: INTERFACE ONLY if data crosses system boundaries
+      // ❌ Internal VSAM/RDB access ≠ INTERFACE
+      else if (this.isCrossSystemInterface(program, programName)) {
+        role = 'INTERFACE';
+        confidence = 0.80;
+        evidence.push('Data transfer across system boundaries (external system)');
+      }
+      // RULE: Dataset creation / cleanup → UTILITY
       else if (this.isUtilityProgram(program, programName)) {
         role = 'UTILITY';
-        confidence = 0.70;
+        confidence = 0.75;
         evidence.push('Dataset creation/cleanup/utility operations');
       }
-      // Fallback: Batch with file writes → BATCH_AGGREGATION (not INTERFACE for simple jobs)
-      else if (isBatch && hasFiles && (dbOps.has('UPDATE') || dbOps.has('INSERT'))) {
-        role = 'BATCH_AGGREGATION';
-        confidence = 0.60;
-        evidence.push('Batch processing with data updates');
+      // BATCH with data updates → BATCH_UPDATE (NOT MASTER_MAINTENANCE)
+      else if (isBatch && (dbOps.has('UPDATE') || dbOps.has('INSERT') || hasVsamCrud)) {
+        role = 'BATCH_UPDATE';
+        confidence = 0.70;
+        evidence.push('BATCH program with data updates');
       }
-      // Fallback: Master Maintenance naming pattern
-      else if (programName.includes('MAINT') || programName.includes('MASTER') ||
-               programName.includes('MST')) {
-        role = 'MASTER_MAINTENANCE';
-        confidence = 0.55;
-        evidence.push('Master maintenance naming pattern');
-      }
-      // Fallback: Generic batch with file operations → BATCH_AGGREGATION
+      // BATCH with file operations → BATCH_AGGREGATION
       else if (isBatch && hasFiles) {
         role = 'BATCH_AGGREGATION';
-        confidence = 0.50;
-        evidence.push('Batch program with file operations');
+        confidence = 0.60;
+        evidence.push('BATCH program with file operations');
       }
-      // RULE: AVOID UNKNOWN - Use inferable behavior
-      // If still UNKNOWN, try to infer from any observable behavior
+      // Naming pattern hints (v2.3: ONLY for ONLINE programs)
+      else if (isInteractive && (programName.includes('MAINT') || programName.includes('MASTER') ||
+               programName.includes('MST'))) {
+        role = 'MASTER_MAINTENANCE';
+        confidence = 0.60;
+        evidence.push('ONLINE program with master maintenance naming pattern');
+      }
+      // Fallback for BATCH with naming pattern
+      else if (isBatch && (programName.includes('MAINT') || programName.includes('MASTER'))) {
+        // v2.3: BATCH can NEVER be MASTER_MAINTENANCE
+        role = 'BATCH_UPDATE';
+        confidence = 0.55;
+        evidence.push('BATCH program (naming suggests master data, but BATCH cannot be MASTER_MAINTENANCE)');
+      }
+      // Generic BATCH fallback
+      else if (isBatch) {
+        role = 'BATCH_UPDATE';
+        confidence = 0.50;
+        evidence.push('BATCH program (generic)');
+      }
+      // ONLINE fallback
+      else if (isInteractive) {
+        role = 'TRANSACTION_PROCESSING';
+        confidence = 0.50;
+        evidence.push('ONLINE program (generic)');
+      }
+      // Last resort - infer from behavior
       else {
-        const inferredRole = this.inferRoleFromBehavior(program, programName);
+        const inferredRole = this.inferRoleFromBehavior(program, programName, isBatch);
         role = inferredRole.role;
         confidence = inferredRole.confidence;
         if (inferredRole.evidence) {
@@ -1906,46 +1946,50 @@ export class CobolProjectAnalyzer {
   }
 
   /**
-   * Check if program is a data transfer program (INTERFACE role)
-   * v2.2 RULE: Data transfer between systems/files → INTERFACE
-   * ❌ Do NOT use INTERFACE for simple aggregation jobs
+   * Check if program is a CROSS-SYSTEM INTERFACE
+   * v2.3 NON-OVERRIDABLE RULE:
+   * - INTERFACE role ONLY if data crosses system boundaries
+   * - Internal VSAM/RDB access ≠ INTERFACE
+   * ❌ Do NOT use INTERFACE for simple file processing or aggregation
    */
-  private isDataTransferProgram(program: CobolBusinessLogicResult, programName: string): boolean {
+  private isCrossSystemInterface(program: CobolBusinessLogicResult, programName: string): boolean {
     const files = program.files || [];
     const upperName = programName.toUpperCase();
 
-    // Check naming patterns suggesting data transfer
-    const hasTransferName = upperName.includes('TRANSFER') || upperName.includes('XFER') ||
-                           upperName.includes('SEND') || upperName.includes('RECV') ||
-                           upperName.includes('EXPORT') || upperName.includes('IMPORT') ||
-                           upperName.includes('EXTRACT') || upperName.includes('LOAD') ||
-                           upperName.includes('INTERFACE') || upperName.includes('GATEWAY');
+    // v2.3: ONLY consider INTERFACE if there's EXPLICIT cross-system indicators
+    // NOT just file read/write patterns
 
-    // Check for multiple files with input/output pattern (transfer between systems)
-    const inputFiles = files.filter(f =>
-      (f.accessType || '').toUpperCase() === 'INPUT' ||
-      (f.operations || []).some(op => op.toUpperCase() === 'READ')
-    );
-    const outputFiles = files.filter(f =>
-      (f.accessType || '').toUpperCase() === 'OUTPUT' ||
-      (f.operations || []).some(op => op.toUpperCase() === 'WRITE')
-    );
+    // Check for EXPLICIT external system naming patterns
+    const hasExternalSystemName =
+      upperName.includes('INTERFACE') ||
+      upperName.includes('GATEWAY') ||
+      upperName.includes('BRIDGE') ||
+      upperName.includes('ADAPTER') ||
+      upperName.includes('CONNECTOR') ||
+      upperName.includes('INBOUND') ||
+      upperName.includes('OUTBOUND') ||
+      upperName.includes('EXTERNAL') ||
+      upperName.includes('EDI') ||       // Electronic Data Interchange
+      upperName.includes('FTP') ||       // File Transfer Protocol
+      upperName.includes('MQ') ||        // Message Queue
+      upperName.includes('CICS');        // Cross-system CICS communication
 
-    // Data transfer: reads from one and writes to another distinct file
-    const hasTransferPattern = inputFiles.length >= 1 && outputFiles.length >= 1 &&
-                               inputFiles.some(i => outputFiles.every(o => o.fileName !== i.fileName));
-
-    // Check for external system indicators in file names
+    // Check for EXPLICIT external file indicators
     const hasExternalFiles = files.some(f => {
       const name = (f.fileName || '').toUpperCase();
-      return name.includes('EXT') || name.includes('EXTERNAL') ||
-             name.includes('SEND') || name.includes('RECV') ||
-             name.includes('INBOUND') || name.includes('OUTBOUND');
+      return name.includes('EXTERNAL') ||
+             name.includes('INBOUND') ||
+             name.includes('OUTBOUND') ||
+             name.includes('EDI') ||
+             name.includes('INTERFACE') ||
+             name.includes('GATEWAY');
     });
 
-    // Only consider as INTERFACE if there's clear transfer/external system indication
-    // NOT just simple file processing
-    return hasTransferName || hasExternalFiles || (hasTransferPattern && (hasTransferName || hasExternalFiles));
+    // v2.3: Internal VSAM/RDB access is NOT INTERFACE
+    // Simple EXTRACT, LOAD, TRANSFER within the same system is NOT INTERFACE
+    // INTERFACE requires EXPLICIT cross-system boundary indicators
+
+    return hasExternalSystemName || hasExternalFiles;
   }
 
   /**
@@ -1986,48 +2030,46 @@ export class CobolProjectAnalyzer {
 
   /**
    * Infer role from observable behavior when other rules don't match
-   * RULE 7: AVOID using UNKNOWN when behavior is inferable
+   * v2.3 RULE: AVOID using UNKNOWN when behavior is inferable
+   * v2.3 NON-OVERRIDABLE: BATCH can NEVER be MASTER_MAINTENANCE
    */
   private inferRoleFromBehavior(
     program: CobolBusinessLogicResult,
-    programName: string
+    programName: string,
+    forceBatch?: boolean
   ): { role: ProgramRole; confidence: number; evidence?: string } {
     const hasDB = (program.databaseAccess || []).length > 0;
     const hasFiles = (program.files || []).length > 0;
-    const isBatch = program.overview?.processingType === 'Batch';
-    const isOnline = program.overview?.processingType === 'Online' ||
-                     program.overview?.processingType === 'Interactive';
+    const isBatch = forceBatch || program.overview?.processingType === 'Batch';
+    const isOnline = !isBatch && (
+      program.overview?.processingType === 'Online' ||
+      program.overview?.processingType === 'Interactive'
+    );
 
     // Any database access suggests data processing
     if (hasDB) {
       const dbOps = new Set((program.databaseAccess || []).map(d => d.operation));
       if (dbOps.has('INSERT') || dbOps.has('UPDATE')) {
         return {
+          // v2.3: BATCH can NEVER be MASTER_MAINTENANCE
           role: isBatch ? 'BATCH_UPDATE' : 'TRANSACTION_PROCESSING',
           confidence: 0.45,
           evidence: 'Database write operations detected'
         };
       }
       return {
-        role: 'REPORTING',
+        role: isBatch ? 'BATCH_REPORTING' : 'REPORTING',
         confidence: 0.45,
         evidence: 'Database read operations detected'
       };
     }
 
-    // File operations suggest batch processing or interface
+    // File operations - v2.3: NOT automatically INTERFACE
     if (hasFiles) {
-      if (isBatch) {
-        return {
-          role: 'BATCH_UPDATE',
-          confidence: 0.45,
-          evidence: 'Batch program with file operations'
-        };
-      }
       return {
-        role: 'INTERFACE',
-        confidence: 0.40,
-        evidence: 'File-based operations suggest interface role'
+        role: isBatch ? 'BATCH_UPDATE' : 'TRANSACTION_PROCESSING',
+        confidence: 0.45,
+        evidence: `${isBatch ? 'Batch' : 'Online'} program with file operations`
       };
     }
 
@@ -2040,7 +2082,7 @@ export class CobolProjectAnalyzer {
       };
     }
 
-    // Batch program suggests batch update or utility
+    // Batch program suggests batch update
     if (isBatch) {
       return {
         role: 'BATCH_UPDATE',
@@ -2050,23 +2092,32 @@ export class CobolProjectAnalyzer {
     }
 
     // Check naming for any remaining hints
-    const nameHints: [string, ProgramRole][] = [
-      ['RPT', 'REPORTING'],
-      ['REPORT', 'REPORTING'],
-      ['PRINT', 'REPORTING'],
-      ['INQ', 'REPORTING'],
-      ['INQUIRY', 'REPORTING'],
-      ['ADD', 'MASTER_MAINTENANCE'],
-      ['DEL', 'MASTER_MAINTENANCE'],
-      ['MOD', 'MASTER_MAINTENANCE'],
-      ['EDIT', 'VALIDATION'],
-      ['CONV', 'UTILITY'],
-      ['SORT', 'UTILITY'],
-      ['MERGE', 'UTILITY'],
+    // v2.3: MASTER_MAINTENANCE hints only apply to ONLINE programs
+    const nameHints: [string, ProgramRole, boolean][] = [
+      ['RPT', 'REPORTING', false],
+      ['REPORT', 'REPORTING', false],
+      ['PRINT', 'BATCH_REPORTING', false],
+      ['INQ', 'TRANSACTION_PROCESSING', false],
+      ['INQUIRY', 'TRANSACTION_PROCESSING', false],
+      ['ADD', 'MASTER_MAINTENANCE', true],   // Only for ONLINE
+      ['DEL', 'MASTER_MAINTENANCE', true],   // Only for ONLINE
+      ['MOD', 'MASTER_MAINTENANCE', true],   // Only for ONLINE
+      ['EDIT', 'VALIDATION', false],
+      ['CONV', 'UTILITY', false],
+      ['SORT', 'UTILITY', false],
+      ['MERGE', 'UTILITY', false],
     ];
 
-    for (const [hint, hintRole] of nameHints) {
+    for (const [hint, hintRole, onlineOnly] of nameHints) {
       if (programName.includes(hint)) {
+        // v2.3: Skip MASTER_MAINTENANCE for BATCH programs
+        if (onlineOnly && isBatch) {
+          return {
+            role: 'BATCH_UPDATE',
+            confidence: 0.40,
+            evidence: `Naming pattern suggests ${hintRole.toLowerCase().replace(/_/g, ' ')}, but BATCH cannot be MASTER_MAINTENANCE`
+          };
+        }
         return {
           role: hintRole,
           confidence: 0.40,
@@ -2082,6 +2133,26 @@ export class CobolProjectAnalyzer {
       confidence: 0.30,
       evidence: 'Role not clearly identifiable from source code; inferred as UTILITY with low confidence. Manual review recommended.'
     };
+  }
+
+  /**
+   * Extract all programs executed by JCL
+   * v2.3 NON-OVERRIDABLE: Any program referenced in JCL → Program Type = BATCH
+   */
+  private extractJclExecutedPrograms(jclResults: JclAnalysisResult[]): Set<string> {
+    const programs = new Set<string>();
+
+    for (const jcl of jclResults) {
+      for (const job of jcl.jobs) {
+        for (const step of job.steps) {
+          if (step.programName) {
+            programs.add(step.programName.toUpperCase());
+          }
+        }
+      }
+    }
+
+    return programs;
   }
 
   /**
@@ -2690,6 +2761,10 @@ export class CobolProjectAnalyzer {
   /**
    * Evaluate system-level complexity factors
    * RULE 12: System-level analysis, not just individual program analysis
+   *
+   * v2.3 NON-OVERRIDABLE COMPLEXITY RULE:
+   * - ONLINE + BATCH + VSAM/RDB + JCL → Overall Complexity ≥ MEDIUM
+   * - Mainframe systems can NEVER have LOW complexity
    */
   private evaluateSystemLevelComplexity(
     programResults: CobolBusinessLogicResult[],
@@ -2709,15 +2784,17 @@ export class CobolProjectAnalyzer {
     let forceAtLeastMedium = false;
     let forceHigh = false;
 
-    // Check for VSAM AND RDB usage
+    // Check for VSAM usage
     const hasVsam = platformDeps.ibmSpecific.some(f =>
       f.feature.includes('VSAM') || f.feature.includes('INDEXED') || f.feature.includes('RELATIVE')
     );
+    // Check for RDB usage
     const hasRdb = platformDeps.ibmSpecific.some(f =>
       f.feature.includes('SQL') || f.feature.includes('DB2')
     ) || platformDeps.fujitsuSpecific.some(f =>
       f.feature.includes('SQL') || f.feature.includes('Symfoware')
     );
+    const hasVsamOrRdb = hasVsam || hasRdb;
 
     const hasVsamAndRdb = hasVsam && hasRdb;
     if (hasVsamAndRdb) {
@@ -2747,6 +2824,24 @@ export class CobolProjectAnalyzer {
     if (hasOnlineAndBatch) {
       forceAtLeastMedium = true;
       reasons.push('System has both Online and Batch processing modes');
+    }
+
+    // ========================================
+    // v2.3 NON-OVERRIDABLE COMPLEXITY RULES
+    // ========================================
+
+    // RULE: ONLINE + BATCH + VSAM/RDB + JCL → Complexity ≥ MEDIUM
+    if (hasOnline && hasBatch && hasVsamOrRdb && hasJcl) {
+      forceAtLeastMedium = true;
+      reasons.push('v2.3 RULE: ONLINE + BATCH + VSAM/RDB + JCL requires at least MEDIUM complexity');
+    }
+
+    // RULE: Mainframe system (has VSAM/JCL/IDCAMS) can NEVER have LOW complexity
+    const isMainframe = platformDeps.platform === 'IBM' || platformDeps.platform === 'FUJITSU' ||
+                       hasVsam || hasJcl;
+    if (isMainframe) {
+      forceAtLeastMedium = true;
+      reasons.push('Mainframe system: complexity cannot be LOW');
     }
 
     // Check for JCL job chains (multi-step jobs)
