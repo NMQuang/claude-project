@@ -44,6 +44,11 @@ function ProjectDashboardPage() {
         { id: 'business-logic-analysis', name: 'Business Logic Analysis', generated: false }
       ]
     }
+    if (migrationType === 'COBOL-Project-Analysis') {
+      return [
+        { id: 'project-analysis', name: 'Project-Level Analysis', generated: false }
+      ]
+    }
     // Default documents for migration types (COBOL-to-Java, PostgreSQL-to-Oracle, etc.)
     return [
       { id: 'as-is-analysis', name: 'As-Is Analysis', generated: false },
@@ -394,7 +399,7 @@ function ProjectDashboardPage() {
                   <div className="metric-label">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? 'Database Tables'
-                      : project.migrationType === 'COBOL-Analysis'
+                      : project.migrationType === 'COBOL-Analysis' || project.migrationType === 'COBOL-Project-Analysis'
                         ? 'COBOL Programs'
                         : 'Source Files'}
                   </div>
@@ -405,8 +410,14 @@ function ProjectDashboardPage() {
                   </div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Lines of Code</div>
-                  <div className="metric-value">{project.metadata.source_analysis?.total_loc || 0}</div>
+                  <div className="metric-label">
+                    {project.migrationType === 'COBOL-Project-Analysis' ? 'Copybooks' : 'Lines of Code'}
+                  </div>
+                  <div className="metric-value">
+                    {project.migrationType === 'COBOL-Project-Analysis'
+                      ? (project.metadata.source_analysis?.copybooks || 0)
+                      : (project.metadata.source_analysis?.total_loc || 0)}
+                  </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">
@@ -414,19 +425,23 @@ function ProjectDashboardPage() {
                       ? 'Stored Procedures/Functions'
                       : project.migrationType === 'COBOL-Analysis'
                         ? 'Paragraphs'
-                        : 'Database Tables'}
+                        : project.migrationType === 'COBOL-Project-Analysis'
+                          ? 'JCL Jobs'
+                          : 'Database Tables'}
                   </div>
                   <div className="metric-value">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? ((project.metadata.source_analysis?.database?.procedures || 0) + (project.metadata.source_analysis?.database?.functions || 0))
                       : project.migrationType === 'COBOL-Analysis'
                         ? (project.metadata.source_analysis?.total_paragraphs || 0)
-                        : (project.metadata.source_analysis?.database?.tables || 0)}
+                        : project.migrationType === 'COBOL-Project-Analysis'
+                          ? (project.metadata.source_analysis?.jcl_jobs || 0)
+                          : (project.metadata.source_analysis?.database?.tables || 0)}
                   </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">
-                    {project.migrationType === 'COBOL-Analysis' ? 'Complexity' : 'Migration Difficulty'}
+                    {project.migrationType === 'COBOL-Analysis' || project.migrationType === 'COBOL-Project-Analysis' ? 'Complexity' : 'Migration Difficulty'}
                   </div>
                   <div className={`metric-value complexity-${project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown'}`}>
                     {project.metadata.migrationComplexity?.difficulty || 'Unknown'}
