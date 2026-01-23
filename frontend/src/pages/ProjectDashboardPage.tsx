@@ -44,6 +44,17 @@ function ProjectDashboardPage() {
         { id: 'business-logic-analysis', name: 'Business Logic Analysis', generated: false }
       ]
     }
+    if (migrationType === 'COBOL-Project-Analysis') {
+      return [
+        { id: 'project-analysis', name: 'Project-Level Analysis', generated: false }
+      ]
+    }
+    if (migrationType === 'Source-Analysis') {
+      return [
+        { id: 'source-analysis', name: 'Source Analysis Report', generated: false },
+        { id: 'business-draft', name: 'Business Draft v1', generated: false }
+      ]
+    }
     // Default documents for migration types (COBOL-to-Java, PostgreSQL-to-Oracle, etc.)
     return [
       { id: 'as-is-analysis', name: 'As-Is Analysis', generated: false },
@@ -394,8 +405,8 @@ function ProjectDashboardPage() {
                   <div className="metric-label">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? 'Database Tables'
-                      : project.migrationType === 'COBOL-Analysis'
-                        ? 'COBOL Programs'
+                      : project.migrationType === 'COBOL-Analysis' || project.migrationType === 'COBOL-Project-Analysis' || project.migrationType === 'Source-Analysis'
+                        ? 'Programs Detected'
                         : 'Source Files'}
                   </div>
                   <div className="metric-value">
@@ -405,8 +416,18 @@ function ProjectDashboardPage() {
                   </div>
                 </div>
                 <div className="metric">
-                  <div className="metric-label">Lines of Code</div>
-                  <div className="metric-value">{project.metadata.source_analysis?.total_loc || 0}</div>
+                  <div className="metric-label">
+                    {project.migrationType === 'COBOL-Project-Analysis' ? 'Copybooks'
+                      : project.migrationType === 'Source-Analysis' ? 'Data Structures'
+                      : 'Lines of Code'}
+                  </div>
+                  <div className="metric-value">
+                    {project.migrationType === 'COBOL-Project-Analysis'
+                      ? (project.metadata.source_analysis?.copybooks || 0)
+                      : project.migrationType === 'Source-Analysis'
+                        ? (project.metadata.source_analysis?.data_structures || 0)
+                        : (project.metadata.source_analysis?.total_loc || 0)}
+                  </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">
@@ -414,22 +435,32 @@ function ProjectDashboardPage() {
                       ? 'Stored Procedures/Functions'
                       : project.migrationType === 'COBOL-Analysis'
                         ? 'Paragraphs'
-                        : 'Database Tables'}
+                        : project.migrationType === 'COBOL-Project-Analysis' || project.migrationType === 'Source-Analysis'
+                          ? 'JCL Jobs'
+                          : 'Database Tables'}
                   </div>
                   <div className="metric-value">
                     {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
                       ? ((project.metadata.source_analysis?.database?.procedures || 0) + (project.metadata.source_analysis?.database?.functions || 0))
                       : project.migrationType === 'COBOL-Analysis'
                         ? (project.metadata.source_analysis?.total_paragraphs || 0)
-                        : (project.metadata.source_analysis?.database?.tables || 0)}
+                        : project.migrationType === 'COBOL-Project-Analysis' || project.migrationType === 'Source-Analysis'
+                          ? (project.metadata.source_analysis?.jcl_jobs || 0)
+                          : (project.metadata.source_analysis?.database?.tables || 0)}
                   </div>
                 </div>
                 <div className="metric">
                   <div className="metric-label">
-                    {project.migrationType === 'COBOL-Analysis' ? 'Complexity' : 'Migration Difficulty'}
+                    {project.migrationType === 'COBOL-Analysis' || project.migrationType === 'COBOL-Project-Analysis'
+                      ? 'Complexity'
+                      : project.migrationType === 'Source-Analysis'
+                        ? 'Open Questions'
+                        : 'Migration Difficulty'}
                   </div>
-                  <div className={`metric-value complexity-${project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown'}`}>
-                    {project.metadata.migrationComplexity?.difficulty || 'Unknown'}
+                  <div className={`metric-value ${project.migrationType === 'Source-Analysis' ? '' : 'complexity-' + (project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown')}`}>
+                    {project.migrationType === 'Source-Analysis'
+                      ? (project.metadata.source_analysis?.open_questions || 0)
+                      : (project.metadata.migrationComplexity?.difficulty || 'Unknown')}
                   </div>
                 </div>
               </div>

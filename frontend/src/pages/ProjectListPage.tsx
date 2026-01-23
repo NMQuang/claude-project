@@ -25,6 +25,16 @@ const MIGRATION_TYPES: MigrationType[] = [
     sourceLanguage: 'COBOL'
   },
   {
+    value: 'COBOL-Project-Analysis',
+    label: 'COBOL Project Analysis',
+    sourceLanguage: 'COBOL'
+  },
+  {
+    value: 'Source-Analysis',
+    label: 'Source Analysis',
+    sourceLanguage: 'COBOL'
+  },
+  {
     value: 'PostgreSQL-to-Oracle',
     label: 'PostgreSQL to Oracle',
     sourceLanguage: 'PostgreSQL',

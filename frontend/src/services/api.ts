@@ -57,6 +57,12 @@ export interface Project {
     source_analysis?: {
       total_files?: number;
       total_loc?: number;
+      total_paragraphs?: number;
+      copybooks?: number;
+      jcl_jobs?: number;
+      entities?: number;
+      data_structures?: number;
+      open_questions?: number;
       database?: {
         tables?: number;
         procedures?: number;

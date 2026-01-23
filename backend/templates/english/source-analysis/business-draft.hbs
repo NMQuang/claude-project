@@ -1,0 +1,273 @@
+# BUSINESS_DRAFT_v1
+
+**Project:** {{project.name}}
+**Source Reference:** {{businessDraft.section0_scopeAssumptions.sourceAnalysisReference}}
+**Generated:** {{businessDraft.section0_scopeAssumptions.generatedAt}}
+**Status:** DRAFT - Requires Human Validation
+
+---
+
+> **IMPORTANT NOTICE**
+>
+> This document represents a controlled transition from source analysis to initial business understanding.
+> All hypotheses are TENTATIVE and require validation by Subject Matter Experts (SMEs).
+> This document does NOT replace SOURCE_ANALYSIS.md.
+
+---
+
+## 0. Scope & Assumptions
+
+### Analysis Scope
+
+{{businessDraft.section0_scopeAssumptions.analysisScope}}
+
+### Assumptions
+
+{{#each businessDraft.section0_scopeAssumptions.assumptions}}
+- {{this}}
+{{/each}}
+
+### Limitations
+
+{{#each businessDraft.section0_scopeAssumptions.limitations}}
+- {{this}}
+{{/each}}
+
+---
+
+## 1. Confirmed Facts (from SOURCE_ANALYSIS.md)
+
+The following facts are directly extracted from source analysis with evidence citations.
+These are **OBSERVATIONS**, not interpretations.
+
+{{#if businessDraft.section1_confirmedFacts}}
+### Summary by Category
+
+| Category | Count |
+|----------|-------|
+| INVENTORY | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "INVENTORY")}}1{{/if}}{{/each}} |
+| DATA_STRUCTURE | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "DATA_STRUCTURE")}}1{{/if}}{{/each}} |
+| DATA_ACCESS | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "DATA_ACCESS")}}1{{/if}}{{/each}} |
+| EXECUTION_FLOW | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "EXECUTION_FLOW")}}1{{/if}}{{/each}} |
+| TECHNOLOGY | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "TECHNOLOGY")}}1{{/if}}{{/each}} |
+
+### Confirmed Facts Detail
+
+| Fact ID | Category | Statement | Source Reference | Evidence Count |
+|---------|----------|-----------|------------------|----------------|
+{{#each businessDraft.section1_confirmedFacts}}
+| `{{this.factId}}` | {{this.category}} | {{this.statement}} | {{this.sourceReference}} | {{this.evidenceCount}} |
+{{/each}}
+
+{{else}}
+*No confirmed facts extracted.*
+{{/if}}
+
+---
+
+## 2. Proposed Business Hypotheses (Clearly Labeled)
+
+> **WARNING**: The hypotheses below are TENTATIVE interpretations.
+> They are based on observed patterns and require SME validation.
+> Do NOT treat these as confirmed business requirements.
+
+{{#if businessDraft.section2_businessHypotheses}}
+### Hypotheses Summary
+
+| Hypothesis ID | Category | Confidence | Requires Validation |
+|---------------|----------|------------|---------------------|
+{{#each businessDraft.section2_businessHypotheses}}
+| `{{this.hypothesisId}}` | {{this.category}} | **{{this.confidenceLevel}}** | Yes |
+{{/each}}
+
+### Hypotheses Detail
+
+{{#each businessDraft.section2_businessHypotheses}}
+#### {{this.hypothesisId}}: {{this.category}}
+
+**Hypothesis (TENTATIVE):**
+> {{this.hypothesis}}
+
+**Confidence Level:** {{this.confidenceLevel}}
+
+**Supporting Patterns:**
+{{#each this.supportingPatterns}}
+- {{this}}
+{{/each}}
+
+**Derived From Facts:** {{join this.derivedFrom ", "}}
+
+**Validation Required:**
+> {{this.requiresValidation}}
+
+---
+
+{{/each}}
+{{else}}
+*No business hypotheses could be generated from the available evidence.*
+{{/if}}
+
+---
+
+## 3. Supporting Evidence Mapping
+
+This section maps each hypothesis to its supporting facts, enabling traceability.
+
+{{#if businessDraft.section3_evidenceMapping}}
+| Hypothesis | Supporting Facts | Pattern Description | Gap Identified |
+|------------|------------------|---------------------|----------------|
+{{#each businessDraft.section3_evidenceMapping}}
+| `{{this.hypothesisId}}` | {{join this.factIds ", "}} | {{this.patternDescription}} | {{#if this.gapIdentified}}{{this.gapIdentified}}{{else}}-{{/if}} |
+{{/each}}
+{{else}}
+*No evidence mapping available.*
+{{/if}}
+
+---
+
+## 4. Parallel Implementation Considerations
+
+These considerations identify dependencies and coordination points relevant for any parallel work.
+
+{{#if businessDraft.section4_parallelConsiderations}}
+### By Category
+
+{{#each businessDraft.section4_parallelConsiderations}}
+#### {{this.considerationId}}: {{this.category}}
+
+**Observation:**
+{{this.observation}}
+
+**Affected Components:**
+{{#each this.affectedComponents}}
+- {{this}}
+{{/each}}
+
+**Source Evidence:** {{this.sourceEvidence}}
+
+---
+
+{{/each}}
+{{else}}
+*No parallel implementation considerations identified.*
+{{/if}}
+
+---
+
+## 5. Open Questions (Unchanged from SOURCE_ANALYSIS.md)
+
+> **NOTE**: These questions are carried forward UNCHANGED from SOURCE_ANALYSIS.md.
+> They represent gaps in understanding that could not be resolved through code analysis alone.
+
+{{#if businessDraft.section5_openQuestions}}
+| Question ID | Category | Question | Context |
+|-------------|----------|----------|---------|
+{{#each businessDraft.section5_openQuestions}}
+| `{{this.questionId}}` | {{this.category}} | {{this.question}} | {{this.context}} |
+{{/each}}
+
+### Open Questions Detail
+
+{{#each businessDraft.section5_openQuestions}}
+#### {{this.questionId}}: {{this.category}}
+
+**Question:**
+> {{this.question}}
+
+**Context:**
+{{this.context}}
+
+{{#if this.relatedEvidence}}
+**Related Evidence:**
+{{#each this.relatedEvidence}}
+- `{{this.file}}:{{this.line}}` - {{this.statement}}
+{{/each}}
+{{/if}}
+
+---
+
+{{/each}}
+{{else}}
+*No open questions from SOURCE_ANALYSIS.md.*
+{{/if}}
+
+---
+
+## 6. Risks of Misinterpretation
+
+This section identifies areas where misinterpretation is likely and provides guidance to avoid common mistakes.
+
+{{#if businessDraft.section6_misinterpretationRisks}}
+{{#each businessDraft.section6_misinterpretationRisks}}
+### {{this.riskId}}: {{this.area}}
+
+**Potential Misinterpretation:**
+> {{this.potentialMisinterpretation}}
+
+**Correct Interpretation:**
+> {{this.correctInterpretation}}
+
+**Guidance:**
+> {{this.guidance}}
+
+---
+
+{{/each}}
+{{else}}
+*No specific misinterpretation risks identified.*
+{{/if}}
+
+---
+
+## Validation Summary
+
+{{#if businessDraft.validationResult.isValid}}
+**Status:** PASSED - Document structure is valid
+{{else}}
+**Status:** FAILED - Document has validation errors
+{{/if}}
+
+{{#if businessDraft.validationResult.errors}}
+### Validation Errors
+
+{{#each businessDraft.validationResult.errors}}
+- **{{this.code}}**: {{this.message}}{{#if this.location}} (Location: {{this.location}}){{/if}}
+{{/each}}
+{{/if}}
+
+{{#if businessDraft.validationResult.warnings}}
+### Validation Warnings
+
+{{#each businessDraft.validationResult.warnings}}
+- **{{this.code}}**: {{this.message}}{{#if this.location}} (Location: {{this.location}}){{/if}}
+{{/each}}
+{{/if}}
+
+---
+
+## Appendix: Document Usage Guidelines
+
+### Intended Use
+
+1. **Human Review**: This document is designed for SME review, not as final documentation
+2. **Validation Sessions**: Use hypotheses as discussion points with business stakeholders
+3. **Iterative Refinement**: Expect multiple revisions as understanding improves
+
+### What This Document Does NOT Do
+
+- Does NOT provide migration guidance or planning
+- Does NOT define target architecture
+- Does NOT replace detailed business requirements
+- Does NOT finalize business process names
+
+### Next Steps
+
+1. Schedule validation sessions with SMEs for each hypothesis
+2. Document confirmed business names for technical entities
+3. Resolve open questions with relevant stakeholders
+4. Update this document based on validation feedback
+
+---
+
+*Generated by Migration Documentation Tool - Business Draft Generator v1.0*
+*This document is intentionally conservative to support human review.*

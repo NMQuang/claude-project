@@ -1,0 +1,454 @@
+# COBOLプロジェクトレベル ビジネスロジック分析
+
+**プロジェクト名:** {{projectAnalysis.projectName}}
+**システムID:** {{projectAnalysis.systemId}}
+**分析日時:** {{projectAnalysis.analyzedAt}}
+
+---
+
+## 0. ビジネス概要
+
+{{projectAnalysis.businessOverview.systemDescription}}
+
+### 主要ビジネスドメイン
+
+**{{projectAnalysis.businessOverview.primaryBusinessDomain}}**
+
+### 主要ビジネス機能
+
+{{#each projectAnalysis.businessOverview.keyBusinessFunctions}}
+- {{this}}
+{{/each}}
+
+### データストア
+
+{{#each projectAnalysis.businessOverview.dataStores}}
+- {{this}}
+{{/each}}
+
+### 処理モード
+
+{{#each projectAnalysis.businessOverview.processingModes}}
+- **{{this}}** 処理
+{{/each}}
+
+### プラットフォーム概要
+
+{{projectAnalysis.businessOverview.platformSummary}}
+
+---
+
+## 1. システムインベントリ
+
+### サマリー
+
+| カテゴリ | 件数 |
+|----------|------|
+| COBOLプログラム | {{projectAnalysis.inventory.programs}} |
+| コピーブック | {{projectAnalysis.inventory.copybooks}} |
+| JCLジョブ | {{projectAnalysis.inventory.jclJobs}} |
+| 総ファイル数 | {{projectAnalysis.inventory.totalFiles}} |
+| 総コード行数 | {{projectAnalysis.inventory.totalLinesOfCode}} |
+
+### プログラム一覧
+
+| プログラムID | ファイル | 行数 | タイプ | 複雑度 |
+|--------------|----------|------|--------|--------|
+{{#each projectAnalysis.inventory.programList}}
+| {{this.programId}} | {{this.relativePath}} | {{this.linesOfCode}} | {{this.processingType}} | {{this.complexity}} |
+{{/each}}
+
+### コピーブック一覧
+
+| 名前 | ファイル | レコード数 | フィールド数 |
+|------|----------|------------|--------------|
+{{#each projectAnalysis.inventory.copybookList}}
+| {{this.name}} | {{this.relativePath}} | {{this.recordCount}} | {{this.totalFields}} |
+{{/each}}
+
+{{#if projectAnalysis.inventory.jclList.length}}
+### JCLジョブ一覧
+
+| ジョブ名 | ファイル | ステップ数 | 実行プログラム |
+|----------|----------|------------|----------------|
+{{#each projectAnalysis.inventory.jclList}}
+| {{this.jobName}} | {{this.relativePath}} | {{this.stepCount}} | {{join this.programsExecuted ", "}} |
+{{/each}}
+{{/if}}
+
+---
+
+## 2. ビジネスエンティティとデータモデル
+
+> **注意:** 永続的なビジネスデータのみがここにリストされています。ワーキングストレージ構造や技術的アーティファクトは除外されています。
+
+{{#each projectAnalysis.businessEntities}}
+### {{this.businessName}}
+
+| プロパティ | 値 |
+|------------|-----|
+| エンティティID | `{{this.entityId}}` |
+| タイプ | **{{this.type}}** |
+| ソース | {{this.source}}{{#if this.sourceFile}} (`{{this.sourceFile}}`){{/if}} |
+
+**ビジネス説明:**
+{{this.businessDescription}}
+
+**使用プログラム:** {{join this.usedByPrograms ", "}}
+
+{{#if this.keys.length}}
+**キー:**
+{{#each this.keys}}
+- `{{this.keyName}}` ({{this.keyType}}): {{join this.fields ", "}}
+{{/each}}
+{{/if}}
+
+{{#if this.accessPatterns.length}}
+**アクセスパターン:**
+| プログラム | アクセス種別 | ビジネス目的 |
+|------------|--------------|--------------|
+{{#each this.accessPatterns}}
+| {{this.programId}} | {{this.accessType}} | {{this.businessPurpose}} |
+{{/each}}
+{{/if}}
+
+{{#if this.fields.length}}
+**フィールド詳細:**
+| フィールド名 | 型 | 長さ | 業務的意味 |
+|--------------|-------|------|------------|
+{{#each this.fields}}
+| {{this.name}} | {{this.dataType}} | {{this.length}} | {{this.businessMeaning}} |
+{{/each}}
+{{/if}}
+
+---
+{{/each}}
+
+---
+
+## 3. ビジネスプロセス
+
+> **注意:** ビジネスプロセスは、個々のCOBOLプログラムではなく、ビジネス目的でグループ化されています。複数のプログラムが1つのビジネスプロセスを実装するために協力する場合があります。
+
+### オンラインプロセス
+
+{{#each projectAnalysis.businessProcesses}}
+{{#if (eq this.processType "ONLINE")}}
+#### {{this.processName}}
+
+**プロセスID:** {{this.processId}}
+
+**説明:**
+{{this.businessDescription}}
+
+**ビジネス成果:**
+{{this.businessOutcome}}
+
+| プロパティ | 値 |
+|------------|-----|
+| エントリーポイント | {{join this.entryPoints ", "}} |
+| 関連プログラム | {{this.programsInvolved.length}} プログラム |
+| アクセスエンティティ | {{this.entitiesAccessed.length}} エンティティ |
+| トリガー | {{this.triggerType}} |
+| 複雑度 | {{this.estimatedComplexity}} |
+| データアクセス方式 | {{this.dataAccessParadigm}} |
+
+**データフロー概要:**
+{{this.dataFlowSummary}}
+
+{{#if this.implementationNote}}
+**実装備考:**
+{{this.implementationNote}}
+{{/if}}
+
+**プログラム:** {{join this.programsInvolved ", "}}
+
+---
+{{/if}}
+{{/each}}
+
+### バッチプロセス
+
+{{#each projectAnalysis.businessProcesses}}
+{{#if (eq this.processType "BATCH")}}
+#### {{this.processName}}
+
+**プロセスID:** {{this.processId}}
+
+**説明:**
+{{this.businessDescription}}
+
+**ビジネス成果:**
+{{this.businessOutcome}}
+
+| プロパティ | 値 |
+|------------|-----|
+| エントリーポイント | {{join this.entryPoints ", "}} |
+| 関連プログラム | {{this.programsInvolved.length}} プログラム |
+| アクセスエンティティ | {{this.entitiesAccessed.length}} エンティティ |
+| 実行頻度 | {{this.frequency}} |
+| 複雑度 | {{this.estimatedComplexity}} |
+| データアクセス方式 | {{this.dataAccessParadigm}} |
+
+**データフロー概要:**
+{{this.dataFlowSummary}}
+
+{{#if this.implementationNote}}
+**実装備考:**
+{{this.implementationNote}}
+{{/if}}
+
+**プログラム:** {{join this.programsInvolved ", "}}
+
+---
+{{/if}}
+{{/each}}
+
+### ハイブリッドプロセス
+
+{{#each projectAnalysis.businessProcesses}}
+{{#if (eq this.processType "HYBRID")}}
+#### {{this.processName}}
+
+**プロセスID:** {{this.processId}}
+
+**説明:**
+{{this.businessDescription}}
+
+**ビジネス成果:**
+{{this.businessOutcome}}
+
+| プロパティ | 値 |
+|------------|-----|
+| 関連プログラム | {{this.programsInvolved.length}} プログラム |
+| アクセスエンティティ | {{this.entitiesAccessed.length}} エンティティ |
+| 複雑度 | {{this.estimatedComplexity}} |
+| データアクセス方式 | {{this.dataAccessParadigm}} |
+
+**データフロー概要:**
+{{this.dataFlowSummary}}
+
+{{#if this.implementationNote}}
+**実装備考:**
+{{this.implementationNote}}
+{{/if}}
+
+---
+{{/if}}
+{{/each}}
+
+---
+
+## 4. プログラム責務マトリクス
+
+| プログラム | 役割 | 信頼度 | 管理エンティティ |
+|------------|------|--------|------------------|
+{{#each projectAnalysis.programRoles}}
+| {{this.programId}} | {{this.role}} | {{this.confidence}} | {{join this.entitiesManaged ", "}} |
+{{/each}}
+
+### 役割分布
+
+{{#with (countRoles projectAnalysis.programRoles)}}
+| 役割 | 件数 |
+|------|------|
+| マスタメンテナンス | {{this.MASTER_MAINTENANCE}} |
+| トランザクション処理 | {{this.TRANSACTION_PROCESSING}} |
+| バッチ更新 | {{this.BATCH_UPDATE}} |
+| バッチ集計 | {{this.BATCH_AGGREGATION}} |
+| バッチレポート | {{this.BATCH_REPORTING}} |
+| レポーティング | {{this.REPORTING}} |
+| ユーティリティ | {{this.UTILITY}} |
+| インターフェース | {{this.INTERFACE}} |
+| バリデーション | {{this.VALIDATION}} |
+| 計算処理 | {{this.CALCULATION}} |
+| データ抽出 | {{this.DATA_EXTRACTION}} |
+| 不明 | {{this.UNKNOWN}} |
+{{/with}}
+
+---
+
+## 5. データフロー分析
+
+> **注意:** データフローにはビジネスインテント（データがアクセスされる理由）が含まれています。技術的な操作だけではありません。
+
+### データフロー概要
+
+| 総フロー数 | READ | WRITE | UPDATE | TRANSFER |
+|------------|------|-------|--------|----------|
+| {{projectAnalysis.dataFlows.flows.length}} | {{countFlowType projectAnalysis.dataFlows.flows "READ"}} | {{countFlowType projectAnalysis.dataFlows.flows "WRITE"}} | {{countFlowType projectAnalysis.dataFlows.flows "UPDATE"}} | {{countFlowType projectAnalysis.dataFlows.flows "TRANSFER"}} |
+
+### ビジネスインテント付き主要データフロー
+
+| フロー | ソース | ターゲット | タイプ | ビジネスインテント |
+|--------|--------|------------|--------|-------------------|
+{{#each projectAnalysis.dataFlows.flows}}
+{{#if (lt @index 20)}}
+| {{this.flowId}} | {{this.sourceEntity}} | {{this.targetEntity}} | {{this.flowType}} | {{this.businessIntent}} |
+{{/if}}
+{{/each}}
+
+### データフロー図（テキスト）
+
+```
+{{#each projectAnalysis.dataFlows.flows}}
+{{#if (lt @index 15)}}
+[{{this.sourceEntity}}] --{{this.flowType}}--> [{{this.targetEntity}}]
+  経由: {{this.throughProgram}}
+  理由: {{this.businessIntent}}
+
+{{/if}}
+{{/each}}
+```
+
+{{#if projectAnalysis.dataFlows.fileToFile.length}}
+### ファイル間フロー
+
+| ソース | ターゲット | プログラム | ステップ | ビジネスインテント |
+|--------|------------|------------|----------|-------------------|
+{{#each projectAnalysis.dataFlows.fileToFile}}
+{{#if (lt @index 10)}}
+| {{this.sourceEntity}} | {{this.targetEntity}} | {{this.throughProgram}} | {{this.throughStep}} | {{this.businessIntent}} |
+{{/if}}
+{{/each}}
+{{/if}}
+
+---
+
+## 6. バッチ実行フロー
+
+{{#each projectAnalysis.batchExecutionFlows}}
+### ジョブ: {{this.jobName}}
+
+**説明:** {{this.description}}
+**プログラム数:** {{this.totalPrograms}}
+
+| ステップ | プログラム | 目的 | 入力データセット | 出力データセット | 条件付き |
+|----------|------------|------|------------------|------------------|----------|
+{{#each this.steps}}
+| {{this.stepNumber}} | {{this.programName}} | {{this.purpose}} | {{join this.inputDatasets ", "}} | {{join this.outputDatasets ", "}} | {{#if this.isConditional}}あり{{else}}なし{{/if}} |
+{{/each}}
+
+---
+{{/each}}
+
+---
+
+## 7. プラットフォーム依存性分析
+
+### プラットフォーム検出
+
+**検出されたプラットフォーム:** {{projectAnalysis.platformDependencies.platform}}
+**移植性スコア:** {{projectAnalysis.platformDependencies.portabilityScore}}% (高いほど移植性が高い)
+
+{{#if projectAnalysis.platformDependencies.vendorNeutral.length}}
+### ベンダー中立COBOL機能（移植可能）
+
+> これらの機能は標準COBOLであり、最小限の変更で移行できます。
+
+| 機能 | 使用回数 | プログラム | 説明 |
+|------|----------|------------|------|
+{{#each projectAnalysis.platformDependencies.vendorNeutral}}
+| {{this.feature}} | {{this.usageCount}} | {{join this.programs ", "}} | {{this.description}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.ibmSpecific.length}}
+### IBM固有機能
+
+| 機能 | 使用回数 | プログラム | 説明 | 移行難易度 |
+|------|----------|------------|------|------------|
+{{#each projectAnalysis.platformDependencies.ibmSpecific}}
+| {{this.feature}} | {{this.usageCount}} | {{join this.programs ", "}} | {{this.description}} | {{this.migrationDifficulty}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.fujitsuSpecific.length}}
+### 富士通固有機能
+
+| 機能 | 使用回数 | プログラム | 説明 | 移行難易度 |
+|------|----------|------------|------|------------|
+{{#each projectAnalysis.platformDependencies.fujitsuSpecific}}
+| {{this.feature}} | {{this.usageCount}} | {{join this.programs ", "}} | {{this.description}} | {{this.migrationDifficulty}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.migrationRisks.length}}
+### プラットフォーム移行リスク
+
+| リスクID | レベル | 説明 | 影響プログラム | 緩和策 |
+|----------|--------|------|----------------|--------|
+{{#each projectAnalysis.platformDependencies.migrationRisks}}
+| {{this.riskId}} | {{this.riskLevel}} | {{this.description}} | {{join this.affectedPrograms ", "}} | {{this.mitigationStrategy}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.platformDependencies.recommendations.length}}
+### プラットフォーム推奨事項
+
+{{#each projectAnalysis.platformDependencies.recommendations}}
+- {{this}}
+{{/each}}
+{{/if}}
+
+---
+
+## 8. 移行影響サマリー
+
+### 総合評価
+
+**総合複雑度:** {{projectAnalysis.migrationImpact.overallComplexity}}
+
+### 工数見積もり
+
+| 項目 | 値 |
+|------|-----|
+| 総プログラム数 | {{projectAnalysis.migrationImpact.estimatedEffort.totalPrograms}} |
+| 低複雑度 | {{projectAnalysis.migrationImpact.estimatedEffort.lowComplexity}} |
+| 中複雑度 | {{projectAnalysis.migrationImpact.estimatedEffort.mediumComplexity}} |
+| 高複雑度 | {{projectAnalysis.migrationImpact.estimatedEffort.highComplexity}} |
+{{#if projectAnalysis.migrationImpact.estimatedEffort.estimatedProgramDays}}
+| 推定工数（人日） | {{projectAnalysis.migrationImpact.estimatedEffort.estimatedProgramDays}} |
+{{/if}}
+
+{{#if projectAnalysis.migrationImpact.criticalPaths.length}}
+### クリティカルパス
+
+| パス | プログラム | 理由 | 優先度 |
+|------|------------|------|--------|
+{{#each projectAnalysis.migrationImpact.criticalPaths}}
+| {{this.pathName}} | {{join this.programs ", "}} | {{this.reason}} | {{this.priority}} |
+{{/each}}
+{{/if}}
+
+{{#if projectAnalysis.migrationImpact.risks.length}}
+### 移行リスク
+
+| リスクID | カテゴリ | 重大度 | 説明 | 緩和策 |
+|----------|----------|--------|------|--------|
+{{#each projectAnalysis.migrationImpact.risks}}
+| {{this.riskId}} | {{this.category}} | {{this.severity}} | {{this.description}} | {{this.mitigation}} |
+{{/each}}
+{{/if}}
+
+### 推奨事項
+
+{{#each projectAnalysis.migrationImpact.recommendations}}
+{{add @index 1}}. {{this}}
+{{/each}}
+
+### 推奨移行優先順序
+
+{{#each projectAnalysis.migrationImpact.priorityOrder}}
+{{#if (lt @index 15)}}
+{{add @index 1}}. {{this}}
+{{/if}}
+{{/each}}
+{{#if (gt projectAnalysis.migrationImpact.priorityOrder.length 15)}}
+... 他 {{subtract projectAnalysis.migrationImpact.priorityOrder.length 15}} プログラム
+{{/if}}
+
+---
+
+*このドキュメントはCOBOLプロジェクト分析ツールにより自動生成されました*
+*生成日時: {{generated_date}}*

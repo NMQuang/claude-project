@@ -9,7 +9,8 @@ const DOC_NAMES: { [key: string]: string } = {
   'migration-design': 'Migration Design',
   'test-strategy': 'Test Strategy',
   'deployment-rollback': 'Deployment & Rollback',
-  'business-logic-analysis': 'Business Logic Analysis'
+  'business-logic-analysis': 'Business Logic Analysis',
+  'project-analysis': 'Project-Level Analysis'
 }
 
 function DocumentEditorPage() {

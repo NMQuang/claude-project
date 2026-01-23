@@ -100,11 +100,21 @@ export interface ComplexityAssessment {
   justification: string;
 }
 
+export interface PlatformFeatures {
+  platform: 'IBM' | 'FUJITSU' | 'MIXED' | 'UNKNOWN';
+  cicsUsage: boolean;
+  db2Usage: boolean;
+  imsUsage: boolean;
+  vsamUsage: boolean;
+  features: string[];
+}
+
 export interface CobolBusinessLogicResult {
   // Program Identity
   programId: string;
   filePath: string;
   fileName: string;
+  relativePath?: string;
 
   // Overview
   overview: {
@@ -142,6 +152,9 @@ export interface CobolBusinessLogicResult {
 
   // Complexity
   complexity: ComplexityAssessment;
+
+  // Platform Features
+  platformFeatures?: PlatformFeatures;
 
   // Raw Metrics (for reference)
   metrics: {
@@ -214,6 +227,9 @@ export class CobolBusinessLogicAnalyzer {
     // Calculate metrics
     const metrics = this.calculateMetrics();
 
+    // Extract platform features
+    const platformFeatures = this.extractPlatformFeatures();
+
     return {
       programId,
       filePath,
@@ -233,6 +249,7 @@ export class CobolBusinessLogicAnalyzer {
       sharedCopybooks: copybooks,
       errorConditions,
       complexity,
+      platformFeatures,
       metrics
     };
   }
@@ -1429,6 +1446,89 @@ export class CobolBusinessLogicAnalyzer {
       processingType,
       triggerCondition,
       terminationCondition
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Platform Features Extraction
+  // --------------------------------------------------------------------------
+
+  private extractPlatformFeatures(): PlatformFeatures {
+    const features: string[] = [];
+    let cicsUsage = false;
+    let db2Usage = false;
+    let imsUsage = false;
+    let vsamUsage = false;
+    let ibmCount = 0;
+    let fujitsuCount = 0;
+
+    const content = this.upperLines.join(' ');
+
+    // Check for CICS
+    if (content.includes('EXEC CICS') || content.includes('DFHCOMMAREA')) {
+      cicsUsage = true;
+      ibmCount++;
+      features.push('CICS Transaction Processing');
+    }
+
+    // Check for DB2 (Embedded SQL)
+    if (content.includes('EXEC SQL') || content.includes('SQLCODE')) {
+      db2Usage = true;
+      ibmCount++;
+      features.push('Embedded SQL (DB2)');
+    }
+
+    // Check for IMS
+    if (content.includes('EXEC DLI') || content.includes('CBLTDLI')) {
+      imsUsage = true;
+      ibmCount++;
+      features.push('IMS Database Access');
+    }
+
+    // Check for VSAM
+    if (content.match(/\bORGANIZATION\s+IS\s+(INDEXED|RELATIVE|SEQUENTIAL)\b/)) {
+      vsamUsage = true;
+      features.push('VSAM File Access');
+    }
+
+    // Check for IBM-specific features
+    if (content.includes('DISPLAY UPON CONSOLE')) {
+      ibmCount++;
+      features.push('IBM Console Display');
+    }
+
+    if (content.includes('FUNCTION CURRENT-DATE') || content.includes('FUNCTION LENGTH')) {
+      features.push('Intrinsic Functions');
+    }
+
+    // Check for Fujitsu-specific features
+    if (content.includes('ACCEPT DATE YYYYMMDD') || content.includes('ACCEPT DAY YYYYDDD')) {
+      fujitsuCount++;
+      features.push('Fujitsu Date Handling');
+    }
+
+    if (content.includes('SYMBOLIC CHARACTERS')) {
+      fujitsuCount++;
+      features.push('Fujitsu Symbolic Characters');
+    }
+
+    // Determine platform
+    let platform: PlatformFeatures['platform'] = 'UNKNOWN';
+    if (ibmCount > 0 && fujitsuCount > 0) {
+      platform = 'MIXED';
+    } else if (ibmCount > 0) {
+      platform = 'IBM';
+    } else if (fujitsuCount > 0) {
+      platform = 'FUJITSU';
+    }
+
+    return {
+      platform,
+      cicsUsage,
+      db2Usage,
+      imsUsage,
+      vsamUsage,
+      features
     };
   }
 

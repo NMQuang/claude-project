@@ -78,6 +78,8 @@ export class DocumentGenerator {
     const typeMap: { [key: string]: string } = {
       'COBOL-to-Java': 'cobol-to-java',
       'COBOL-Analysis': 'cobol-analysis',
+      'COBOL-Project-Analysis': 'cobol-analysis',
+      'Source-Analysis': 'source-analysis',
       'PostgreSQL-to-Oracle': 'pg-to-oracle',
       'PL1-to-Java': 'pl1-to-java',
       'Oracle-to-PostgreSQL': 'oracle-to-pg',
@@ -149,6 +151,69 @@ export class DocumentGenerator {
     // Helper: Not equal comparison
     Handlebars.registerHelper('ne', (a: any, b: any) => {
       return a !== b;
+    });
+
+    // Helper: Join array elements
+    Handlebars.registerHelper('join', (arr: any[], separator: string) => {
+      if (!arr || !Array.isArray(arr)) return '';
+      return arr.join(separator);
+    });
+
+    // Helper: Count roles in program roles array
+    Handlebars.registerHelper('countRoles', (programRoles: any[]) => {
+      const counts: { [key: string]: number } = {
+        MASTER_MAINTENANCE: 0,
+        TRANSACTION_PROCESSING: 0,
+        BATCH_UPDATE: 0,
+        REPORTING: 0,
+        UTILITY: 0,
+        INTERFACE: 0,
+        VALIDATION: 0,
+        CALCULATION: 0,
+        UNKNOWN: 0
+      };
+
+      if (programRoles && Array.isArray(programRoles)) {
+        for (const pr of programRoles) {
+          const role = pr.role || 'UNKNOWN';
+          if (counts.hasOwnProperty(role)) {
+            counts[role]++;
+          } else {
+            counts.UNKNOWN++;
+          }
+        }
+      }
+
+      return counts;
+    });
+
+    // Helper: Count flow type
+    Handlebars.registerHelper('countFlowType', (flows: any[], flowType: string) => {
+      if (!flows || !Array.isArray(flows)) return 0;
+      return flows.filter(f => f.flowType === flowType).length;
+    });
+
+    // Helper: Count batch processes
+    Handlebars.registerHelper('countBatchProcesses', (processes: any[]) => {
+      if (!processes || !Array.isArray(processes)) return 0;
+      return processes.filter(p => p.processType === 'BATCH').length;
+    });
+
+    // Helper: Count online processes
+    Handlebars.registerHelper('countOnlineProcesses', (processes: any[]) => {
+      if (!processes || !Array.isArray(processes)) return 0;
+      return processes.filter(p => p.processType === 'ONLINE').length;
+    });
+
+    // Helper: Filter processes by type
+    Handlebars.registerHelper('filterProcesses', (processes: any[], processType: string) => {
+      if (!processes || !Array.isArray(processes)) return [];
+      return processes.filter(p => p.processType === processType);
+    });
+
+    // Helper: Subtract numbers
+    Handlebars.registerHelper('subtract', (a: number, b: number) => {
+      return a - b;
     });
 
     // Helper: Group database access by table name
