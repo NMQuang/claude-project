@@ -14,6 +14,8 @@ import { fileURLToPath } from 'url';
 import { CobolAnalyzer } from './analyzers/CobolAnalyzer.js';
 import { CobolBusinessLogicAnalyzer } from './analyzers/CobolBusinessLogicAnalyzer.js';
 import { CobolProjectAnalyzer } from './analyzers/CobolProjectAnalyzer.js';
+import { SourceAnalyzer } from './analyzers/SourceAnalyzer.js';
+import { BusinessDraftGenerator } from './generators/BusinessDraftGenerator.js';
 import { DDLAnalyzer } from './analyzers/DDLAnalyzer.js';
 import { JavaAnalyzer } from './analyzers/JavaAnalyzer.js';
 import { PostgreSQLDDLAnalyzer } from './analyzers/PostgreSQLDDLAnalyzer.js';
@@ -391,6 +393,40 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
         migrationImpact: projectAnalysisResult.migrationImpact.overallComplexity
       });
 
+    } else if (project.migrationType === 'Source-Analysis') {
+      // Source-level Evidence-Based Analysis
+      const sourceAnalyzer = new SourceAnalyzer();
+      const sourceAnalysisResult = await sourceAnalyzer.analyzeSource(uploadDir, project.name);
+
+      // Store results in project metadata
+      project.metadata = {
+        type: 'Source-Analysis',
+        sourceAnalysis: sourceAnalysisResult,
+        analyzedAt: new Date().toISOString(),
+        source_analysis: {
+          total_files: sourceAnalysisResult.section1_programInventory.length,
+          total_loc: sourceAnalysisResult.section0_scopeSummary.fileInventory.totalLinesOfCode,
+          data_structures: sourceAnalysisResult.section2_persistentDataStructures.length,
+          jcl_jobs: sourceAnalysisResult.section4_jclExecutionRelationships.length,
+          open_questions: sourceAnalysisResult.section5_observationsAndQuestions.openQuestions.length
+        },
+        migrationComplexity: {
+          difficulty: 'N/A',
+          overall: 0,
+          description: 'Source-level analysis (evidence-based, no complexity scoring)'
+        }
+      };
+      project.status = 'Analyzed';
+
+      res.json({
+        message: 'Source-level analysis complete (evidence-based)',
+        programs: sourceAnalysisResult.section1_programInventory.length,
+        dataStructures: sourceAnalysisResult.section2_persistentDataStructures.length,
+        jclJobs: sourceAnalysisResult.section4_jclExecutionRelationships.length,
+        observations: sourceAnalysisResult.section5_observationsAndQuestions.observations.length,
+        openQuestions: sourceAnalysisResult.section5_observationsAndQuestions.openQuestions.length
+      });
+
     } else if (project.migrationType === 'PostgreSQL-to-Oracle') {
       // NEW: PostgreSQL-to-Oracle analysis
 
@@ -536,6 +572,48 @@ app.post('/api/projects/:id/generate', async (req, res) => {
         version: '1.0',
         author: 'Auto-generated'
       };
+    } else if (project.migrationType === 'Source-Analysis') {
+      // Special handling for Source-level Analysis (evidence-based)
+      const sourceAnalysis = project.metadata.sourceAnalysis;
+
+      if (!sourceAnalysis) {
+        return res.status(400).json({ error: 'No source analysis data found' });
+      }
+
+      // Handle business-draft document type
+      if (documentType === 'business-draft') {
+        const businessDraftGenerator = new BusinessDraftGenerator();
+        const businessDraft = businessDraftGenerator.generateBusinessDraft(sourceAnalysis, project.name);
+
+        // Check validation result
+        if (!businessDraft.validationResult.isValid) {
+          console.warn('Business Draft validation warnings:', businessDraft.validationResult.errors);
+        }
+
+        data = {
+          project: {
+            name: project.name,
+            migration_type: project.migrationType
+          },
+          businessDraft,
+          sourceAnalysis,
+          generated_date: new Date().toISOString().split('T')[0],
+          version: '1.0',
+          author: 'Auto-generated'
+        };
+      } else {
+        // Default: source-analysis document
+        data = {
+          project: {
+            name: project.name,
+            migration_type: project.migrationType
+          },
+          sourceAnalysis,
+          generated_date: new Date().toISOString().split('T')[0],
+          version: '1.0',
+          author: 'Auto-generated'
+        };
+      }
     } else {
       // Standard migration document data
       data = {

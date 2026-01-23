@@ -1,0 +1,273 @@
+# BUSINESS_DRAFT_v1 (ビジネスドラフト v1)
+
+**プロジェクト:** {{project.name}}
+**ソース参照:** {{businessDraft.section0_scopeAssumptions.sourceAnalysisReference}}
+**生成日時:** {{businessDraft.section0_scopeAssumptions.generatedAt}}
+**ステータス:** ドラフト - 人間による検証が必要
+
+---
+
+> **重要な注意事項**
+>
+> この文書は、ソース分析から初期ビジネス理解への制御された移行を表しています。
+> すべての仮説は暫定的であり、サブジェクトマターエキスパート（SME）による検証が必要です。
+> この文書は SOURCE_ANALYSIS.md を置き換えるものではありません。
+
+---
+
+## 0. 範囲と前提条件
+
+### 分析範囲
+
+{{businessDraft.section0_scopeAssumptions.analysisScope}}
+
+### 前提条件
+
+{{#each businessDraft.section0_scopeAssumptions.assumptions}}
+- {{this}}
+{{/each}}
+
+### 制限事項
+
+{{#each businessDraft.section0_scopeAssumptions.limitations}}
+- {{this}}
+{{/each}}
+
+---
+
+## 1. 確認された事実（SOURCE_ANALYSIS.md より）
+
+以下の事実は、エビデンス引用付きでソース分析から直接抽出されたものです。
+これらは**観察結果**であり、解釈ではありません。
+
+{{#if businessDraft.section1_confirmedFacts}}
+### カテゴリ別サマリー
+
+| カテゴリ | 件数 |
+|----------|------|
+| INVENTORY（インベントリ） | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "INVENTORY")}}1{{/if}}{{/each}} |
+| DATA_STRUCTURE（データ構造） | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "DATA_STRUCTURE")}}1{{/if}}{{/each}} |
+| DATA_ACCESS（データアクセス） | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "DATA_ACCESS")}}1{{/if}}{{/each}} |
+| EXECUTION_FLOW（実行フロー） | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "EXECUTION_FLOW")}}1{{/if}}{{/each}} |
+| TECHNOLOGY（技術） | {{#each businessDraft.section1_confirmedFacts}}{{#if (eq this.category "TECHNOLOGY")}}1{{/if}}{{/each}} |
+
+### 確認された事実の詳細
+
+| 事実ID | カテゴリ | 記述 | ソース参照 | エビデンス数 |
+|--------|----------|------|------------|--------------|
+{{#each businessDraft.section1_confirmedFacts}}
+| `{{this.factId}}` | {{this.category}} | {{this.statement}} | {{this.sourceReference}} | {{this.evidenceCount}} |
+{{/each}}
+
+{{else}}
+*確認された事実はありません。*
+{{/if}}
+
+---
+
+## 2. 提案されたビジネス仮説（明確にラベル付け）
+
+> **警告**: 以下の仮説は暫定的な解釈です。
+> 観察されたパターンに基づいており、SMEによる検証が必要です。
+> これらを確認されたビジネス要件として扱わないでください。
+
+{{#if businessDraft.section2_businessHypotheses}}
+### 仮説サマリー
+
+| 仮説ID | カテゴリ | 信頼度 | 検証必要 |
+|--------|----------|--------|----------|
+{{#each businessDraft.section2_businessHypotheses}}
+| `{{this.hypothesisId}}` | {{this.category}} | **{{this.confidenceLevel}}** | はい |
+{{/each}}
+
+### 仮説の詳細
+
+{{#each businessDraft.section2_businessHypotheses}}
+#### {{this.hypothesisId}}: {{this.category}}
+
+**仮説（暫定）:**
+> {{this.hypothesis}}
+
+**信頼度レベル:** {{this.confidenceLevel}}
+
+**裏付けパターン:**
+{{#each this.supportingPatterns}}
+- {{this}}
+{{/each}}
+
+**参照元の事実:** {{join this.derivedFrom ", "}}
+
+**必要な検証:**
+> {{this.requiresValidation}}
+
+---
+
+{{/each}}
+{{else}}
+*利用可能なエビデンスからビジネス仮説を生成できませんでした。*
+{{/if}}
+
+---
+
+## 3. エビデンスマッピング
+
+このセクションは、各仮説をその裏付け事実にマッピングし、トレーサビリティを確保します。
+
+{{#if businessDraft.section3_evidenceMapping}}
+| 仮説 | 裏付け事実 | パターン説明 | 特定されたギャップ |
+|------|------------|--------------|-------------------|
+{{#each businessDraft.section3_evidenceMapping}}
+| `{{this.hypothesisId}}` | {{join this.factIds ", "}} | {{this.patternDescription}} | {{#if this.gapIdentified}}{{this.gapIdentified}}{{else}}-{{/if}} |
+{{/each}}
+{{else}}
+*エビデンスマッピングはありません。*
+{{/if}}
+
+---
+
+## 4. 並行実装の考慮事項
+
+これらの考慮事項は、並行作業に関連する依存関係と調整ポイントを特定します。
+
+{{#if businessDraft.section4_parallelConsiderations}}
+### カテゴリ別
+
+{{#each businessDraft.section4_parallelConsiderations}}
+#### {{this.considerationId}}: {{this.category}}
+
+**観察事項:**
+{{this.observation}}
+
+**影響を受けるコンポーネント:**
+{{#each this.affectedComponents}}
+- {{this}}
+{{/each}}
+
+**ソースエビデンス:** {{this.sourceEvidence}}
+
+---
+
+{{/each}}
+{{else}}
+*並行実装の考慮事項は特定されていません。*
+{{/if}}
+
+---
+
+## 5. オープンな質問（SOURCE_ANALYSIS.md から変更なし）
+
+> **注意**: これらの質問は SOURCE_ANALYSIS.md から変更なしで引き継がれています。
+> コード分析だけでは解決できなかった理解のギャップを表しています。
+
+{{#if businessDraft.section5_openQuestions}}
+| 質問ID | カテゴリ | 質問 | コンテキスト |
+|--------|----------|------|--------------|
+{{#each businessDraft.section5_openQuestions}}
+| `{{this.questionId}}` | {{this.category}} | {{this.question}} | {{this.context}} |
+{{/each}}
+
+### オープンな質問の詳細
+
+{{#each businessDraft.section5_openQuestions}}
+#### {{this.questionId}}: {{this.category}}
+
+**質問:**
+> {{this.question}}
+
+**コンテキスト:**
+{{this.context}}
+
+{{#if this.relatedEvidence}}
+**関連エビデンス:**
+{{#each this.relatedEvidence}}
+- `{{this.file}}:{{this.line}}` - {{this.statement}}
+{{/each}}
+{{/if}}
+
+---
+
+{{/each}}
+{{else}}
+*SOURCE_ANALYSIS.md からのオープンな質問はありません。*
+{{/if}}
+
+---
+
+## 6. 誤解のリスク
+
+このセクションは、誤解が起こりやすい領域を特定し、一般的な間違いを避けるためのガイダンスを提供します。
+
+{{#if businessDraft.section6_misinterpretationRisks}}
+{{#each businessDraft.section6_misinterpretationRisks}}
+### {{this.riskId}}: {{this.area}}
+
+**潜在的な誤解:**
+> {{this.potentialMisinterpretation}}
+
+**正しい解釈:**
+> {{this.correctInterpretation}}
+
+**ガイダンス:**
+> {{this.guidance}}
+
+---
+
+{{/each}}
+{{else}}
+*特定の誤解リスクは特定されていません。*
+{{/if}}
+
+---
+
+## 検証サマリー
+
+{{#if businessDraft.validationResult.isValid}}
+**ステータス:** 合格 - ドキュメント構造は有効です
+{{else}}
+**ステータス:** 失敗 - ドキュメントに検証エラーがあります
+{{/if}}
+
+{{#if businessDraft.validationResult.errors}}
+### 検証エラー
+
+{{#each businessDraft.validationResult.errors}}
+- **{{this.code}}**: {{this.message}}{{#if this.location}}（場所: {{this.location}}）{{/if}}
+{{/each}}
+{{/if}}
+
+{{#if businessDraft.validationResult.warnings}}
+### 検証警告
+
+{{#each businessDraft.validationResult.warnings}}
+- **{{this.code}}**: {{this.message}}{{#if this.location}}（場所: {{this.location}}）{{/if}}
+{{/each}}
+{{/if}}
+
+---
+
+## 付録: ドキュメント使用ガイドライン
+
+### 意図された使用方法
+
+1. **人間によるレビュー**: この文書はSMEレビュー用に設計されており、最終文書ではありません
+2. **検証セッション**: ビジネスステークホルダーとの議論ポイントとして仮説を使用
+3. **反復的な改良**: 理解が深まるにつれて複数の改訂が予想されます
+
+### この文書がしないこと
+
+- 移行ガイダンスや計画は提供しません
+- ターゲットアーキテクチャは定義しません
+- 詳細なビジネス要件は置き換えません
+- ビジネスプロセス名は最終化しません
+
+### 次のステップ
+
+1. 各仮説についてSMEとの検証セッションをスケジュール
+2. 技術エンティティの確認されたビジネス名を文書化
+3. 関連するステークホルダーとオープンな質問を解決
+4. 検証フィードバックに基づいてこの文書を更新
+
+---
+
+*Migration Documentation Tool - Business Draft Generator v1.0 により生成*
+*この文書は人間によるレビューをサポートするため、意図的に保守的です。*

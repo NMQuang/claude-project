@@ -1,0 +1,285 @@
+# ソースレベル分析レポート
+
+**プロジェクト:** {{project.name}}
+**分析タイプ:** エビデンスベースソース分析
+**分析日時:** {{sourceAnalysis.section0_scopeSummary.analysisTimestamp}}
+
+---
+
+> **注記:** このレポートはエビデンスベースの観察のみを含みます。すべての発見事項には明示的なソース引用（ファイル:行番号）が含まれています。ビジネス解釈や推測による命名は適用されていません。
+
+---
+
+## セクション0: ソーススコープサマリー
+
+### ファイルインベントリ
+
+| カテゴリ | 件数 |
+|----------|------|
+| COBOLプログラム | {{sourceAnalysis.section0_scopeSummary.fileInventory.cobolPrograms}} |
+| コピーブック | {{sourceAnalysis.section0_scopeSummary.fileInventory.copybooks}} |
+| JCLファイル | {{sourceAnalysis.section0_scopeSummary.fileInventory.jclFiles}} |
+| DDLファイル | {{sourceAnalysis.section0_scopeSummary.fileInventory.ddlFiles}} |
+| **総ファイル数** | **{{sourceAnalysis.section0_scopeSummary.fileInventory.totalFiles}}** |
+| **総コード行数** | **{{sourceAnalysis.section0_scopeSummary.fileInventory.totalLinesOfCode}}** |
+
+### 検出されたテクノロジー
+
+{{#if sourceAnalysis.section0_scopeSummary.detectedTechnologies.length}}
+| テクノロジー | 出現回数 | エビデンス |
+|--------------|----------|------------|
+{{#each sourceAnalysis.section0_scopeSummary.detectedTechnologies}}
+| {{this.technology}} | {{this.occurrenceCount}} | {{#each this.evidence}}{{#if @first}}{{this.file}}{{/if}}{{/each}} |
+{{/each}}
+{{else}}
+特定のテクノロジーは検出されませんでした。
+{{/if}}
+
+---
+
+## セクション1: プログラムインベントリと実行パターン
+
+### プログラム一覧
+
+| プログラムID | ファイル | LOC | 実行パターン | 外部呼び出し |
+|--------------|----------|-----|--------------|--------------|
+{{#each sourceAnalysis.section1_programInventory}}
+| {{this.programId}} | {{this.relativePath}} | {{this.linesOfCode}} | {{this.observedExecutionPattern}} | {{this.externalCallsDetected.length}} |
+{{/each}}
+
+{{#each sourceAnalysis.section1_programInventory}}
+### {{this.programId}}
+
+**ファイル:** `{{this.relativePath}}`
+
+**観察された実行パターン:** {{this.observedExecutionPattern}}
+
+{{#if this.patternEvidence.length}}
+**パターンエビデンス:**
+{{#each this.patternEvidence}}
+- `{{this.file}}:{{this.line}}` - {{this.statement}}
+{{/each}}
+{{/if}}
+
+**観察された構造:**
+- ディビジョン: {{join this.observedStructure.divisions ", "}}
+- パラグラフ数: {{this.observedStructure.paragraphCount}}
+- 参照コピーブック: {{#if this.observedStructure.copybooksReferenced.length}}{{join this.observedStructure.copybooksReferenced ", "}}{{else}}なし{{/if}}
+
+{{#if this.externalCallsDetected.length}}
+**検出された外部呼び出し:**
+| 対象プログラム | 呼び出しタイプ | エビデンス |
+|----------------|----------------|------------|
+{{#each this.externalCallsDetected}}
+| {{this.targetProgram}} | {{this.callType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+{{/each}}
+{{/if}}
+
+---
+{{/each}}
+
+---
+
+## セクション2: 永続データ構造
+
+{{#if sourceAnalysis.section2_persistentDataStructures.length}}
+
+### サマリー
+
+| ID | 構造名 | ストレージタイプ | ソースファイル | フィールド数 | 参照元 |
+|----|--------|------------------|----------------|--------------|--------|
+{{#each sourceAnalysis.section2_persistentDataStructures}}
+| {{this.structureId}} | {{this.structureName}} | {{this.storageType}} | {{this.sourceFile}} | {{this.observedFields.length}} | {{this.referencedByPrograms.length}}プログラム |
+{{/each}}
+
+{{#each sourceAnalysis.section2_persistentDataStructures}}
+### {{this.structureId}}: {{this.structureName}}
+
+**ストレージタイプ:** {{this.storageType}}
+**ソース:** `{{this.evidence.file}}:{{this.evidence.line}}`
+**エビデンス:** `{{this.evidence.statement}}`
+
+{{#if this.observedKeyFields.length}}
+**観察されたキーフィールド:**
+| フィールド名 | キータイプ | エビデンス |
+|--------------|------------|------------|
+{{#each this.observedKeyFields}}
+| {{this.fieldName}} | {{this.keyType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+{{/each}}
+{{/if}}
+
+{{#if this.observedFields.length}}
+**観察されたフィールド (最初の20件):**
+| フィールド名 | PICTURE句 | 長さ | データ型 |
+|--------------|-----------|------|----------|
+{{#each this.observedFields}}
+{{#if (lt @index 20)}}
+| {{this.fieldName}} | {{this.pictureClause}} | {{this.computedLength}} | {{this.dataType}} |
+{{/if}}
+{{/each}}
+{{#if (gt this.observedFields.length 20)}}
+... 他{{subtract this.observedFields.length 20}}フィールド
+{{/if}}
+{{/if}}
+
+{{#if this.referencedByPrograms.length}}
+**参照元プログラム:**
+| プログラム | アクセスタイプ | エビデンス |
+|------------|----------------|------------|
+{{#each this.referencedByPrograms}}
+| {{this.programId}} | {{this.accessType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+{{/each}}
+{{/if}}
+
+---
+{{/each}}
+
+{{else}}
+ソース分析から永続データ構造は特定されませんでした。
+{{/if}}
+
+---
+
+## セクション3: 観察されたデータアクセスパターン
+
+{{#if sourceAnalysis.section3_dataAccessPatterns.length}}
+
+### アクセスパターンサマリー
+
+| ID | プログラム | 対象 | アクセス動詞 | タイプ | エビデンス |
+|----|------------|------|--------------|--------|------------|
+{{#each sourceAnalysis.section3_dataAccessPatterns}}
+{{#if (lt @index 50)}}
+| {{this.observationId}} | {{this.programId}} | {{this.targetStructure}} | {{this.accessVerb}} | {{this.accessType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+{{/if}}
+{{/each}}
+{{#if (gt sourceAnalysis.section3_dataAccessPatterns.length 50)}}
+
+*... 他{{subtract sourceAnalysis.section3_dataAccessPatterns.length 50}}件のアクセスパターン*
+{{/if}}
+
+{{else}}
+データアクセスパターンは観察されませんでした。
+{{/if}}
+
+---
+
+## セクション4: JCL実行関係
+
+{{#if sourceAnalysis.section4_jclExecutionRelationships.length}}
+
+{{#each sourceAnalysis.section4_jclExecutionRelationships}}
+### ジョブ: {{this.jobName}}
+
+**ソースファイル:** `{{this.sourceFile}}`
+**エビデンス:** `{{this.evidence.file}}:{{this.evidence.line}}` - `{{this.evidence.statement}}`
+
+#### ステップシーケンス
+
+| ステップ# | ステップ名 | プログラム | 条件付き | 入力データセット | 出力データセット |
+|-----------|------------|------------|----------|------------------|------------------|
+{{#each this.stepSequence}}
+| {{this.stepNumber}} | {{this.stepName}} | {{this.executedProgram}} | {{#if this.isConditional}}はい{{else}}いいえ{{/if}} | {{join this.inputDatasets ", "}} | {{join this.outputDatasets ", "}} |
+{{/each}}
+
+{{#if this.datasetReferences.length}}
+#### データセット参照
+
+| データセット名 | DD名 | アクセスモード | 使用ステップ |
+|----------------|------|----------------|--------------|
+{{#each this.datasetReferences}}
+| {{this.datasetName}} | {{this.ddName}} | {{this.accessMode}} | {{join this.usedInSteps ", "}} |
+{{/each}}
+{{/if}}
+
+---
+{{/each}}
+
+{{else}}
+JCL実行関係は特定されませんでした。
+{{/if}}
+
+---
+
+## セクション5: 観察事項と未解決の質問
+
+### 観察された事実
+
+{{#if sourceAnalysis.section5_observationsAndQuestions.observations.length}}
+
+| ファクトID | カテゴリ | 観察事項 | 影響コンポーネント |
+|------------|----------|----------|---------------------|
+{{#each sourceAnalysis.section5_observationsAndQuestions.observations}}
+| {{this.factId}} | {{this.category}} | {{this.observation}} | {{join this.affectedComponents ", "}} |
+{{/each}}
+
+{{#each sourceAnalysis.section5_observationsAndQuestions.observations}}
+
+#### {{this.factId}}: {{this.category}}
+
+**観察事項:** {{this.observation}}
+
+**エビデンス:**
+{{#each this.evidence}}
+- `{{this.file}}:{{this.line}}` - {{this.statement}}
+{{/each}}
+
+**影響コンポーネント:** {{join this.affectedComponents ", "}}
+
+---
+{{/each}}
+
+{{else}}
+特定のパターンや異常は観察されませんでした。
+{{/if}}
+
+### 未解決の質問
+
+{{#if sourceAnalysis.section5_observationsAndQuestions.openQuestions.length}}
+
+| 質問ID | カテゴリ | 質問 |
+|--------|----------|------|
+{{#each sourceAnalysis.section5_observationsAndQuestions.openQuestions}}
+| {{this.questionId}} | {{this.category}} | {{this.question}} |
+{{/each}}
+
+{{#each sourceAnalysis.section5_observationsAndQuestions.openQuestions}}
+
+#### {{this.questionId}}: {{this.category}}
+
+**質問:** {{this.question}}
+
+**コンテキスト:** {{this.context}}
+
+{{#if this.relatedEvidence}}
+**関連エビデンス:**
+{{#each this.relatedEvidence}}
+- `{{this.file}}:{{this.line}}` - {{this.statement}}
+{{/each}}
+{{/if}}
+
+---
+{{/each}}
+
+{{else}}
+未解決の質問は特定されませんでした。
+{{/if}}
+
+---
+
+## 付録: エビデンス引用形式
+
+本ドキュメントのすべての観察事項は以下のエビデンス引用形式に従います：
+
+```
+`ファイルパス:行番号` - 観察されたステートメント
+```
+
+例:
+- `CUSTMNT.cbl:150` - EXEC SQL SELECT 検出
+- `BATCH001.jcl:10` - //STEP01 EXEC PGM=CUSTUPD
+
+---
+
+*ソース分析ツール（エビデンスベース）により自動生成*
+*生成日: {{generated_date}}*

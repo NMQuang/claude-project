@@ -79,6 +79,7 @@ export class DocumentGenerator {
       'COBOL-to-Java': 'cobol-to-java',
       'COBOL-Analysis': 'cobol-analysis',
       'COBOL-Project-Analysis': 'cobol-analysis',
+      'Source-Analysis': 'source-analysis',
       'PostgreSQL-to-Oracle': 'pg-to-oracle',
       'PL1-to-Java': 'pl1-to-java',
       'Oracle-to-PostgreSQL': 'oracle-to-pg',

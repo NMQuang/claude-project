@@ -18,6 +18,10 @@ export const MIGRATION_FILE_FILTERS: Record<string, MigrationTypeFileFilters> = 
     extensions: ['.cbl', '.cob', '.cpy', '.jcl', '.prc', '.proc'],
     description: 'COBOL programs, copybooks, and JCL for project-level analysis'
   },
+  'Source-Analysis': {
+    extensions: ['.cbl', '.cob', '.cpy', '.jcl', '.prc', '.proc', '.sql', '.ddl'],
+    description: 'COBOL programs, copybooks, JCL, and DDL for source-level analysis (evidence-based)'
+  },
   'PostgreSQL-to-Oracle': {
     extensions: ['.sql', '.java', '.xml', '.yml', '.yaml'],
     description: 'SQL, Java, and ORM config files (.sql, .java, .xml, .yml, .yaml)'

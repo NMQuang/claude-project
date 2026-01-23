@@ -61,6 +61,8 @@ export interface Project {
       copybooks?: number;
       jcl_jobs?: number;
       entities?: number;
+      data_structures?: number;
+      open_questions?: number;
       database?: {
         tables?: number;
         procedures?: number;
