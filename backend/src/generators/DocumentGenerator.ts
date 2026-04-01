@@ -74,16 +74,13 @@ export class DocumentGenerator {
       return 'cobol-to-java'; // Default for backward compatibility
     }
 
-    // Normalize migration type names to folder names
     const typeMap: { [key: string]: string } = {
       'COBOL-to-Java': 'cobol-to-java',
-      'PostgreSQL-to-Oracle': 'pg-to-oracle',
-      'PL1-to-Java': 'pl1-to-java',
-      'Oracle-to-PostgreSQL': 'oracle-to-pg',
-      'MySQL-to-Oracle': 'mysql-to-oracle'
+      'Source-Analysis-COBOL': 'source-analysis',
+      'PostgreSQL-to-Oracle': 'pg-to-oracle'
     };
 
-    return typeMap[migrationType] || 'cobol-to-java'; // Default fallback
+    return typeMap[migrationType] || 'cobol-to-java';
   }
 
   /**
@@ -92,7 +89,6 @@ export class DocumentGenerator {
   private registerHelpers() {
     // Helper: Format date
     Handlebars.registerHelper('formatDate', (date: string, format: string) => {
-      // Simple date formatting (in production, use a library like date-fns)
       return date;
     });
 
@@ -148,6 +144,115 @@ export class DocumentGenerator {
     // Helper: Not equal comparison
     Handlebars.registerHelper('ne', (a: any, b: any) => {
       return a !== b;
+    });
+
+    // Helper: Join array elements
+    Handlebars.registerHelper('join', (arr: any[], separator: string) => {
+      if (!arr || !Array.isArray(arr)) return '';
+      return arr.join(separator);
+    });
+
+    // Helper: Count roles in program roles array
+    Handlebars.registerHelper('countRoles', (programRoles: any[]) => {
+      const counts: { [key: string]: number } = {
+        MASTER_MAINTENANCE: 0,
+        TRANSACTION_PROCESSING: 0,
+        BATCH_UPDATE: 0,
+        REPORTING: 0,
+        UTILITY: 0,
+        INTERFACE: 0,
+        VALIDATION: 0,
+        CALCULATION: 0,
+        UNKNOWN: 0
+      };
+
+      if (programRoles && Array.isArray(programRoles)) {
+        for (const pr of programRoles) {
+          const role = pr.role || 'UNKNOWN';
+          if (counts.hasOwnProperty(role)) {
+            counts[role]++;
+          } else {
+            counts.UNKNOWN++;
+          }
+        }
+      }
+
+      return counts;
+    });
+
+    // Helper: Count flow type (supports both flowType and accessType fields)
+    Handlebars.registerHelper('countFlowType', (flows: any[], flowType: string) => {
+      if (!flows || !Array.isArray(flows)) return 0;
+      return flows.filter(f => f.flowType === flowType || f.accessType === flowType).length;
+    });
+
+    // Helper: Count by accessType (for DataAccessObservation arrays)
+    Handlebars.registerHelper('countAccessType', (patterns: any[], accessType: string) => {
+      if (!patterns || !Array.isArray(patterns)) return 0;
+      return patterns.filter(p => p.accessType === accessType).length;
+    });
+
+    // Helper: Count batch processes
+    Handlebars.registerHelper('countBatchProcesses', (processes: any[]) => {
+      if (!processes || !Array.isArray(processes)) return 0;
+      return processes.filter(p => p.processType === 'BATCH').length;
+    });
+
+    // Helper: Count online processes
+    Handlebars.registerHelper('countOnlineProcesses', (processes: any[]) => {
+      if (!processes || !Array.isArray(processes)) return 0;
+      return processes.filter(p => p.processType === 'ONLINE').length;
+    });
+
+    // Helper: Filter processes by type
+    Handlebars.registerHelper('filterProcesses', (processes: any[], processType: string) => {
+      if (!processes || !Array.isArray(processes)) return [];
+      return processes.filter(p => p.processType === processType);
+    });
+
+    // Helper: Subtract numbers
+    Handlebars.registerHelper('subtract', (a: number, b: number) => {
+      return a - b;
+    });
+
+    // Helper: Group database access by table name
+    Handlebars.registerHelper('groupByTable', (databaseAccess: any[]) => {
+      if (!databaseAccess || !Array.isArray(databaseAccess)) {
+        return [];
+      }
+
+      const tableMap = new Map<string, { table: string; selectCount: number; insertCount: number; updateCount: number; deleteCount: number }>();
+
+      for (const access of databaseAccess) {
+        const tableName = access.tableName || 'UNKNOWN';
+        if (!tableMap.has(tableName)) {
+          tableMap.set(tableName, {
+            table: tableName,
+            selectCount: 0,
+            insertCount: 0,
+            updateCount: 0,
+            deleteCount: 0
+          });
+        }
+
+        const entry = tableMap.get(tableName)!;
+        switch (access.operation) {
+          case 'SELECT':
+            entry.selectCount++;
+            break;
+          case 'INSERT':
+            entry.insertCount++;
+            break;
+          case 'UPDATE':
+            entry.updateCount++;
+            break;
+          case 'DELETE':
+            entry.deleteCount++;
+            break;
+        }
+      }
+
+      return Array.from(tableMap.values());
     });
   }
 }

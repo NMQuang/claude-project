@@ -15,32 +15,19 @@ interface MigrationType {
 const MIGRATION_TYPES: MigrationType[] = [
   {
     value: 'COBOL-to-Java',
-    label: 'COBOL to Java',
+    label: 'COBOL to Java Migration',
     sourceLanguage: 'COBOL',
     targetLanguage: 'Java 17'
   },
   {
+    value: 'Source-Analysis-COBOL',
+    label: 'COBOL Source Analysis (Online / Batch / JCL)',
+    sourceLanguage: 'COBOL'
+  },
+  {
     value: 'PostgreSQL-to-Oracle',
-    label: 'PostgreSQL to Oracle',
+    label: 'PostgreSQL to Oracle Migration',
     sourceLanguage: 'PostgreSQL',
-    targetLanguage: 'Oracle'
-  },
-  {
-    value: 'PL1-to-Java',
-    label: 'PL/I to Java',
-    sourceLanguage: 'PL/I',
-    targetLanguage: 'Java 17'
-  },
-  {
-    value: 'Oracle-to-PostgreSQL',
-    label: 'Oracle to PostgreSQL',
-    sourceLanguage: 'Oracle',
-    targetLanguage: 'PostgreSQL'
-  },
-  {
-    value: 'MySQL-to-Oracle',
-    label: 'MySQL to Oracle',
-    sourceLanguage: 'MySQL',
     targetLanguage: 'Oracle'
   }
 ];
@@ -56,6 +43,7 @@ function ProjectListPage() {
     sourceLanguage: 'COBOL',
     targetLanguage: 'Java 17'
   })
+
 
   useEffect(() => {
     loadProjects()
