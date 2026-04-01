@@ -123,7 +123,7 @@ export const deleteProject = async (id: string): Promise<void> => {
 };
 
 // File Upload
-export const uploadFiles = async (projectId: string, files: FileList, isFolder: boolean = false): Promise<any> => {
+export const uploadFiles = async (projectId: string, files: FileList | File[], isFolder: boolean = false): Promise<any> => {
   const formData = new FormData();
   Array.from(files).forEach(file => {
     formData.append('files', file);
@@ -133,12 +133,17 @@ export const uploadFiles = async (projectId: string, files: FileList, isFolder: 
     }
   });
 
-  const response = await api.post(`/projects/${projectId}/upload`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+  const response = await fetch(`${API_BASE_URL}/projects/${projectId}/upload`, {
+    method: 'POST',
+    body: formData,
   });
-  return response.data;
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+  }
+
+  return response.json();
 };
 
 // Analysis

@@ -39,23 +39,12 @@ function ProjectDashboardPage() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en')
 
   const getDocumentsByMigrationType = (migrationType: string): DocumentStatus[] => {
-    if (migrationType === 'COBOL-Analysis') {
+    if (migrationType === 'Source-Analysis-COBOL') {
       return [
-        { id: 'business-logic-analysis', name: 'Business Logic Analysis', generated: false }
+        { id: 'source-analysis', name: 'Source Analysis Report', generated: false }
       ]
     }
-    if (migrationType === 'COBOL-Project-Analysis') {
-      return [
-        { id: 'project-analysis', name: 'Project-Level Analysis', generated: false }
-      ]
-    }
-    if (migrationType === 'Source-Analysis') {
-      return [
-        { id: 'source-analysis', name: 'Source Analysis Report', generated: false },
-        { id: 'business-draft', name: 'Business Draft v1', generated: false }
-      ]
-    }
-    // Default documents for migration types (COBOL-to-Java, PostgreSQL-to-Oracle, etc.)
+    // Default documents for COBOL-to-Java and PostgreSQL-to-Oracle
     return [
       { id: 'as-is-analysis', name: 'As-Is Analysis', generated: false },
       { id: 'migration-strategy', name: 'Migration Strategy', generated: false },
@@ -164,10 +153,8 @@ function ProjectDashboardPage() {
       setUploadingFiles(true)
 
       // Convert File array to FileList-like object while preserving webkitRelativePath
-      const dataTransfer = new DataTransfer()
-      validFiles.forEach(file => dataTransfer.items.add(file))
-
-      await uploadFiles(id, dataTransfer.files, true)
+      // Skip DataTransfer because it drops the webkitRelativePath property on Chrome/Edge
+      await uploadFiles(id, validFiles, true)
 
       let message = `${validFiles.length} file(s) from folder uploaded successfully`
       if (skippedCount > 0) {
@@ -256,19 +243,19 @@ function ProjectDashboardPage() {
           <ComplexityDimension
             name="Logic Complexity"
             score={complexity.logicComplexity}
-            details={complexity.details.logic}
+            details={complexity.details?.logic || []}
             colorClass="logic"
           />
           <ComplexityDimension
             name="Data & SQL Complexity"
             score={complexity.dataComplexity}
-            details={complexity.details.data}
+            details={complexity.details?.data || []}
             colorClass="data"
           />
           <ComplexityDimension
             name="COBOL-specific Risk"
             score={complexity.cobolSpecificRisk}
-            details={complexity.details.risk}
+            details={complexity.details?.risk || []}
             colorClass="risk"
           />
         </>
@@ -280,43 +267,129 @@ function ProjectDashboardPage() {
           <ComplexityDimension
             name="Schema & Data Type Complexity"
             score={pgComplexity.schemaDataTypeComplexity}
-            details={pgComplexity.details.schemaDataType}
+            details={pgComplexity.details?.schemaDataType || []}
             colorClass="dimension1"
           />
           <ComplexityDimension
             name="SQL & Query Rewrite Complexity"
             score={pgComplexity.sqlQueryRewriteComplexity}
-            details={pgComplexity.details.sqlQueryRewrite}
+            details={pgComplexity.details?.sqlQueryRewrite || []}
             colorClass="dimension2"
           />
           <ComplexityDimension
             name="Stored Procedures, Functions & Triggers"
             score={pgComplexity.procedureFunctionTriggerComplexity}
-            details={pgComplexity.details.procedureFunctionTrigger}
+            details={pgComplexity.details?.procedureFunctionTrigger || []}
             colorClass="dimension3"
           />
           <ComplexityDimension
             name="Data Volume & Migration Strategy"
             score={pgComplexity.dataVolumeMigrationComplexity}
-            details={pgComplexity.details.dataVolumeMigration}
+            details={pgComplexity.details?.dataVolumeMigration || []}
             colorClass="dimension4"
           />
           <ComplexityDimension
             name="Application & ORM Dependencies"
             score={pgComplexity.applicationORMDependencyComplexity}
-            details={pgComplexity.details.applicationORMDependency}
+            details={pgComplexity.details?.applicationORMDependency || []}
             colorClass="dimension5"
           />
           <ComplexityDimension
             name="Operational & Runtime Risks"
             score={pgComplexity.operationalRuntimeRiskComplexity}
-            details={pgComplexity.details.operationalRuntimeRisk}
+            details={pgComplexity.details?.operationalRuntimeRisk || []}
             colorClass="dimension6"
           />
         </>
       )
     }
     return null
+  }
+
+  // Render Source-Analysis-COBOL metrics panel
+  const renderSourceAnalysisMetrics = (metadata: any) => {
+    const sa = metadata.source_analysis || {}
+    const total = (sa.online_programs || 0) + (sa.batch_programs || 0) + (sa.undetermined || 0)
+    const onlinePct = total > 0 ? Math.round(((sa.online_programs || 0) / total) * 100) : 0
+    const batchPct = total > 0 ? Math.round(((sa.batch_programs || 0) / total) * 100) : 0
+    const undeterminedPct = total > 0 ? Math.round(((sa.undetermined || 0) / total) * 100) : 0
+
+    return (
+      <>
+        <div className="metric-grid metric-grid-3col">
+          <div className="metric">
+            <div className="metric-label">Total Programs</div>
+            <div className="metric-value">{sa.total_files || 0}</div>
+          </div>
+          <div className="metric metric-online">
+            <div className="metric-label">🟢 Online (CICS)</div>
+            <div className="metric-value metric-online-val">{sa.online_programs || 0}</div>
+          </div>
+          <div className="metric metric-batch">
+            <div className="metric-label">🔵 Batch</div>
+            <div className="metric-value metric-batch-val">{sa.batch_programs || 0}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">❓ Undetermined</div>
+            <div className="metric-value">{sa.undetermined || 0}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">JCL Jobs</div>
+            <div className="metric-value">{sa.jcl_jobs || 0}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">Data Structures</div>
+            <div className="metric-value">{sa.data_structures || 0}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">Total LOC</div>
+            <div className="metric-value">{(sa.total_loc || 0).toLocaleString()}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">Copybooks</div>
+            <div className="metric-value">{sa.copybooks || 0}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">Open Questions</div>
+            <div className="metric-value metric-warn">{sa.open_questions || 0}</div>
+          </div>
+        </div>
+
+        {total > 0 && (
+          <div className="execution-pattern-breakdown">
+            <h4>Execution Pattern Distribution</h4>
+            <div className="pattern-bar-container">
+              <div
+                className="pattern-bar pattern-online"
+                style={{ width: `${onlinePct}%` }}
+                title={`Online (CICS): ${sa.online_programs || 0} programs (${onlinePct}%)`}
+              >
+                {onlinePct > 8 && `${onlinePct}%`}
+              </div>
+              <div
+                className="pattern-bar pattern-batch"
+                style={{ width: `${batchPct}%` }}
+                title={`Batch: ${sa.batch_programs || 0} programs (${batchPct}%)`}
+              >
+                {batchPct > 8 && `${batchPct}%`}
+              </div>
+              <div
+                className="pattern-bar pattern-undetermined"
+                style={{ width: `${undeterminedPct}%` }}
+                title={`Undetermined: ${sa.undetermined || 0} programs (${undeterminedPct}%)`}
+              >
+                {undeterminedPct > 8 && `${undeterminedPct}%`}
+              </div>
+            </div>
+            <div className="pattern-legend">
+              <span className="legend-item legend-online">🟢 Online/CICS: {sa.online_programs || 0}</span>
+              <span className="legend-item legend-batch">🔵 Batch: {sa.batch_programs || 0}</span>
+              <span className="legend-item legend-undetermined">⬜ Undetermined: {sa.undetermined || 0}</span>
+            </div>
+          </div>
+        )}
+      </>
+    )
   }
 
   if (loading) {
@@ -400,80 +473,59 @@ function ProjectDashboardPage() {
           <h3>Analysis Metrics</h3>
           {project.metadata ? (
             <>
-              <div className="metric-grid">
-                <div className="metric">
-                  <div className="metric-label">
-                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
-                      ? 'Database Tables'
-                      : project.migrationType === 'COBOL-Analysis' || project.migrationType === 'COBOL-Project-Analysis' || project.migrationType === 'Source-Analysis'
-                        ? 'Programs Detected'
-                        : 'Source Files'}
-                  </div>
-                  <div className="metric-value">
-                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
-                      ? (project.metadata.source_analysis?.database?.tables || 0)
-                      : (project.metadata.source_analysis?.total_files || 0)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="metric-label">
-                    {project.migrationType === 'COBOL-Project-Analysis' ? 'Copybooks'
-                      : project.migrationType === 'Source-Analysis' ? 'Data Structures'
-                      : 'Lines of Code'}
-                  </div>
-                  <div className="metric-value">
-                    {project.migrationType === 'COBOL-Project-Analysis'
-                      ? (project.metadata.source_analysis?.copybooks || 0)
-                      : project.migrationType === 'Source-Analysis'
-                        ? (project.metadata.source_analysis?.data_structures || 0)
-                        : (project.metadata.source_analysis?.total_loc || 0)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="metric-label">
-                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
-                      ? 'Stored Procedures/Functions'
-                      : project.migrationType === 'COBOL-Analysis'
-                        ? 'Paragraphs'
-                        : project.migrationType === 'COBOL-Project-Analysis' || project.migrationType === 'Source-Analysis'
-                          ? 'JCL Jobs'
+              {project.migrationType === 'Source-Analysis-COBOL' ? (
+                renderSourceAnalysisMetrics(project.metadata)
+              ) : (
+                <>
+                  <div className="metric-grid">
+                    <div className="metric">
+                      <div className="metric-label">
+                        {project.migrationType === 'PostgreSQL-to-Oracle'
+                          ? 'Database Tables'
+                          : 'Source Files'}
+                      </div>
+                      <div className="metric-value">
+                        {project.migrationType === 'PostgreSQL-to-Oracle'
+                          ? (project.metadata.source_analysis?.database?.tables || 0)
+                          : (project.metadata.source_analysis?.total_files || 0)}
+                      </div>
+                    </div>
+                    <div className="metric">
+                      <div className="metric-label">Lines of Code</div>
+                      <div className="metric-value">
+                        {(project.metadata.source_analysis?.total_loc || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="metric">
+                      <div className="metric-label">
+                        {project.migrationType === 'PostgreSQL-to-Oracle'
+                          ? 'Stored Procedures/Functions'
                           : 'Database Tables'}
-                  </div>
-                  <div className="metric-value">
-                    {project.migrationType === 'PostgreSQL-to-Oracle' || project.migrationType === 'Oracle-to-PostgreSQL' || project.migrationType === 'MySQL-to-Oracle'
-                      ? ((project.metadata.source_analysis?.database?.procedures || 0) + (project.metadata.source_analysis?.database?.functions || 0))
-                      : project.migrationType === 'COBOL-Analysis'
-                        ? (project.metadata.source_analysis?.total_paragraphs || 0)
-                        : project.migrationType === 'COBOL-Project-Analysis' || project.migrationType === 'Source-Analysis'
-                          ? (project.metadata.source_analysis?.jcl_jobs || 0)
+                      </div>
+                      <div className="metric-value">
+                        {project.migrationType === 'PostgreSQL-to-Oracle'
+                          ? ((project.metadata.source_analysis?.database?.procedures || 0) + (project.metadata.source_analysis?.database?.functions || 0))
                           : (project.metadata.source_analysis?.database?.tables || 0)}
+                      </div>
+                    </div>
+                    <div className="metric">
+                      <div className="metric-label">Migration Difficulty</div>
+                      <div className={`metric-value complexity-${project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown'}`}>
+                        {project.metadata.migrationComplexity?.difficulty || 'Unknown'}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="metric">
-                  <div className="metric-label">
-                    {project.migrationType === 'COBOL-Analysis' || project.migrationType === 'COBOL-Project-Analysis'
-                      ? 'Complexity'
-                      : project.migrationType === 'Source-Analysis'
-                        ? 'Open Questions'
-                        : 'Migration Difficulty'}
-                  </div>
-                  <div className={`metric-value ${project.migrationType === 'Source-Analysis' ? '' : 'complexity-' + (project.metadata.migrationComplexity?.difficulty?.toLowerCase() || 'unknown')}`}>
-                    {project.migrationType === 'Source-Analysis'
-                      ? (project.metadata.source_analysis?.open_questions || 0)
-                      : (project.metadata.migrationComplexity?.difficulty || 'Unknown')}
-                  </div>
-                </div>
-              </div>
 
-              {project.metadata.migrationComplexity && (
-                <div className="complexity-breakdown">
-                  <h4>Migration Complexity Score: {project.metadata.migrationComplexity.overall}/100</h4>
-                  <p className="complexity-description">{project.metadata.migrationComplexity.description}</p>
-
-                  <div className="complexity-dimensions">
-                    {renderComplexityDimensions(project.metadata.migrationComplexity, project.migrationType)}
-                  </div>
-                </div>
+                  {project.metadata.migrationComplexity && (
+                    <div className="complexity-breakdown">
+                      <h4>Migration Complexity Score: {project.metadata.migrationComplexity.overall}/100</h4>
+                      <p className="complexity-description">{project.metadata.migrationComplexity.description}</p>
+                      <div className="complexity-dimensions">
+                        {renderComplexityDimensions(project.metadata.migrationComplexity, project.migrationType)}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </>
           ) : (

@@ -1,12 +1,13 @@
-# Source-Level Analysis Report
+# COBOL Source Analysis Report
 
 **Project:** {{project.name}}
-**Analysis Type:** Evidence-Based Source Analysis
+**Analysis Type:** Evidence-Based COBOL Source Analysis (Online / Batch / JCL)
 **Analysis Date:** {{sourceAnalysis.section0_scopeSummary.analysisTimestamp}}
+**Generated:** {{generated_date}}
 
 ---
 
-> **Note:** This report contains evidence-based observations only. All findings include explicit source citations (file:line). No business interpretation or inferred naming is applied.
+> **Methodology:** This report contains evidence-based observations only. Every finding includes an explicit source citation `(file:line)`. No business interpretation, inferred naming, or guesswork is applied.
 
 ---
 
@@ -17,61 +18,185 @@
 | Category | Count |
 |----------|-------|
 | COBOL Programs | {{sourceAnalysis.section0_scopeSummary.fileInventory.cobolPrograms}} |
-| Copybooks | {{sourceAnalysis.section0_scopeSummary.fileInventory.copybooks}} |
-| JCL Files | {{sourceAnalysis.section0_scopeSummary.fileInventory.jclFiles}} |
-| DDL Files | {{sourceAnalysis.section0_scopeSummary.fileInventory.ddlFiles}} |
+| Copybooks (.cpy) | {{sourceAnalysis.section0_scopeSummary.fileInventory.copybooks}} |
+| JCL Files (.jcl/.prc/.proc) | {{sourceAnalysis.section0_scopeSummary.fileInventory.jclFiles}} |
+| DDL Files (.sql/.ddl) | {{sourceAnalysis.section0_scopeSummary.fileInventory.ddlFiles}} |
 | **Total Files** | **{{sourceAnalysis.section0_scopeSummary.fileInventory.totalFiles}}** |
 | **Total Lines of Code** | **{{sourceAnalysis.section0_scopeSummary.fileInventory.totalLinesOfCode}}** |
 
 ### Detected Technologies
 
 {{#if sourceAnalysis.section0_scopeSummary.detectedTechnologies.length}}
-| Technology | Occurrence Count | Evidence |
-|------------|-----------------|----------|
+| Technology | Occurrence Count | First Evidence |
+|------------|-----------------|----------------|
 {{#each sourceAnalysis.section0_scopeSummary.detectedTechnologies}}
-| {{this.technology}} | {{this.occurrenceCount}} | {{#each this.evidence}}{{#if @first}}{{this.file}}{{/if}}{{/each}} |
+| `{{this.technology}}` | {{this.occurrenceCount}} | `{{#each this.evidence}}{{#if @first}}{{this.file}}{{/if}}{{/each}}` |
 {{/each}}
 {{else}}
-No specific technologies detected.
+*No specific technologies detected.*
 {{/if}}
 
 ---
 
-## Section 1: Program Inventory and Execution Patterns
+## Section A: Execution Pattern Classification
 
-### Program List
+> Programs are classified based on **observable source code indicators only**.
+> - 🟢 **ONLINE** = `EXEC CICS` command detected anywhere in program
+> - 🔵 **BATCH** = sequential file I/O, `SORT`/`MERGE` verb, checkpoint paragraph, or PERFORM-UNTIL-EOF pattern
+> - ❓ **UNDETERMINED** = no conclusive indicator found → requires manual review
 
-| Program ID | File | LOC | Execution Pattern | External Calls |
-|------------|------|-----|-------------------|----------------|
-{{#each sourceAnalysis.section1_programInventory}}
-| {{this.programId}} | {{this.relativePath}} | {{this.linesOfCode}} | {{this.observedExecutionPattern}} | {{this.externalCallsDetected.length}} |
+### A0: Classification Summary
+
+| Classification | Count | % of Total |
+|----------------|-------|------------|
+| 🟢 Online (CICS-indicated) | {{sourceAnalysis.executionPatternSummary.onlinePrograms.length}} | {{percentage sourceAnalysis.executionPatternSummary.onlinePrograms.length sourceAnalysis.section0_scopeSummary.fileInventory.cobolPrograms}}% |
+| 🔵 Batch (Batch-indicated) | {{sourceAnalysis.executionPatternSummary.batchPrograms.length}} | {{percentage sourceAnalysis.executionPatternSummary.batchPrograms.length sourceAnalysis.section0_scopeSummary.fileInventory.cobolPrograms}}% |
+| ❓ Undetermined | {{sourceAnalysis.executionPatternSummary.undeterminedPrograms.length}} | {{percentage sourceAnalysis.executionPatternSummary.undeterminedPrograms.length sourceAnalysis.section0_scopeSummary.fileInventory.cobolPrograms}}% |
+| **Total Programs** | **{{sourceAnalysis.section0_scopeSummary.fileInventory.cobolPrograms}}** | 100% |
+
+### A1: Online Programs (CICS-Indicated)
+
+{{#if sourceAnalysis.executionPatternSummary.onlinePrograms.length}}
+| # | Program ID | File | Observed CICS Indicators |
+|---|------------|------|--------------------------|
+{{#each sourceAnalysis.executionPatternSummary.onlinePrograms}}
+| {{add @index 1}} | `{{this.programId}}` | `{{this.fileName}}` | {{join this.indicators " · "}} |
 {{/each}}
 
+> **CICS programs are interactive/online transactions.** Migration requires mapping each CICS command to a REST endpoint or message-driven equivalent.
+{{else}}
+*No CICS-indicated online programs detected in this source set.*
+{{/if}}
+
+---
+
+### A2: Batch Programs (Batch-Indicated)
+
+{{#if sourceAnalysis.executionPatternSummary.batchPrograms.length}}
+| # | Program ID | File | Batch Indicators |
+|---|------------|------|-----------------|
+{{#each sourceAnalysis.executionPatternSummary.batchPrograms}}
+| {{add @index 1}} | `{{this.programId}}` | `{{this.fileName}}` | {{join this.indicators " · "}} |
+{{/each}}
+
+> **Batch programs process data in bulk without user interaction.** Migration requires mapping file I/O to database operations or message queues.
+{{else}}
+*No batch-indicated programs detected in this source set.*
+{{/if}}
+
+---
+
+### A3: Undetermined Programs
+
+{{#if sourceAnalysis.executionPatternSummary.undeterminedPrograms.length}}
+| # | Program ID | File |
+|---|------------|------|
+{{#each sourceAnalysis.executionPatternSummary.undeterminedPrograms}}
+| {{add @index 1}} | `{{this.programId}}` | `{{this.fileName}}` |
+{{/each}}
+
+> ⚠️ These programs lack sufficient observable indicators. They may be **subroutines/utilities** called by other programs, or have patterns not yet covered by the analyzer. **Manual review recommended.**
+{{else}}
+✅ All programs have been successfully classified (no undetermined programs).
+{{/if}}
+
+---
+
+### A4: JCL Execution Context
+
+| Metric | Value |
+|--------|-------|
+| Total JCL Jobs | {{sourceAnalysis.executionPatternSummary.jclSummary.totalJobs}} |
+| Total JCL Steps | {{sourceAnalysis.executionPatternSummary.jclSummary.totalSteps}} |
+| Unique Programs Invoked via JCL (`EXEC PGM=`) | {{sourceAnalysis.executionPatternSummary.jclSummary.programsInvokedByJcl.length}} |
+
+{{#if sourceAnalysis.executionPatternSummary.jclSummary.programsInvokedByJcl.length}}
+**Programs invoked by JCL:**
+
+```
+{{join sourceAnalysis.executionPatternSummary.jclSummary.programsInvokedByJcl ", "}}
+```
+{{/if}}
+
+---
+
+## Section 1: Program Inventory
+
+### 1.0: Program Summary Table
+
+| Program ID | LOC | Execution Pattern | Paragraphs | Copybooks | External Calls |
+|------------|-----|-------------------|------------|-----------|----------------|
 {{#each sourceAnalysis.section1_programInventory}}
-### {{this.programId}}
+| `{{this.programId}}` | {{this.linesOfCode}} | {{this.observedExecutionPattern}} | {{this.observedStructure.paragraphCount}} | {{this.observedStructure.copybooksReferenced.length}} | {{this.externalCallsDetected.length}} |
+{{/each}}
 
-**File:** `{{this.relativePath}}`
+---
 
-**Observed Execution Pattern:** {{this.observedExecutionPattern}}
+### 1.1: Program Call Dependencies
+
+> Programs that call other programs via `CALL` statement.
+
+{{#if sourceAnalysis.section1_programInventory.length}}
+{{#each sourceAnalysis.section1_programInventory}}
+{{#if this.externalCallsDetected.length}}
+**`{{this.programId}}`** calls:
+{{#each this.externalCallsDetected}}
+- → `{{this.targetProgram}}` ({{this.callType}}) — `{{this.evidence.file}}:{{this.evidence.line}}`
+{{/each}}
+
+{{/if}}
+{{/each}}
+{{else}}
+*No inter-program calls detected.*
+{{/if}}
+
+---
+
+### 1.2: Copybook Usage
+
+> Copybooks referenced per program (COPY statement observed).
+
+{{#if sourceAnalysis.section1_programInventory.length}}
+| Program ID | Copybooks Referenced |
+|------------|---------------------|
+{{#each sourceAnalysis.section1_programInventory}}
+{{#if this.observedStructure.copybooksReferenced.length}}
+| `{{this.programId}}` | {{join this.observedStructure.copybooksReferenced ", "}} |
+{{/if}}
+{{/each}}
+{{else}}
+*No copybook references detected.*
+{{/if}}
+
+---
+
+### 1.3: Program Detail
+
+{{#each sourceAnalysis.section1_programInventory}}
+#### `{{this.programId}}` — {{this.observedExecutionPattern}}
+
+| Attribute | Value |
+|-----------|-------|
+| File | `{{this.relativePath}}` |
+| Lines of Code | {{this.linesOfCode}} |
+| Execution Pattern | {{this.observedExecutionPattern}} |
+| Paragraphs | {{this.observedStructure.paragraphCount}} |
+| Divisions | {{join this.observedStructure.divisions ", "}} |
+| Copybooks | {{#if this.observedStructure.copybooksReferenced.length}}{{join this.observedStructure.copybooksReferenced ", "}}{{else}}—{{/if}} |
 
 {{#if this.patternEvidence.length}}
 **Pattern Evidence:**
 {{#each this.patternEvidence}}
-- `{{this.file}}:{{this.line}}` - {{this.statement}}
+- `{{this.file}}:{{this.line}}` — {{this.statement}}
 {{/each}}
 {{/if}}
 
-**Observed Structure:**
-- Divisions: {{join this.observedStructure.divisions ", "}}
-- Paragraph Count: {{this.observedStructure.paragraphCount}}
-- Copybooks Referenced: {{#if this.observedStructure.copybooksReferenced.length}}{{join this.observedStructure.copybooksReferenced ", "}}{{else}}None{{/if}}
-
 {{#if this.externalCallsDetected.length}}
-**External Calls Detected:**
-| Target Program | Call Type | Evidence |
-|----------------|-----------|----------|
+**External Calls:**
+| Target | Type | Evidence |
+|--------|------|----------|
 {{#each this.externalCallsDetected}}
-| {{this.targetProgram}} | {{this.callType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+| `{{this.targetProgram}}` | {{this.callType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
 {{/each}}
 {{/if}}
 
@@ -84,58 +209,71 @@ No specific technologies detected.
 
 {{#if sourceAnalysis.section2_persistentDataStructures.length}}
 
-### Summary
+### 2.0: Structure Summary
 
-| ID | Structure Name | Storage Type | Source File | Fields | Referenced By |
-|----|----------------|--------------|-------------|--------|---------------|
+| ID | Structure Name | Storage Type | Fields | Referenced By |
+|----|----------------|--------------|--------|---------------|
 {{#each sourceAnalysis.section2_persistentDataStructures}}
-| {{this.structureId}} | {{this.structureName}} | {{this.storageType}} | {{this.sourceFile}} | {{this.observedFields.length}} | {{this.referencedByPrograms.length}} programs |
+| {{this.structureId}} | `{{this.structureName}}` | {{this.storageType}} | {{this.observedFields.length}} | {{this.referencedByPrograms.length}} programs |
 {{/each}}
 
-{{#each sourceAnalysis.section2_persistentDataStructures}}
-### {{this.structureId}}: {{this.structureName}}
+---
 
-**Storage Type:** {{this.storageType}}
+### 2.1: Data Access Cross-Reference
+
+> Which programs access which data structures, and in what mode.
+
+{{#each sourceAnalysis.section2_persistentDataStructures}}
+{{#if this.referencedByPrograms.length}}
+**`{{this.structureName}}`** ({{this.storageType}}):
+| Program | Access Mode | Evidence |
+|---------|-------------|----------|
+{{#each this.referencedByPrograms}}
+| `{{this.programId}}` | `{{this.accessType}}` | `{{this.evidence.file}}:{{this.evidence.line}}` |
+{{/each}}
+
+{{/if}}
+{{/each}}
+
+---
+
+### 2.2: Structure Detail
+
+{{#each sourceAnalysis.section2_persistentDataStructures}}
+#### {{this.structureId}}: `{{this.structureName}}`
+
+**Storage Type:** `{{this.storageType}}`
 **Source:** `{{this.evidence.file}}:{{this.evidence.line}}`
-**Evidence:** `{{this.evidence.statement}}`
+**Evidence Statement:** `{{this.evidence.statement}}`
 
 {{#if this.observedKeyFields.length}}
-**Observed Key Fields:**
+**Key Fields:**
 | Field Name | Key Type | Evidence |
 |------------|----------|----------|
 {{#each this.observedKeyFields}}
-| {{this.fieldName}} | {{this.keyType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+| `{{this.fieldName}}` | {{this.keyType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
 {{/each}}
 {{/if}}
 
 {{#if this.observedFields.length}}
-**Observed Fields (first 20):**
-| Field Name | Picture | Length | Data Type |
-|------------|---------|--------|-----------|
+**Fields (first 20 of {{this.observedFields.length}}):**
+| Field Name | Picture Clause | Length | Data Type |
+|------------|----------------|--------|-----------|
 {{#each this.observedFields}}
 {{#if (lt @index 20)}}
-| {{this.fieldName}} | {{this.pictureClause}} | {{this.computedLength}} | {{this.dataType}} |
+| `{{this.fieldName}}` | `{{this.pictureClause}}` | {{this.computedLength}} | {{this.dataType}} |
 {{/if}}
 {{/each}}
 {{#if (gt this.observedFields.length 20)}}
-... and {{subtract this.observedFields.length 20}} more fields
+*... and {{subtract this.observedFields.length 20}} more fields*
 {{/if}}
-{{/if}}
-
-{{#if this.referencedByPrograms.length}}
-**Referenced By Programs:**
-| Program | Access Type | Evidence |
-|---------|-------------|----------|
-{{#each this.referencedByPrograms}}
-| {{this.programId}} | {{this.accessType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
-{{/each}}
 {{/if}}
 
 ---
 {{/each}}
 
 {{else}}
-No persistent data structures identified from source analysis.
+*No persistent data structures identified from source analysis.*
 {{/if}}
 
 ---
@@ -144,22 +282,30 @@ No persistent data structures identified from source analysis.
 
 {{#if sourceAnalysis.section3_dataAccessPatterns.length}}
 
-### Access Pattern Summary
+### 3.0: Access Type Distribution
 
-| ID | Program | Target | Access Verb | Type | Evidence |
-|----|---------|--------|-------------|------|----------|
+| Access Type | Count |
+|-------------|-------|
+| FILE_IO | {{countFlowType sourceAnalysis.section3_dataAccessPatterns "FILE_IO"}} |
+| SQL | {{countFlowType sourceAnalysis.section3_dataAccessPatterns "SQL"}} |
+| VSAM | {{countFlowType sourceAnalysis.section3_dataAccessPatterns "VSAM"}} |
+| **Total** | **{{sourceAnalysis.section3_dataAccessPatterns.length}}** |
+
+### 3.1: Access Pattern Detail
+
+| ID | Program | Target Structure | Verb | Type | Evidence |
+|----|---------|-----------------|------|------|----------|
 {{#each sourceAnalysis.section3_dataAccessPatterns}}
-{{#if (lt @index 50)}}
-| {{this.observationId}} | {{this.programId}} | {{this.targetStructure}} | {{this.accessVerb}} | {{this.accessType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
+{{#if (lt @index 100)}}
+| {{this.observationId}} | `{{this.programId}}` | `{{this.targetStructure}}` | `{{this.accessVerb}}` | {{this.accessType}} | `{{this.evidence.file}}:{{this.evidence.line}}` |
 {{/if}}
 {{/each}}
-{{#if (gt sourceAnalysis.section3_dataAccessPatterns.length 50)}}
-
-*... and {{subtract sourceAnalysis.section3_dataAccessPatterns.length 50}} more access patterns*
+{{#if (gt sourceAnalysis.section3_dataAccessPatterns.length 100)}}
+*... and {{subtract sourceAnalysis.section3_dataAccessPatterns.length 100}} more access patterns (truncated for readability)*
 {{/if}}
 
 {{else}}
-No data access patterns observed.
+*No data access patterns observed.*
 {{/if}}
 
 ---
@@ -168,27 +314,37 @@ No data access patterns observed.
 
 {{#if sourceAnalysis.section4_jclExecutionRelationships.length}}
 
+### 4.0: JCL Job Overview
+
+| Job Name | Source File | Steps | Datasets Referenced |
+|----------|-------------|-------|---------------------|
 {{#each sourceAnalysis.section4_jclExecutionRelationships}}
-### Job: {{this.jobName}}
+| `{{this.jobName}}` | `{{this.sourceFile}}` | {{this.stepSequence.length}} | {{this.datasetReferences.length}} |
+{{/each}}
 
-**Source File:** `{{this.sourceFile}}`
-**Evidence:** `{{this.evidence.file}}:{{this.evidence.line}}` - `{{this.evidence.statement}}`
+---
 
-#### Step Sequence
+{{#each sourceAnalysis.section4_jclExecutionRelationships}}
+### 4.{{add @index 1}}: Job `{{this.jobName}}`
 
-| Step # | Step Name | Program | Conditional | Input Datasets | Output Datasets |
-|--------|-----------|---------|-------------|----------------|-----------------|
+**Source:** `{{this.evidence.file}}:{{this.evidence.line}}`
+**JCL Statement:** `{{this.evidence.statement}}`
+
+#### Step Execution Flow
+
+| Step # | Step Name | Program (`EXEC PGM=`) | Conditional | DD Input | DD Output |
+|--------|-----------|----------------------|-------------|----------|-----------|
 {{#each this.stepSequence}}
-| {{this.stepNumber}} | {{this.stepName}} | {{this.executedProgram}} | {{#if this.isConditional}}Yes{{else}}No{{/if}} | {{join this.inputDatasets ", "}} | {{join this.outputDatasets ", "}} |
+| {{this.stepNumber}} | `{{this.stepName}}` | `{{this.executedProgram}}` | {{#if this.isConditional}}⚠️ Yes{{else}}No{{/if}} | {{join this.inputDatasets ", "}} | {{join this.outputDatasets ", "}} |
 {{/each}}
 
 {{#if this.datasetReferences.length}}
-#### Dataset References
+#### Dataset References in `{{this.jobName}}`
 
 | Dataset Name | DD Name | Access Mode | Used In Steps |
 |--------------|---------|-------------|---------------|
 {{#each this.datasetReferences}}
-| {{this.datasetName}} | {{this.ddName}} | {{this.accessMode}} | {{join this.usedInSteps ", "}} |
+| `{{this.datasetName}}` | `{{this.ddName}}` | {{this.accessMode}} | {{join this.usedInSteps ", "}} |
 {{/each}}
 {{/if}}
 
@@ -196,32 +352,32 @@ No data access patterns observed.
 {{/each}}
 
 {{else}}
-No JCL execution relationships identified.
+*No JCL execution relationships identified.*
 {{/if}}
 
 ---
 
-## Section 5: Observations and Open Questions
+## Section 5: Observations & Open Questions
 
-### Observed Facts
+### 5.1: Observed Facts
 
 {{#if sourceAnalysis.section5_observationsAndQuestions.observations.length}}
 
 | Fact ID | Category | Observation | Affected Components |
 |---------|----------|-------------|---------------------|
 {{#each sourceAnalysis.section5_observationsAndQuestions.observations}}
-| {{this.factId}} | {{this.category}} | {{this.observation}} | {{join this.affectedComponents ", "}} |
+| {{this.factId}} | `{{this.category}}` | {{this.observation}} | {{join this.affectedComponents ", "}} |
 {{/each}}
 
 {{#each sourceAnalysis.section5_observationsAndQuestions.observations}}
 
-#### {{this.factId}}: {{this.category}}
+#### {{this.factId}} — `{{this.category}}`
 
 **Observation:** {{this.observation}}
 
 **Evidence:**
 {{#each this.evidence}}
-- `{{this.file}}:{{this.line}}` - {{this.statement}}
+- `{{this.file}}:{{this.line}}` — {{this.statement}}
 {{/each}}
 
 **Affected Components:** {{join this.affectedComponents ", "}}
@@ -230,22 +386,26 @@ No JCL execution relationships identified.
 {{/each}}
 
 {{else}}
-No specific patterns or anomalies observed.
+*No specific patterns or anomalies observed.*
 {{/if}}
 
-### Open Questions
+---
+
+### 5.2: Open Questions
 
 {{#if sourceAnalysis.section5_observationsAndQuestions.openQuestions.length}}
+
+> These questions require human review or access to runtime/operational data not available in source files.
 
 | Question ID | Category | Question |
 |-------------|----------|----------|
 {{#each sourceAnalysis.section5_observationsAndQuestions.openQuestions}}
-| {{this.questionId}} | {{this.category}} | {{this.question}} |
+| {{this.questionId}} | `{{this.category}}` | {{this.question}} |
 {{/each}}
 
 {{#each sourceAnalysis.section5_observationsAndQuestions.openQuestions}}
 
-#### {{this.questionId}}: {{this.category}}
+#### {{this.questionId}} — `{{this.category}}`
 
 **Question:** {{this.question}}
 
@@ -254,7 +414,7 @@ No specific patterns or anomalies observed.
 {{#if this.relatedEvidence}}
 **Related Evidence:**
 {{#each this.relatedEvidence}}
-- `{{this.file}}:{{this.line}}` - {{this.statement}}
+- `{{this.file}}:{{this.line}}` — {{this.statement}}
 {{/each}}
 {{/if}}
 
@@ -262,24 +422,40 @@ No specific patterns or anomalies observed.
 {{/each}}
 
 {{else}}
-No open questions identified.
+*No open questions identified.*
 {{/if}}
 
 ---
 
-## Appendix: Evidence Citation Format
+## Appendix: Reading This Report
 
-All observations in this document follow the evidence citation format:
-
+### Evidence Citation Format
+All observations use the format:
 ```
-`file_path:line_number` - observed_statement
+`file_path:line_number` — observed_statement
 ```
 
-Example:
-- `CUSTMNT.cbl:150` - EXEC SQL SELECT detected
-- `BATCH001.jcl:10` - //STEP01 EXEC PGM=CUSTUPD
+**Examples:**
+- `CUSTMNT.cbl:150` — EXEC SQL SELECT detected
+- `BATCH001.jcl:10` — //STEP01 EXEC PGM=CUSTUPD
+- `ONLPGM01.cbl:1` — CICS usage detected: EXEC CICS RECEIVE ...
+
+### Storage Type Legend
+| Code | Meaning |
+|------|---------|
+| `VSAM_FILE` | VSAM file with key observed in copybook |
+| `DATABASE_TABLE` | Table accessed via EXEC SQL |
+| `SEQUENTIAL_FILE` | Sequential file (no key structure) |
+| `INDEXED_FILE` | Indexed file (alternate key) |
+| `UNDETERMINED` | Insufficient evidence to classify |
+
+### Execution Pattern Legend
+| Code | Meaning |
+|------|---------|
+| `ONLINE_INDICATED` | EXEC CICS command observed → interactive transaction |
+| `BATCH_INDICATED` | File I/O, SORT, MERGE, or checkpoint pattern observed |
+| `UNDETERMINED` | No conclusive indicator → likely utility/subroutine |
 
 ---
 
-*Document generated automatically by Source Analysis Tool (Evidence-Based)*
-*Generated: {{generated_date}}*
+*Generated by Migration Documentation Tool — Source Analysis Engine (Evidence-Based)*

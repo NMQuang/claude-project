@@ -74,19 +74,13 @@ export class DocumentGenerator {
       return 'cobol-to-java'; // Default for backward compatibility
     }
 
-    // Normalize migration type names to folder names
     const typeMap: { [key: string]: string } = {
       'COBOL-to-Java': 'cobol-to-java',
-      'COBOL-Analysis': 'cobol-analysis',
-      'COBOL-Project-Analysis': 'cobol-analysis',
-      'Source-Analysis': 'source-analysis',
-      'PostgreSQL-to-Oracle': 'pg-to-oracle',
-      'PL1-to-Java': 'pl1-to-java',
-      'Oracle-to-PostgreSQL': 'oracle-to-pg',
-      'MySQL-to-Oracle': 'mysql-to-oracle'
+      'Source-Analysis-COBOL': 'source-analysis',
+      'PostgreSQL-to-Oracle': 'pg-to-oracle'
     };
 
-    return typeMap[migrationType] || 'cobol-to-java'; // Default fallback
+    return typeMap[migrationType] || 'cobol-to-java';
   }
 
   /**
@@ -95,7 +89,6 @@ export class DocumentGenerator {
   private registerHelpers() {
     // Helper: Format date
     Handlebars.registerHelper('formatDate', (date: string, format: string) => {
-      // Simple date formatting (in production, use a library like date-fns)
       return date;
     });
 
@@ -187,10 +180,16 @@ export class DocumentGenerator {
       return counts;
     });
 
-    // Helper: Count flow type
+    // Helper: Count flow type (supports both flowType and accessType fields)
     Handlebars.registerHelper('countFlowType', (flows: any[], flowType: string) => {
       if (!flows || !Array.isArray(flows)) return 0;
-      return flows.filter(f => f.flowType === flowType).length;
+      return flows.filter(f => f.flowType === flowType || f.accessType === flowType).length;
+    });
+
+    // Helper: Count by accessType (for DataAccessObservation arrays)
+    Handlebars.registerHelper('countAccessType', (patterns: any[], accessType: string) => {
+      if (!patterns || !Array.isArray(patterns)) return 0;
+      return patterns.filter(p => p.accessType === accessType).length;
     });
 
     // Helper: Count batch processes

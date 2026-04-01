@@ -190,10 +190,37 @@ export interface OpenQuestion {
 }
 
 /**
- * Main analysis result - Fixed 6-section format
+ * Execution pattern classification summary (derived from Section 1)
+ * Provides a high-level breakdown of Online vs Batch programs and JCL depth
+ */
+export interface ExecutionPatternSummary {
+  onlinePrograms: {
+    programId: string;
+    fileName: string;
+    indicators: string[];  // CICS commands detected
+  }[];
+  batchPrograms: {
+    programId: string;
+    fileName: string;
+    indicators: string[];  // SORT/MERGE/file I-O patterns
+  }[];
+  undeterminedPrograms: {
+    programId: string;
+    fileName: string;
+  }[];
+  jclSummary: {
+    totalJobs: number;
+    totalSteps: number;
+    programsInvokedByJcl: string[];  // programs referenced in JCL EXEC PGM=
+  };
+}
+
+/**
+ * Main analysis result - Fixed 6-section format with COBOL classification
  */
 export interface SourceAnalysisResult {
   section0_scopeSummary: SourceScopeSummary;
+  executionPatternSummary: ExecutionPatternSummary;  // NEW: Online/Batch/JCL classification
   section1_programInventory: ProgramInventoryEntry[];
   section2_persistentDataStructures: PersistentDataStructure[];
   section3_dataAccessPatterns: DataAccessObservation[];
@@ -270,8 +297,13 @@ export class SourceAnalyzer {
       programResults, copybookResults, jclResults, section1, section2
     );
 
+    const executionPatternSummary = this.buildExecutionPatternSummary(
+      section1, jclResults
+    );
+
     return {
       section0_scopeSummary: section0,
+      executionPatternSummary,
       section1_programInventory: section1,
       section2_persistentDataStructures: section2,
       section3_dataAccessPatterns: section3,
@@ -451,53 +483,132 @@ export class SourceAnalyzer {
 
   /**
    * Observe execution pattern from evidence (evidence-based, not interpretive)
+   * Enhanced: detects SORT, MERGE, checkpoint patterns, SQL-only batch, CICS commands
    */
   private observeExecutionPattern(program: CobolBusinessLogicResult): {
     pattern: 'BATCH_INDICATED' | 'ONLINE_INDICATED' | 'UNDETERMINED';
     evidence: SourceEvidence[];
+    indicators: string[];
   } {
     const evidence: SourceEvidence[] = [];
+    const indicators: string[] = [];
     const relativePath = (program as any).relativePath || program.fileName;
 
-    // Check for CICS indicators (online)
+    // --- ONLINE indicators (CICS) ---
     if (program.platformFeatures?.cicsUsage) {
+      const cicsCommands = (program as any).cicsCommands || [];
+      const cmdSample = cicsCommands.slice(0, 3).join(', ') || 'EXEC CICS ...';
       evidence.push({
         file: relativePath,
         line: 1,
-        statement: `CICS usage detected`
+        statement: `CICS usage detected: ${cmdSample}`
       });
-      return { pattern: 'ONLINE_INDICATED', evidence };
+      indicators.push('CICS_USAGE');
+      return { pattern: 'ONLINE_INDICATED', evidence, indicators };
     }
 
-    // Check for file processing indicators (batch)
+    // --- BATCH indicators ---
+    const batchIndicators: string[] = [];
+
+    // 1. Sequential file I/O (classic batch)
     const hasFileProcessing = program.files && program.files.length > 0;
     const hasSequentialAccess = program.files?.some(f =>
-      f.accessType === 'INPUT' || f.accessType === 'OUTPUT'
+      f.accessType === 'INPUT' || f.accessType === 'OUTPUT' || f.accessType === 'EXTEND'
     );
-
     if (hasFileProcessing && hasSequentialAccess) {
-      evidence.push({
-        file: relativePath,
-        line: 1,
-        statement: `File processing detected (${program.files!.length} file(s))`
-      });
-      return { pattern: 'BATCH_INDICATED', evidence };
+      batchIndicators.push(`SEQUENTIAL_FILE_IO (${program.files!.length} file(s))`);
     }
 
-    // Check PERFORM patterns (batch indicator) - using paragraphs.performs
-    const hasBatchLoop = program.paragraphs?.some(p =>
-      p.performs && p.performs.length > 0
+    // 2. SORT verb (batch sort step)
+    if ((program as any).hasSortVerb || (program as any).sortFiles?.length > 0) {
+      batchIndicators.push('SORT_VERB_DETECTED');
+    }
+
+    // 3. MERGE verb
+    if ((program as any).hasMergeVerb) {
+      batchIndicators.push('MERGE_VERB_DETECTED');
+    }
+
+    // 4. Checkpoint/restart patterns (paragraph names contain CKPT/CHKPT/RESTART)
+    const checkpointParagraph = program.paragraphs?.find(p =>
+      /CKPT|CHKPT|CHECKPOINT|RESTART/i.test(p.name || '')
     );
-    if (hasBatchLoop && hasFileProcessing) {
-      evidence.push({
-        file: relativePath,
-        line: 1,
-        statement: 'PERFORM patterns with file processing detected'
-      });
-      return { pattern: 'BATCH_INDICATED', evidence };
+    if (checkpointParagraph) {
+      batchIndicators.push(`CHECKPOINT_PATTERN (${checkpointParagraph.name})`);
     }
 
-    return { pattern: 'UNDETERMINED', evidence: [] };
+    // 5. PERFORM UNTIL on file status (batch loop)
+    const hasProcessAllLoop = program.paragraphs?.some(p =>
+      p.performs?.some((perf: any) =>
+        /EOF|END-OF-FILE|END-FILE|AT-END|WS-EOF/i.test(typeof perf === 'string' ? perf : perf.target || '')
+      )
+    );
+    if (hasProcessAllLoop) {
+      batchIndicators.push('PERFORM_UNTIL_EOF_PATTERN');
+    }
+
+    // 6. SQL-only batch (no CICS, has SQL inserts/updates = likely DB batch)
+    const hasMassiveSQL = (program.databaseAccess?.length || 0) > 5 &&
+      program.databaseAccess?.some(d => d.operation === 'INSERT' || d.operation === 'UPDATE' || d.operation === 'DELETE');
+    if (hasMassiveSQL && !hasFileProcessing) {
+      batchIndicators.push(`SQL_BATCH_UPDATE (${program.databaseAccess!.length} SQL statements)`);
+    }
+
+    if (batchIndicators.length > 0) {
+      for (const indicator of batchIndicators) {
+        evidence.push({ file: relativePath, line: 1, statement: indicator });
+        indicators.push(indicator);
+      }
+      return { pattern: 'BATCH_INDICATED', evidence, indicators };
+    }
+
+    return { pattern: 'UNDETERMINED', evidence: [], indicators: [] };
+  }
+
+  /**
+   * Build ExecutionPatternSummary from Section 1 inventory + JCL results
+   */
+  private buildExecutionPatternSummary(
+    section1: ProgramInventoryEntry[],
+    jclResults: JclAnalysisResult[]
+  ): ExecutionPatternSummary {
+    const onlinePrograms: ExecutionPatternSummary['onlinePrograms'] = [];
+    const batchPrograms: ExecutionPatternSummary['batchPrograms'] = [];
+    const undeterminedPrograms: ExecutionPatternSummary['undeterminedPrograms'] = [];
+
+    for (const entry of section1) {
+      const indicators = entry.patternEvidence.map(e => e.statement || '').filter(Boolean);
+      if (entry.observedExecutionPattern === 'ONLINE_INDICATED') {
+        onlinePrograms.push({ programId: entry.programId, fileName: entry.fileName, indicators });
+      } else if (entry.observedExecutionPattern === 'BATCH_INDICATED') {
+        batchPrograms.push({ programId: entry.programId, fileName: entry.fileName, indicators });
+      } else {
+        undeterminedPrograms.push({ programId: entry.programId, fileName: entry.fileName });
+      }
+    }
+
+    // JCL summary
+    let totalJobs = 0;
+    let totalSteps = 0;
+    const programsInvokedByJcl: string[] = [];
+    for (const jcl of jclResults) {
+      for (const job of jcl.jobs) {
+        totalJobs++;
+        totalSteps += job.steps?.length || 0;
+        for (const step of job.steps || []) {
+          if (step.programName && !programsInvokedByJcl.includes(step.programName)) {
+            programsInvokedByJcl.push(step.programName);
+          }
+        }
+      }
+    }
+
+    return {
+      onlinePrograms,
+      batchPrograms,
+      undeterminedPrograms,
+      jclSummary: { totalJobs, totalSteps, programsInvokedByJcl }
+    };
   }
 
   /**

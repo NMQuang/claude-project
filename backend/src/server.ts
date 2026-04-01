@@ -12,10 +12,7 @@ import { fileURLToPath } from 'url';
 
 // Import analyzers and generators
 import { CobolAnalyzer } from './analyzers/CobolAnalyzer.js';
-import { CobolBusinessLogicAnalyzer } from './analyzers/CobolBusinessLogicAnalyzer.js';
-import { CobolProjectAnalyzer } from './analyzers/CobolProjectAnalyzer.js';
 import { SourceAnalyzer } from './analyzers/SourceAnalyzer.js';
-import { BusinessDraftGenerator } from './generators/BusinessDraftGenerator.js';
 import { DDLAnalyzer } from './analyzers/DDLAnalyzer.js';
 import { JavaAnalyzer } from './analyzers/JavaAnalyzer.js';
 import { PostgreSQLDDLAnalyzer } from './analyzers/PostgreSQLDDLAnalyzer.js';
@@ -166,15 +163,21 @@ app.post('/api/projects/:id/upload', (req, res) => {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    const files = req.files as Express.Multer.File[];
+    const files = req.files as Express.Multer.File[] | undefined;
     const filePaths = req.body.filePaths; // Array of relative paths from folder upload
+
+    if (!files || files.length === 0) {
+      console.error('No files found in request. req.body:', req.body);
+      return res.status(400).json({ error: 'No valid files received by backend' });
+    }
+
     const uploadDir = path.join(__dirname, '../uploads', project.id);
 
     // Process files to preserve folder structure
     const processedFiles = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      let relativePath = file.filename; // Default to filename
+      let relativePath = file.originalname; // Multer saves originalname 
 
       // If filePaths provided (folder upload), use relative path
       if (filePaths) {
@@ -244,7 +247,7 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
       if (ddlFiles.length > 0) {
         for (const file of ddlFiles) {
           const result = await ddlAnalyzer.analyze(file);
-          ddlResults = result; // In production, merge multiple DDL files
+          ddlResults = result;
         }
       }
 
@@ -252,7 +255,6 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
       const extractor = new MetadataExtractor();
       const metadata = extractor.extract(analysisResults, ddlResults);
 
-      // Save to project
       project.metadata = metadata;
       project.ddlMetadata = ddlResults;
       project.status = 'Analyzed';
@@ -263,166 +265,54 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
         ddlMetadata: ddlResults
       });
 
-    } else if (project.migrationType === 'COBOL-Analysis') {
-      // COBOL Business Logic Analysis
-      const businessLogicAnalyzer = new CobolBusinessLogicAnalyzer();
-      const cobolFiles = getAllFiles(uploadDir, ['.cbl', '.cob']);
-
-      const businessLogicResults = [];
-      for (const file of cobolFiles) {
-        const result = await businessLogicAnalyzer.analyze(file);
-        // Add relative path (from upload directory)
-        const relativePath = path.relative(uploadDir, file).replace(/\\/g, '/');
-        result.relativePath = relativePath;
-        businessLogicResults.push(result);
-      }
-
-      // Calculate metrics from analysis results
-      let totalLoc = 0;
-      let totalParagraphs = 0;
-      let totalSqlStatements = 0;
-      let highComplexityCount = 0;
-      let mediumComplexityCount = 0;
-
-      for (const result of businessLogicResults) {
-        totalLoc += result.metrics?.totalLines || 0;
-        totalParagraphs += result.paragraphs?.length || 0;
-        totalSqlStatements += result.metrics?.sqlStatementCount || 0;
-
-        const difficulty = result.complexity?.overallDifficulty;
-        if (difficulty === 'High') highComplexityCount++;
-        else if (difficulty === 'Medium') mediumComplexityCount++;
-      }
-
-      // Determine overall difficulty
-      let overallDifficulty = 'Low';
-      if (highComplexityCount > 0 || (mediumComplexityCount > cobolFiles.length / 2)) {
-        overallDifficulty = 'High';
-      } else if (mediumComplexityCount > 0) {
-        overallDifficulty = 'Medium';
-      }
-
-      // Store results in project metadata with source_analysis for frontend compatibility
-      project.metadata = {
-        type: 'COBOL-Analysis',
-        businessLogicResults,
-        totalFiles: cobolFiles.length,
-        analyzedAt: new Date().toISOString(),
-        // Add source_analysis for frontend metrics display
-        source_analysis: {
-          total_files: cobolFiles.length,
-          total_loc: totalLoc,
-          total_paragraphs: totalParagraphs,
-          database: {
-            tables: totalSqlStatements > 0 ? totalSqlStatements : 0
-          }
-        },
-        // Add migrationComplexity for frontend display
-        migrationComplexity: {
-          difficulty: overallDifficulty,
-          overall: overallDifficulty === 'High' ? 75 : (overallDifficulty === 'Medium' ? 50 : 25),
-          description: `COBOL Business Logic Analysis - ${cobolFiles.length} program(s) analyzed with ${overallDifficulty.toLowerCase()} complexity`
-        }
-      };
-      project.status = 'Analyzed';
-
-      res.json({
-        message: 'COBOL Business Logic analysis complete',
-        totalFiles: cobolFiles.length,
-        results: businessLogicResults.map(r => ({
-          programId: r.programId,
-          fileName: r.fileName,
-          relativePath: r.relativePath,
-          processingType: r.overview.processingType,
-          paragraphCount: r.paragraphs.length,
-          complexityLevel: r.complexity.overallDifficulty
-        }))
-      });
-
-    } else if (project.migrationType === 'COBOL-Project-Analysis') {
-      // COBOL Project-Level Analysis
-      const projectAnalyzer = new CobolProjectAnalyzer();
-      const projectAnalysisResult = await projectAnalyzer.analyzeProject(uploadDir, project.name);
-
-      // Calculate metrics summary
-      const totalLoc = projectAnalysisResult.inventory.totalLinesOfCode;
-      const totalPrograms = projectAnalysisResult.inventory.programs;
-      const totalCopybooks = projectAnalysisResult.inventory.copybooks;
-      const totalJclJobs = projectAnalysisResult.inventory.jclJobs;
-
-      // Determine overall difficulty
-      const effort = projectAnalysisResult.migrationImpact.estimatedEffort;
-      let overallDifficulty = 'Low';
-      if (effort.highComplexity > totalPrograms * 0.3) {
-        overallDifficulty = 'High';
-      } else if (effort.mediumComplexity > totalPrograms * 0.5) {
-        overallDifficulty = 'Medium';
-      }
-
-      // Store results in project metadata
-      project.metadata = {
-        type: 'COBOL-Project-Analysis',
-        projectAnalysis: projectAnalysisResult,
-        analyzedAt: new Date().toISOString(),
-        source_analysis: {
-          total_files: totalPrograms,
-          total_loc: totalLoc,
-          total_paragraphs: projectAnalysisResult.programResults.reduce(
-            (sum, p) => sum + (p.paragraphs?.length || 0), 0
-          ),
-          copybooks: totalCopybooks,
-          jcl_jobs: totalJclJobs,
-          entities: projectAnalysisResult.businessEntities.length,
-          database: {
-            tables: projectAnalysisResult.businessEntities.filter(e => e.source === 'DATABASE').length
-          }
-        },
-        migrationComplexity: {
-          difficulty: overallDifficulty,
-          overall: overallDifficulty === 'High' ? 75 : (overallDifficulty === 'Medium' ? 50 : 25),
-          description: `Project-level analysis: ${totalPrograms} programs, ${totalCopybooks} copybooks, ${totalJclJobs} JCL jobs`
-        }
-      };
-      project.status = 'Analyzed';
-
-      res.json({
-        message: 'COBOL Project-Level analysis complete',
-        inventory: projectAnalysisResult.inventory,
-        businessEntities: projectAnalysisResult.businessEntities.length,
-        businessProcesses: projectAnalysisResult.businessProcesses.length,
-        migrationImpact: projectAnalysisResult.migrationImpact.overallComplexity
-      });
-
-    } else if (project.migrationType === 'Source-Analysis') {
-      // Source-level Evidence-Based Analysis
+    } else if (project.migrationType === 'Source-Analysis-COBOL') {
+      // Source-level Evidence-Based Analysis — COBOL Online / Batch / JCL
       const sourceAnalyzer = new SourceAnalyzer();
       const sourceAnalysisResult = await sourceAnalyzer.analyzeSource(uploadDir, project.name);
 
+      const eps = sourceAnalysisResult.executionPatternSummary;
+      const inv = sourceAnalysisResult.section0_scopeSummary.fileInventory;
+
       // Store results in project metadata
       project.metadata = {
-        type: 'Source-Analysis',
+        type: 'Source-Analysis-COBOL',
         sourceAnalysis: sourceAnalysisResult,
         analyzedAt: new Date().toISOString(),
         source_analysis: {
           total_files: sourceAnalysisResult.section1_programInventory.length,
-          total_loc: sourceAnalysisResult.section0_scopeSummary.fileInventory.totalLinesOfCode,
+          total_loc: inv.totalLinesOfCode,
+          copybooks: inv.copybooks,
+          // Online vs Batch classification
+          online_programs: eps.onlinePrograms.length,
+          batch_programs: eps.batchPrograms.length,
+          undetermined: eps.undeterminedPrograms.length,
+          // JCL
+          jcl_jobs: eps.jclSummary.totalJobs,
+          jcl_steps: eps.jclSummary.totalSteps,
+          jcl_programs_invoked: eps.jclSummary.programsInvokedByJcl.length,
+          // Data
           data_structures: sourceAnalysisResult.section2_persistentDataStructures.length,
-          jcl_jobs: sourceAnalysisResult.section4_jclExecutionRelationships.length,
-          open_questions: sourceAnalysisResult.section5_observationsAndQuestions.openQuestions.length
+          data_access_patterns: sourceAnalysisResult.section3_dataAccessPatterns.length,
+          open_questions: sourceAnalysisResult.section5_observationsAndQuestions.openQuestions.length,
+          observations: sourceAnalysisResult.section5_observationsAndQuestions.observations.length
         },
         migrationComplexity: {
           difficulty: 'N/A',
           overall: 0,
-          description: 'Source-level analysis (evidence-based, no complexity scoring)'
+          description: 'Source-level COBOL analysis (evidence-based, no complexity scoring)'
         }
       };
       project.status = 'Analyzed';
 
       res.json({
-        message: 'Source-level analysis complete (evidence-based)',
+        message: 'Source-level COBOL analysis complete (evidence-based)',
         programs: sourceAnalysisResult.section1_programInventory.length,
+        onlinePrograms: eps.onlinePrograms.length,
+        batchPrograms: eps.batchPrograms.length,
+        undeterminedPrograms: eps.undeterminedPrograms.length,
+        jclJobs: eps.jclSummary.totalJobs,
+        jclSteps: eps.jclSummary.totalSteps,
         dataStructures: sourceAnalysisResult.section2_persistentDataStructures.length,
-        jclJobs: sourceAnalysisResult.section4_jclExecutionRelationships.length,
         observations: sourceAnalysisResult.section5_observationsAndQuestions.observations.length,
         openQuestions: sourceAnalysisResult.section5_observationsAndQuestions.openQuestions.length
       });
@@ -527,95 +417,20 @@ app.post('/api/projects/:id/generate', async (req, res) => {
     // Prepare document data based on migration type
     let data: any;
 
-    if (project.migrationType === 'COBOL-Analysis') {
-      // Special handling for COBOL Business Logic Analysis
-      const { programIndex = 0 } = req.body;
-      const businessLogicResults = project.metadata.businessLogicResults || [];
-
-      if (businessLogicResults.length === 0) {
-        return res.status(400).json({ error: 'No COBOL files analyzed' });
-      }
-
-      // Get specific program or first one
-      const businessLogic = businessLogicResults[programIndex] || businessLogicResults[0];
-
-      data = {
-        project: {
-          name: project.name,
-          migration_type: project.migrationType
-        },
-        businessLogic,
-        allPrograms: businessLogicResults.map((r: any, idx: number) => ({
-          index: idx,
-          programId: r.programId,
-          fileName: r.fileName
-        })),
-        generated_date: new Date().toISOString().split('T')[0],
-        version: '1.0',
-        author: 'Auto-generated'
-      };
-    } else if (project.migrationType === 'COBOL-Project-Analysis') {
-      // Special handling for COBOL Project-Level Analysis
-      const projectAnalysis = project.metadata.projectAnalysis;
-
-      if (!projectAnalysis) {
-        return res.status(400).json({ error: 'No project analysis data found' });
-      }
-
-      data = {
-        project: {
-          name: project.name,
-          migration_type: project.migrationType
-        },
-        projectAnalysis,
-        generated_date: new Date().toISOString().split('T')[0],
-        version: '1.0',
-        author: 'Auto-generated'
-      };
-    } else if (project.migrationType === 'Source-Analysis') {
-      // Special handling for Source-level Analysis (evidence-based)
+    if (project.migrationType === 'Source-Analysis-COBOL') {
       const sourceAnalysis = project.metadata.sourceAnalysis;
-
       if (!sourceAnalysis) {
         return res.status(400).json({ error: 'No source analysis data found' });
       }
-
-      // Handle business-draft document type
-      if (documentType === 'business-draft') {
-        const businessDraftGenerator = new BusinessDraftGenerator();
-        const businessDraft = businessDraftGenerator.generateBusinessDraft(sourceAnalysis, project.name);
-
-        // Check validation result
-        if (!businessDraft.validationResult.isValid) {
-          console.warn('Business Draft validation warnings:', businessDraft.validationResult.errors);
-        }
-
-        data = {
-          project: {
-            name: project.name,
-            migration_type: project.migrationType
-          },
-          businessDraft,
-          sourceAnalysis,
-          generated_date: new Date().toISOString().split('T')[0],
-          version: '1.0',
-          author: 'Auto-generated'
-        };
-      } else {
-        // Default: source-analysis document
-        data = {
-          project: {
-            name: project.name,
-            migration_type: project.migrationType
-          },
-          sourceAnalysis,
-          generated_date: new Date().toISOString().split('T')[0],
-          version: '1.0',
-          author: 'Auto-generated'
-        };
-      }
+      data = {
+        project: { name: project.name, migration_type: project.migrationType },
+        sourceAnalysis,
+        generated_date: new Date().toISOString().split('T')[0],
+        version: '1.0',
+        author: 'Auto-generated'
+      };
     } else {
-      // Standard migration document data
+      // Standard migration document data (COBOL-to-Java, PostgreSQL-to-Oracle)
       data = {
         project: {
           name: project.name,
@@ -640,6 +455,7 @@ app.post('/api/projects/:id/generate', async (req, res) => {
         author: 'Auto-generated'
       };
     }
+
 
     // Generate document
     const generator = new DocumentGenerator();
