@@ -8,6 +8,7 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { fileURLToPath } from 'url';
 
 // Import analyzers and generators
@@ -33,22 +34,8 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const projectId = req.params.id;
-    const uploadDir = path.join(__dirname, '../uploads', projectId);
-
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  }
-});
+// Configure multer for file uploads in memory (for Vercel Serverless environment)
+const storage = multer.memoryStorage();
 
 const fileFilter = async (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const projectId = req.params.id;
@@ -135,6 +122,14 @@ app.get('/api/projects/:id', async (req, res) => {
     return res.status(404).json({ error: 'Project not found' });
   }
 
+  // Fetch generated document types
+  const { data: docs } = await supabase
+    .from('documents')
+    .select('document_type')
+    .eq('project_id', req.params.id);
+
+  const generatedDocuments = docs ? docs.map(d => d.document_type) : [];
+
   res.json({
     ...project,
     migrationType: project.migration_type,
@@ -142,7 +137,8 @@ app.get('/api/projects/:id', async (req, res) => {
     sourceDatabase: project.source_database,
     targetLanguage: project.target_language,
     targetDatabase: project.target_database,
-    createdAt: project.created_at
+    createdAt: project.created_at,
+    generatedDocuments
   });
 });
 
@@ -210,49 +206,50 @@ app.post('/api/projects/:id/upload', (req, res) => {
       return res.status(400).json({ error: 'No valid files received by backend' });
     }
 
-    const uploadDir = path.join(__dirname, '../uploads', project.id);
-
-    // Process files to preserve folder structure
+    // Process files and upload to Supabase Storage
     const processedFiles = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      let relativePath = file.originalname; // Multer saves originalname 
+      let relativePath = file.originalname; 
 
       // If filePaths provided (folder upload), use relative path
       if (filePaths) {
         const pathArray = Array.isArray(filePaths) ? filePaths : [filePaths];
         if (pathArray[i]) {
           relativePath = pathArray[i];
-
-          // Create subdirectory if needed
-          const targetDir = path.join(uploadDir, path.dirname(relativePath));
-          if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
-          }
-
-          // Move file to correct location with folder structure
-          const targetPath = path.join(uploadDir, relativePath);
-          if (file.path !== targetPath) {
-            fs.renameSync(file.path, targetPath);
-          }
         }
+      }
+
+      const storagePath = `${project.id}/${relativePath}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('source_files')
+        .upload(storagePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Failed to upload block to Supabase:', uploadError);
+        return res.status(500).json({ error: `Storage upload error: ${uploadError.message}` });
       }
 
       processedFiles.push({
         filename: path.basename(relativePath),
         relativePath: relativePath,
         size: file.size,
-        path: path.join(uploadDir, relativePath)
+        path: storagePath
       });
     }
 
     res.json({
-      message: 'Files uploaded successfully',
+      message: 'Files uploaded to Supabase Storage successfully',
       files: processedFiles
     });
   });
 });
 
+// Utility to create minimal required directory structure
 // Analyze project
 app.post('/api/projects/:id/analyze', async (req, res) => {
   const { data: project, error: dbError } = await supabase
@@ -269,10 +266,44 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
     // Update status to Analyzing
     await supabase.from('projects').update({ status: 'Analyzing' }).eq('id', project.id);
 
-    const uploadDir = path.join(__dirname, '../uploads', project.id);
+    // Create a temporary directory for analysis
+    const tempDir = path.join(os.tmpdir(), `migration-doc-tool-${project.id}`);
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(tempDir, { recursive: true });
+
+    // Helper: Recursively download files from Supabase Storage
+    const downloadFolder = async (prefix: string) => {
+      const { data, error } = await supabase.storage.from('source_files').list(prefix);
+      if (error || !data) return;
+
+      for (const item of data) {
+        const itemPath = `${prefix}/${item.name}`;
+        if (!item.id) {
+          // Folder
+          await downloadFolder(itemPath);
+        } else {
+          // File
+          const { data: fileData, error: downloadError } = await supabase.storage.from('source_files').download(itemPath);
+          if (fileData && !downloadError) {
+            const relativePath = itemPath.substring(project.id.length + 1); // remove 'projectId/' 
+            const targetPath = path.join(tempDir, relativePath);
+            fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+            fs.writeFileSync(targetPath, Buffer.from(await fileData.arrayBuffer()));
+          }
+        }
+      }
+    };
+
+    console.log(`Downloading project ${project.id} from Supabase Storage...`);
+    await downloadFolder(project.id);
+    console.log(`Download complete to temp dir: ${tempDir}`);
+
+    const uploadDir = tempDir; // Use the temp directory for analysis
 
     // Route based on migration type
-    if (project.migrationType === 'COBOL-to-Java') {
+    if (project.migration_type === 'COBOL-to-Java' || project.migrationType === 'COBOL-to-Java') {
       // Existing COBOL analysis logic
       const cobolAnalyzer = new CobolAnalyzer();
       const cobolFiles = getAllFiles(uploadDir, '.cbl');
@@ -422,6 +453,15 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
 
     } else {
       return res.status(400).json({ error: `Unsupported migration type: ${project.migration_type}` });
+    }
+
+    // Cleanup: Remove temporary directory after analysis is complete
+    try {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    } catch (cleanupErr) {
+      console.warn(`Failed to cleanup temp dir ${tempDir}:`, cleanupErr);
     }
 
   } catch (error) {
@@ -637,10 +677,25 @@ app.delete('/api/projects/:id', async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 
-  // Delete local uploaded files if they exist
-  const uploadDir = path.join(__dirname, '../uploads', req.params.id);
-  if (fs.existsSync(uploadDir)) {
-    fs.rmSync(uploadDir, { recursive: true, force: true });
+  // Recursively collect all file paths in the Supabase Storage folder
+  const filesToRemove: string[] = [];
+  const collectFiles = async (prefix: string) => {
+    const { data, error: listError } = await supabase.storage.from('source_files').list(prefix);
+    if (!data || listError) return;
+    
+    for (const item of data) {
+      if (!item.id) { // is a folder
+        await collectFiles(`${prefix}/${item.name}`);
+      } else { // is a file
+        filesToRemove.push(`${prefix}/${item.name}`);
+      }
+    }
+  };
+  
+  await collectFiles(req.params.id);
+  
+  if (filesToRemove.length > 0) {
+    await supabase.storage.from('source_files').remove(filesToRemove);
   }
 
   res.json({ message: 'Project deleted successfully' });
@@ -677,21 +732,23 @@ function getAllFiles(dirPath: string, extensions: string | string[]): string[] {
 }
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`=== Migration Documentation Tool - API Server ===`);
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`API endpoints available at http://localhost:${PORT}/api`);
-  console.log(`\nAvailable endpoints:`);
-  console.log(`  GET    /api/health`);
-  console.log(`  GET    /api/projects`);
-  console.log(`  POST   /api/projects`);
-  console.log(`  GET    /api/projects/:id`);
-  console.log(`  POST   /api/projects/:id/upload`);
-  console.log(`  POST   /api/projects/:id/analyze`);
-  console.log(`  POST   /api/projects/:id/generate`);
-  console.log(`  GET    /api/projects/:id/documents/:docType`);
-  console.log(`  PUT    /api/projects/:id/documents/:docType`);
-  console.log(`\nReady to accept connections!`);
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`=== Migration Documentation Tool - API Server ===`);
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`API endpoints available at http://localhost:${PORT}/api`);
+    console.log(`\nAvailable endpoints:`);
+    console.log(`  GET    /api/health`);
+    console.log(`  GET    /api/projects`);
+    console.log(`  POST   /api/projects`);
+    console.log(`  GET    /api/projects/:id`);
+    console.log(`  POST   /api/projects/:id/upload`);
+    console.log(`  POST   /api/projects/:id/analyze`);
+    console.log(`  POST   /api/projects/:id/generate`);
+    console.log(`  GET    /api/projects/:id/documents/:docType`);
+    console.log(`  PUT    /api/projects/:id/documents/:docType`);
+    console.log(`\nReady to accept connections!`);
+  });
+}
 
 export default app;
