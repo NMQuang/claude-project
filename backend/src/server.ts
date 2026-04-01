@@ -20,6 +20,7 @@ import { ORMConfigAnalyzer } from './analyzers/ORMConfigAnalyzer.js';
 import { MetadataExtractor } from './extractors/MetadataExtractor.js';
 import { DocumentGenerator } from './generators/DocumentGenerator.js';
 import { isValidFileForMigrationType, getAllowedExtensions } from './utils/fileFilters.js';
+import { supabase } from './db/supabase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,47 +50,38 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = async (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const projectId = req.params.id;
-  const project = projects.get(projectId);
+  
+  try {
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('migration_type')
+      .eq('id', projectId)
+      .single();
 
-  if (!project) {
-    cb(new Error('Project not found'));
-    return;
+    if (error || !project) {
+      cb(new Error('Project not found'));
+      return;
+    }
+
+    // Validate file extension based on migration type
+    if (!isValidFileForMigrationType(file.originalname, project.migration_type)) {
+      const allowedExtensions = getAllowedExtensions(project.migration_type);
+      cb(new Error(`File type not allowed for ${project.migration_type} migration. Allowed types: ${allowedExtensions.join(', ')}`));
+      return;
+    }
+
+    cb(null, true);
+  } catch (err) {
+    cb(err as Error);
   }
-
-  // Validate file extension based on migration type
-  if (!isValidFileForMigrationType(file.originalname, project.migrationType)) {
-    const allowedExtensions = getAllowedExtensions(project.migrationType);
-    cb(new Error(`File type not allowed for ${project.migrationType} migration. Allowed types: ${allowedExtensions.join(', ')}`));
-    return;
-  }
-
-  cb(null, true);
 };
 
 const upload = multer({
   storage,
   fileFilter
 });
-
-// In-memory storage for projects (replace with database in production)
-interface Project {
-  id: string;
-  name: string;
-  migrationType: string;
-  status: string;
-  createdAt: string;
-  sourceLanguage?: string;
-  sourceDatabase?: string;
-  targetLanguage?: string;
-  targetDatabase?: string;
-  metadata?: any;
-  ddlMetadata?: any;
-  generatedDocuments?: string[]; // Track which documents have been generated
-}
-
-const projects: Map<string, Project> = new Map();
 
 // Error handling middleware
 const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
@@ -107,45 +99,88 @@ app.get('/api/health', (req, res) => {
 });
 
 // Get all projects
-app.get('/api/projects', (req, res) => {
-  const projectList = Array.from(projects.values());
-  res.json(projectList);
+app.get('/api/projects', async (req, res) => {
+  const { data: projects, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  // Chuyển đổi mapping để tương thích với frontend data model (camelCase vs snake_case)
+  const formattedProjects = projects.map(p => ({
+    ...p,
+    migrationType: p.migration_type,
+    sourceLanguage: p.source_language,
+    sourceDatabase: p.source_database,
+    targetLanguage: p.target_language,
+    targetDatabase: p.target_database,
+    createdAt: p.created_at
+  }));
+
+  res.json(formattedProjects);
 });
 
 // Get project by ID
-app.get('/api/projects/:id', (req, res) => {
-  const project = projects.get(req.params.id);
+app.get('/api/projects/:id', async (req, res) => {
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
 
-  if (!project) {
+  if (error || !project) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
-  res.json(project);
+  res.json({
+    ...project,
+    migrationType: project.migration_type,
+    sourceLanguage: project.source_language,
+    sourceDatabase: project.source_database,
+    targetLanguage: project.target_language,
+    targetDatabase: project.target_database,
+    createdAt: project.created_at
+  });
 });
 
 // Create new project
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', async (req, res) => {
   const { name, migrationType, sourceLanguage, sourceDatabase, targetLanguage, targetDatabase } = req.body;
 
   if (!name || !migrationType) {
     return res.status(400).json({ error: 'Name and migration type are required' });
   }
 
-  const project: Project = {
-    id: uuidv4(),
-    name,
-    migrationType,
-    status: 'Created',
-    createdAt: new Date().toISOString(),
-    sourceLanguage,
-    sourceDatabase,
-    targetLanguage,
-    targetDatabase
-  };
+  const { data: project, error } = await supabase
+    .from('projects')
+    .insert([{
+      name,
+      migration_type: migrationType,
+      status: 'Created',
+      source_language: sourceLanguage,
+      source_database: sourceDatabase,
+      target_language: targetLanguage,
+      target_database: targetDatabase
+    }])
+    .select()
+    .single();
 
-  projects.set(project.id, project);
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
 
-  res.status(201).json(project);
+  res.status(201).json({
+    ...project,
+    migrationType: project.migration_type,
+    sourceLanguage: project.source_language,
+    sourceDatabase: project.source_database,
+    targetLanguage: project.target_language,
+    targetDatabase: project.target_database,
+    createdAt: project.created_at
+  });
 });
 
 // Upload files to project
@@ -157,9 +192,13 @@ app.post('/api/projects/:id/upload', (req, res) => {
       return res.status(400).json({ error: err.message });
     }
 
-    const project = projects.get(req.params.id);
+    const { data: project, error: dbError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
 
-    if (!project) {
+    if (dbError || !project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
@@ -216,14 +255,19 @@ app.post('/api/projects/:id/upload', (req, res) => {
 
 // Analyze project
 app.post('/api/projects/:id/analyze', async (req, res) => {
-  const project = projects.get(req.params.id);
+  const { data: project, error: dbError } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
 
-  if (!project) {
+  if (dbError || !project) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
   try {
-    project.status = 'Analyzing';
+    // Update status to Analyzing
+    await supabase.from('projects').update({ status: 'Analyzing' }).eq('id', project.id);
 
     const uploadDir = path.join(__dirname, '../uploads', project.id);
 
@@ -255,9 +299,12 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
       const extractor = new MetadataExtractor();
       const metadata = extractor.extract(analysisResults, ddlResults);
 
-      project.metadata = metadata;
-      project.ddlMetadata = ddlResults;
-      project.status = 'Analyzed';
+      // Save to Supabase
+      await supabase.from('projects').update({
+        metadata,
+        ddl_metadata: ddlResults,
+        status: 'Analyzed'
+      }).eq('id', project.id);
 
       res.json({
         message: 'Analysis complete',
@@ -265,7 +312,7 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
         ddlMetadata: ddlResults
       });
 
-    } else if (project.migrationType === 'Source-Analysis-COBOL') {
+    } else if (project.migration_type === 'Source-Analysis-COBOL') {
       // Source-level Evidence-Based Analysis — COBOL Online / Batch / JCL
       const sourceAnalyzer = new SourceAnalyzer();
       const sourceAnalysisResult = await sourceAnalyzer.analyzeSource(uploadDir, project.name);
@@ -274,7 +321,7 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
       const inv = sourceAnalysisResult.section0_scopeSummary.fileInventory;
 
       // Store results in project metadata
-      project.metadata = {
+      const newMetadata = {
         type: 'Source-Analysis-COBOL',
         sourceAnalysis: sourceAnalysisResult,
         analyzedAt: new Date().toISOString(),
@@ -302,7 +349,11 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
           description: 'Source-level COBOL analysis (evidence-based, no complexity scoring)'
         }
       };
-      project.status = 'Analyzed';
+
+      await supabase.from('projects').update({
+        metadata: newMetadata,
+        status: 'Analyzed'
+      }).eq('id', project.id);
 
       res.json({
         message: 'Source-level COBOL analysis complete (evidence-based)',
@@ -317,7 +368,7 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
         openQuestions: sourceAnalysisResult.section5_observationsAndQuestions.openQuestions.length
       });
 
-    } else if (project.migrationType === 'PostgreSQL-to-Oracle') {
+    } else if (project.migration_type === 'PostgreSQL-to-Oracle') {
       // NEW: PostgreSQL-to-Oracle analysis
 
       // 1. Analyze Java files
@@ -356,10 +407,12 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
       const extractor = new MetadataExtractor();
       const metadata = extractor.extractPostgreSQL(javaResults, ddlResult, ormResults);
 
-      // Save to project
-      project.metadata = metadata;
-      project.ddlMetadata = ddlResult;
-      project.status = 'Analyzed';
+      // Save to Supabase
+      await supabase.from('projects').update({
+        metadata,
+        ddl_metadata: ddlResult,
+        status: 'Analyzed'
+      }).eq('id', project.id);
 
       res.json({
         message: 'PostgreSQL-to-Oracle analysis complete',
@@ -368,20 +421,24 @@ app.post('/api/projects/:id/analyze', async (req, res) => {
       });
 
     } else {
-      return res.status(400).json({ error: `Unsupported migration type: ${project.migrationType}` });
+      return res.status(400).json({ error: `Unsupported migration type: ${project.migration_type}` });
     }
 
   } catch (error) {
-    project.status = 'Error';
+    await supabase.from('projects').update({ status: 'Error' }).eq('id', project.id);
     throw error;
   }
 });
 
 // Get project metadata
-app.get('/api/projects/:id/metadata', (req, res) => {
-  const project = projects.get(req.params.id);
+app.get('/api/projects/:id/metadata', async (req, res) => {
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('metadata, ddl_metadata')
+    .eq('id', req.params.id)
+    .single();
 
-  if (!project) {
+  if (error || !project) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
@@ -397,9 +454,13 @@ app.get('/api/projects/:id/metadata', (req, res) => {
 
 // Generate document
 app.post('/api/projects/:id/generate', async (req, res) => {
-  const project = projects.get(req.params.id);
+  const { data: project, error: dbError } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
 
-  if (!project) {
+  if (dbError || !project) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
@@ -417,13 +478,13 @@ app.post('/api/projects/:id/generate', async (req, res) => {
     // Prepare document data based on migration type
     let data: any;
 
-    if (project.migrationType === 'Source-Analysis-COBOL') {
+    if (project.migration_type === 'Source-Analysis-COBOL') {
       const sourceAnalysis = project.metadata.sourceAnalysis;
       if (!sourceAnalysis) {
         return res.status(400).json({ error: 'No source analysis data found' });
       }
       data = {
-        project: { name: project.name, migration_type: project.migrationType },
+        project: { name: project.name, migration_type: project.migration_type },
         sourceAnalysis,
         generated_date: new Date().toISOString().split('T')[0],
         version: '1.0',
@@ -434,55 +495,50 @@ app.post('/api/projects/:id/generate', async (req, res) => {
       data = {
         project: {
           name: project.name,
-          migration_type: project.migrationType
+          migration_type: project.migration_type
         },
         source: {
-          language: project.sourceLanguage || 'COBOL',
-          database: project.sourceDatabase || 'Oracle 11g',
+          language: project.source_language || 'COBOL',
+          database: project.source_database || 'Oracle 11g',
           app_server: 'IBM WebSphere',
           os: 'z/OS'
         },
         target: {
-          language: project.targetLanguage || 'Java 17',
+          language: project.target_language || 'Java 17',
           framework: 'Spring Boot 3.x',
-          database: project.targetDatabase || 'PostgreSQL 15',
+          database: project.target_database || 'PostgreSQL 15',
           deployment: 'Docker/Kubernetes'
         },
         metadata: project.metadata,
-        ddl_metadata: project.ddlMetadata,
+        ddl_metadata: project.ddl_metadata,
         generated_date: new Date().toISOString().split('T')[0],
         version: '1.0',
         author: 'Auto-generated'
       };
     }
 
-
     // Generate document
     const generator = new DocumentGenerator();
-    const markdown = await generator.generate(documentType, data, language, project.migrationType);
+    const markdown = await generator.generate(documentType, data, language, project.migration_type);
 
-    // Save document
-    const docsDir = path.join(__dirname, '../../outputs', project.id, 'documents');
-    if (!fs.existsSync(docsDir)) {
-      fs.mkdirSync(docsDir, { recursive: true });
-    }
+    // Save document to Supabase (Upsert based on unique constraint)
+    const { error: upsertError } = await supabase
+      .from('documents')
+      .upsert({
+        project_id: project.id,
+        document_type: documentType,
+        content: markdown
+      }, { onConflict: 'project_id, document_type' });
 
-    const docPath = path.join(docsDir, `${documentType}.md`);
-    fs.writeFileSync(docPath, markdown);
-
-    // Track generated document
-    if (!project.generatedDocuments) {
-      project.generatedDocuments = [];
-    }
-    if (!project.generatedDocuments.includes(documentType)) {
-      project.generatedDocuments.push(documentType);
+    if (upsertError) {
+      console.error('Error saving document to Supabase:', upsertError);
+      throw upsertError;
     }
 
     res.json({
       message: 'Document generated successfully',
       documentType,
-      content: markdown,
-      path: docPath
+      content: markdown
     });
 
   } catch (error) {
@@ -491,58 +547,55 @@ app.post('/api/projects/:id/generate', async (req, res) => {
 });
 
 // Get document
-app.get('/api/projects/:id/documents/:docType', (req, res) => {
-  const project = projects.get(req.params.id);
+app.get('/api/projects/:id/documents/:docType', async (req, res) => {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('content')
+    .eq('project_id', req.params.id)
+    .eq('document_type', req.params.docType)
+    .single();
 
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
-  const docPath = path.join(__dirname, '../../outputs', project.id, 'documents', `${req.params.docType}.md`);
-
-  if (!fs.existsSync(docPath)) {
+  if (error || !data) {
     return res.status(404).json({ error: 'Document not found' });
   }
 
-  const content = fs.readFileSync(docPath, 'utf-8');
-
   res.json({
     documentType: req.params.docType,
-    content
+    content: data.content
   });
 });
 
 // Update document
-app.put('/api/projects/:id/documents/:docType', (req, res) => {
-  const project = projects.get(req.params.id);
-
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
+app.put('/api/projects/:id/documents/:docType', async (req, res) => {
   const { content } = req.body;
 
   if (!content) {
     return res.status(400).json({ error: 'Content is required' });
   }
 
-  const docPath = path.join(__dirname, '../../outputs', project.id, 'documents', `${req.params.docType}.md`);
-  fs.writeFileSync(docPath, content);
+  const { error } = await supabase
+    .from('documents')
+    .update({ content })
+    .eq('project_id', req.params.id)
+    .eq('document_type', req.params.docType);
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
 
   res.json({ message: 'Document updated successfully' });
 });
 
 // Download a single document
-app.get('/api/projects/:id/documents/:docType/download', (req, res) => {
-  const project = projects.get(req.params.id);
+app.get('/api/projects/:id/documents/:docType/download', async (req, res) => {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('content')
+    .eq('project_id', req.params.id)
+    .eq('document_type', req.params.docType)
+    .single();
 
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
-  const docPath = path.join(__dirname, '../../outputs', project.id, 'documents', `${req.params.docType}.md`);
-
-  if (!fs.existsSync(docPath)) {
+  if (error || !data) {
     return res.status(404).json({ error: 'Document not found' });
   }
 
@@ -550,53 +603,45 @@ app.get('/api/projects/:id/documents/:docType/download', (req, res) => {
   res.setHeader('Content-Type', 'text/markdown');
   res.setHeader('Content-Disposition', `attachment; filename="${req.params.docType}.md"`);
 
-  // Send file
-  res.sendFile(docPath);
+  // Send content
+  res.send(data.content);
 });
 
-// Export documents as ZIP
-app.get('/api/projects/:id/export', (req, res) => {
-  const project = projects.get(req.params.id);
+// Export documents setup (Just returning basic list for now, to be implemented fully if needed)
+app.get('/api/projects/:id/export', async (req, res) => {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('document_type')
+    .eq('project_id', req.params.id);
 
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
-
-  const docsDir = path.join(__dirname, '../../outputs', project.id, 'documents');
-
-  if (!fs.existsSync(docsDir)) {
+  if (error || !data || data.length === 0) {
     return res.status(404).json({ error: 'No documents found' });
   }
 
-  // In production, create a ZIP file
-  // For now, return list of documents
-  const files = fs.readdirSync(docsDir);
-
   res.json({
     message: 'Export prepared',
-    files: files.map(f => ({
-      name: f,
-      path: path.join(docsDir, f)
+    files: data.map(d => ({
+      name: `${d.document_type}.md`
     }))
   });
 });
 
 // Delete project
-app.delete('/api/projects/:id', (req, res) => {
-  const project = projects.get(req.params.id);
+app.delete('/api/projects/:id', async (req, res) => {
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', req.params.id);
 
-  if (!project) {
-    return res.status(404).json({ error: 'Project not found' });
+  if (error) {
+    return res.status(500).json({ error: error.message });
   }
 
-  // Delete files
-  const uploadDir = path.join(__dirname, '../../outputs', project.id);
+  // Delete local uploaded files if they exist
+  const uploadDir = path.join(__dirname, '../uploads', req.params.id);
   if (fs.existsSync(uploadDir)) {
     fs.rmSync(uploadDir, { recursive: true, force: true });
   }
-
-  // Delete project
-  projects.delete(req.params.id);
 
   res.json({ message: 'Project deleted successfully' });
 });
